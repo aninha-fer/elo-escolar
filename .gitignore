@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# AI Assistants / IDEs
+.agents
+.claude
+.cursor
+.devin
