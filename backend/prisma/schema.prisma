@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum status_aluno {
+  RASCUNHO
+  MATRICULADO
+  INATIVO
+}
+
+enum tipo_turma {
+  REGULAR
+  OFICINA
+}
+
+enum turno_padrao {
+  MANHA
+  TARDE
+}
+
+enum status_vinculo {
+  ATIVO
+  CANCELADO
+}
+
+enum tipo_recorrencia {
+  EVENTUAL
+  SEMANAL
+  MENSAL
+}
+
+enum status {
+  ATIVA
+  INATIVA
+}
+
+model pessoa {
+  id              Int       @id @default(autoincrement())
+  nome            String
+  telefone        String?
+  data_nascimento DateTime? @db.Date
+  status_geral    status    @default(ATIVO)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  aluno       aluno?
+  funcionario funcionario?
+  usuario     usuario?
+}
+
+model aluno {
+  id                   Int         @id @default(autoincrement())
+  pessoa_id            Int         @unique
+  pessoa               pessoa      @relation(fields: [pessoa_id], references: [id])
+  nome_responsavel     String?
+  telefone_responsavel String?
+  turno                turno_padrao
+  participa_almoco     Boolean     @default(false)
+  status               status_aluno @default(RASCUNHO)
+  dias_frequencia      Int[]
+
+  matriculas_turmas     matricula_turma[]
+  atendimentos_clinicos atendimento_clinico[]
+}
+
+model funcionario {
+  id                    Int                  @id @default(autoincrement())
+  pessoa_id             Int                  @unique
+  pessoa                pessoa               @relation(fields: [pessoa_id], references: [id])
+  cargo                 String
+  
+  turmas                turma[]
+  atendimentos_clinicos atendimento_clinico[]
+}
+
+model usuario {
+  id         Int    @id @default(autoincrement())
+  pessoa_id  Int    @unique
+  pessoa     pessoa @relation(fields: [pessoa_id], references: [id])
+  email      String @unique
+  senha_hash String
+  role       String
+}
+
+model ambiente {
+  id     Int     @id @default(autoincrement())
+  nome   String
+  status status  @default(ATIVO)
+  turmas turma[]
+}
+
+model turma {
+  id                Int           @id @default(autoincrement())
+  nome              String
+  tipo              tipo_turma
+  capacidade_maxima Int?
+  turno             turno_padrao
+  ambiente_id       Int
+  ambiente          ambiente      @relation(fields: [ambiente_id], references: [id])
+  descricao         String?
+  profissional_id   Int
+  profissional      funcionario   @relation(fields: [profissional_id], references: [id])
+  ano_letivo        Int?
+  status            status  @default(ATIVA)
+  created_at         DateTime      @default(now())
+
+  horarios   turma_horario[]
+  matriculas matricula_turma[]
+  @@index([ambiente_id])
+  @@index([profissional_id])
+}
+
+model turma_horario {
+  id          Int      @id @default(autoincrement())
+  turma_id    Int
+  turma       turma    @relation(fields: [turma_id], references: [id])
+  dia_semana  Int
+  hora_inicio DateTime @db.Time
+  hora_fim    DateTime @db.Time
+
+  @@index([turma_id])
+}
+
+model matricula_turma {
+  id          Int           @id @default(autoincrement())
+  aluno_id    Int
+  aluno       aluno         @relation(fields: [aluno_id], references: [id])
+  turma_id    Int
+  turma       turma         @relation(fields: [turma_id], references: [id])
+  data_inicio DateTime      @db.Date
+  data_fim    DateTime?     @db.Date
+  status      status_vinculo @default(ATIVO)
+  created_at   DateTime      @default(now())
+
+  @@index([aluno_id])
+  @@index([turma_id])
+}
+
+model atendimento_clinico {
+  id               Int             @id @default(autoincrement())
+  aluno_id         Int
+  aluno            aluno           @relation(fields: [aluno_id], references: [id])
+  profissional_id  Int
+  profissional     funcionario     @relation(fields: [profissional_id], references: [id])
+  modalidade       String
+  tipo_recorrencia tipo_recorrencia @default(EVENTUAL)
+  data_inicio      DateTime        @db.Date
+  hora_inicio      DateTime        @db.Time
+  duracao_minutos  Int
+  frequencia       Int?
+  dias_semana      Int[]
+  data_termino     DateTime        @db.Date
+  status           status_vinculo   @default(ATIVO)
+  createdAt        DateTime        @default(now())
+
+  sessoes atendimento_sessao[]
+
+   @@index([aluno_id])
+   @@index([profissional_id])
+}
+
+model atendimento_sessao {
+  id                     Int                @id @default(autoincrement())
+  atendimento_clinico_id Int
+  atendimento_clinico    atendimento_clinico @relation(fields: [atendimento_clinico_id], references: [id])
+  data_sessao            DateTime           @db.Date
+  hora_inicio            DateTime           @db.Time
+  duracao_minutos        Int
+  status                 status_vinculo      @default(ATIVO)
+  
+  @@index([atendimento_clinico_id])
+}
