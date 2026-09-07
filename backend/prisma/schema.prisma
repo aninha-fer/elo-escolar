@@ -9,7 +9,7 @@ datasource db {
 
 enum status_aluno {
   RASCUNHO
-  MATRICULADO
+  ATIVO
   INATIVO
 }
 
@@ -23,11 +23,6 @@ enum turno_padrao {
   TARDE
 }
 
-enum status_vinculo {
-  ATIVO
-  CANCELADO
-}
-
 enum tipo_recorrencia {
   EVENTUAL
   SEMANAL
@@ -35,8 +30,8 @@ enum tipo_recorrencia {
 }
 
 enum status {
-  ATIVA
-  INATIVA
+  ATIVO
+  INATIVO
 }
 
 model pessoa {
@@ -106,7 +101,7 @@ model turma {
   profissional_id   Int
   profissional      funcionario   @relation(fields: [profissional_id], references: [id])
   ano_letivo        Int?
-  status            status  @default(ATIVA)
+  status            status  @default(ATIVO)
   created_at         DateTime      @default(now())
 
   horarios   turma_horario[]
@@ -132,9 +127,9 @@ model matricula_turma {
   aluno       aluno         @relation(fields: [aluno_id], references: [id])
   turma_id    Int
   turma       turma         @relation(fields: [turma_id], references: [id])
-  data_inicio DateTime      @db.Date
+  data_inicio DateTime?      @db.Date
   data_fim    DateTime?     @db.Date
-  status      status_vinculo @default(ATIVO)
+  status      status @default(ATIVO)
   created_at   DateTime      @default(now())
 
   @@index([aluno_id])
@@ -155,7 +150,7 @@ model atendimento_clinico {
   frequencia       Int?
   dias_semana      Int[]
   data_termino     DateTime        @db.Date
-  status           status_vinculo   @default(ATIVO)
+  status           status   @default(ATIVO)
   createdAt        DateTime        @default(now())
 
   sessoes atendimento_sessao[]
@@ -171,7 +166,7 @@ model atendimento_sessao {
   data_sessao            DateTime           @db.Date
   hora_inicio            DateTime           @db.Time
   duracao_minutos        Int
-  status                 status_vinculo      @default(ATIVO)
+  status                 status      @default(ATIVO)
   
   @@index([atendimento_clinico_id])
 }
