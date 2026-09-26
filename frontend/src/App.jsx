@@ -1,3 +1,5 @@
+import Sidebar from "./layouts/Sidebar"
+import { AppRoutes } from "./routes"
 
 
 function App() {
@@ -5,7 +7,7 @@ function App() {
   return (
     <>
       <div>
-
+        <AppRoutes/>
       </div>
     </>
   )
