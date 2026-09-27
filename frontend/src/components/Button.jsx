@@ -1,14 +1,8 @@
-export function Button({ children, variant, ...props }) {
-    const baseStyles = 'px-4 py-2 rounded-lg font-medium transition-colors';
-  
-    const variants = {
-        primary: 'bg-blue-600 text-white hover:bg-blue-700',
-        secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
-        outline: 'border border-gray-400 text-gray-700 hover:bg-gray-50',
-    }; 
+export function Button({ children, ...props }) {
+    const baseStyles = 'px-sm py-sm rounded-md font-[10px] flex items-center gap-sm justify-center font-semibold bg-secondary text-bg-surface hover:bg-blue-500';
 
     return (
-        <button className={`${baseStyles} ${variants[variant]}`} {...props}>
+        <button className={`${baseStyles}`} {...props}>
             {children}
         </button>
     );
