@@ -12,7 +12,7 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
     }
 
     const oficinas = await prisma.turma.findMany({
-        where: { 
+        where: {
             id: { in: oficinas_ids },
             tipo: 'OFICINA',
             status: 'ATIVO'
@@ -28,8 +28,8 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
     const vagasOcupadas = await prisma.matricula_turma.groupBy({
         by: ['turma_id'],
         where: {
-        turma_id: { in: oficinas_ids },
-        status: 'ATIVO'
+            turma_id: { in: oficinas_ids },
+            status: 'ATIVO'
         },
         _count: { turma_id: true }
     });
@@ -41,18 +41,37 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
 
     for (const oficina of oficinas) {
         if (oficina.turno !== aluno.turno) {
-            conflitos.push(`[${oficina.nome}] Ocorre no turno ${oficina.turno}, incompatível com o turno ${aluno.turno} do aluno.`);
+            conflitos.push({
+                codigo: 'TURNO_INCOMPATIVEL',
+                oficina_nome: oficina.nome,
+                detalhes: {
+                    turno_oficina: oficina.turno,
+                    turno_aluno: aluno.turno,
+                },
+            });
         }
 
         const diasOficina = [...new Set(oficina.horarios.map(h => h.dia_semana))];
         const diasNaoAutorizados = diasOficina.filter(dia => !aluno.dias_frequencia.includes(dia));
         if (diasNaoAutorizados.length > 0) {
-            conflitos.push(`[${oficina.nome}] Ocorre em dias que o aluno não tem frequência registrada (Dias exigidos: ${diasNaoAutorizados.join(', ')}).`);
+            conflitos.push({
+                codigo: 'FREQUENCIA_INSUFICIENTE',
+                oficina_nome: oficina.nome,
+                detalhes: {
+                    dias_exigidos: diasNaoAutorizados.join(', '),
+                },
+            });
         }
 
         const ocupacaoAtual = contagemVagas[oficina.id] || 0;
         if (ocupacaoAtual >= oficina.capacidade_maxima) {
-            conflitos.push(`[${oficina.nome}] Não possui vagas disponíveis (Capacidade: ${oficina.capacidade_maxima}).`);
+            conflitos.push({
+                codigo: 'CAPACIDADE_MAXIMA',
+                oficina_nome: oficina.nome,
+                detalhes: {
+                    capacidade: oficina.capacidade_maxima,
+                },
+            });
         }
     }
 
@@ -64,7 +83,7 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
         },
         include: {
             turma: {
-            include: { horarios: true }
+                include: { horarios: true }
             }
         }
     });
@@ -72,7 +91,10 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
     const turmasMatriculadasIds = matriculasAtuais.map(m => m.turma_id);
     for (const oficina of oficinas) {
         if (turmasMatriculadasIds.includes(oficina.id)) {
-            conflitos.push(`Matrícula duplicada: O aluno já está matriculado na oficina [${oficina.nome}].`);
+            conflitos.push({
+                codigo: 'MATRICULA_DUPLICADA',
+                oficina_nome: oficina.nome,
+            });
         }
     }
 
@@ -83,7 +105,7 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
                 turma_nome: m.turma.nome,
                 turma_tipo: m.turma.tipo,
                 dia_semana: h.dia_semana,
-                hora_inicio: h.hora_inicio.getTime(), 
+                hora_inicio: h.hora_inicio.getTime(),
                 hora_fim: h.hora_fim.getTime()
             });
         }
@@ -92,7 +114,7 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
     const gradeSolicitada = [];
     for (const oficina of oficinas) {
         if (turmasMatriculadasIds.includes(oficina.id)) {
-            continue; 
+            continue;
         }
 
         for (const h of oficina.horarios) {
@@ -107,17 +129,24 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
 
     const temChoqueHorario = (h1, h2) => {
         return (h1.dia_semana === h2.dia_semana) &&
-                (h1.hora_inicio < h2.hora_fim) &&
-                (h1.hora_fim > h2.hora_inicio);
+            (h1.hora_inicio < h2.hora_fim) &&
+            (h1.hora_fim > h2.hora_inicio);
     };
 
     for (let i = 0; i < gradeSolicitada.length; i++) {
         for (let j = i + 1; j < gradeSolicitada.length; j++) {
             const req1 = gradeSolicitada[i];
             const req2 = gradeSolicitada[j];
-            
+
             if (temChoqueHorario(req1, req2)) {
-                conflitos.push(`Choque interno: [${req1.turma_nome}] e [${req2.turma_nome}] ocorrem simultaneamente no dia da semana ${req1.dia_semana}.`);
+                conflitos.push({
+                    codigo: 'OFICINAS_SIMULTANEAS',
+                    detalhes: {
+                        oficina_1: req1.turma_nome,
+                        oficina_2: req2.turma_nome,
+                        dia_semana: req1.dia_semana,
+                    },
+                });
             }
         }
     }
@@ -125,11 +154,18 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
     for (const req of gradeSolicitada) {
         for (const atual of gradeAtual) {
             if (atual.turma_tipo === 'REGULAR') {
-                continue; 
+                continue;
             }
 
             if (temChoqueHorario(req, atual)) {
-                conflitos.push(`Choque de horário: A oficina [${req.turma_nome}] sobrepõe a atividade já matriculada [${atual.turma_nome}] no dia da semana ${req.dia_semana}.`);
+                conflitos.push({
+                codigo: 'CHOQUE_HORARIO_OFICINA',
+                oficina_nome: req.turma_nome,
+                detalhes: {
+                    oficina_matriculada: atual.turma_nome,
+                    dia_semana: req.dia_semana,
+                },
+            });
             }
         }
     }
@@ -144,15 +180,15 @@ async function matricularOficinasService({ aluno_id, oficinas_ids }) {
     }
 
     const novasMatriculas = await prisma.$transaction(
-        oficinas.map(oficina => 
-        prisma.matricula_turma.create({
-            data: {
-                aluno_id: aluno.id,
-                turma_id: oficina.id,
-                data_inicio: new Date(),
-                status: 'ATIVO'
-            }
-        })
+        oficinas.map(oficina =>
+            prisma.matricula_turma.create({
+                data: {
+                    aluno_id: aluno.id,
+                    turma_id: oficina.id,
+                    data_inicio: new Date(),
+                    status: 'ATIVO'
+                }
+            })
         )
     );
 

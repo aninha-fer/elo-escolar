@@ -2,7 +2,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { alunoService } from '../../services/alunoService';
 import { VisaoGeral } from './components/VisaoGeral';
-// import { Oficinas } from './components/Oficinas';
+import { Oficinas } from './components/Oficinas';
+import { formatarTurno } from '../../utils/formatters';
 
 export function AlunoDetalhes() {
     const { id } = useParams();
@@ -10,6 +11,8 @@ export function AlunoDetalhes() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [aluno, setAluno] = useState(null);
     const [agenda, setAgenda] = useState([]);
+    const [oficinasDisponiveis, setOficinasDisponiveis] = useState([]);
+    const [refreshToken, setRefreshToken] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -35,7 +38,6 @@ export function AlunoDetalhes() {
             try {
                 const dados = await alunoService.buscarAgendaPorId(id, controller.signal);
                 setAgenda(dados);
-                console.log('Agenda carregada:', dados);
             } catch (err) {
                 if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
 
@@ -47,25 +49,43 @@ export function AlunoDetalhes() {
         }
         carregarAgenda();
 
+        async function carregarOficinasDisponiveis() {
+            try {
+                const dados = await alunoService.listarOficinasDisponiveis(controller.signal);
+                setOficinasDisponiveis(dados);
+            } catch (err) {
+                if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
+                setError('Não foi possível carregar as oficinas disponíveis.');
+            }
+        }
+        carregarOficinasDisponiveis();
+
         return () => controller.abort();
-    }, [id]);
+    }, [id, refreshToken]);
 
     if (loading) return <div className="p-4">Carregando dados do aluno...</div>;
     if (error) return <div className="p-4 text-red-600 bg-red-50 rounded">{error}</div>;
 
     const turmaRegular = agenda.find(item => item.tipo === 'REGULAR');
     const oficinas = agenda.filter(item => item.tipo === 'OFICINA');
+    const quantidadeOficinas = new Set(
+        oficinas.map((oficina) => oficina.turma_id ?? oficina.turma_nome),
+    ).size;
     const abaAtiva = searchParams.get('aba') || 'visao-geral';
 
     const TABS = [
         { id: 'visao-geral', label: 'Visão Geral', count: null },
         // { id: 'atendimentos', label: 'Atendimentos', count: null },
-        { id: 'oficinas', label: 'Oficinas', count: oficinas.length },
+        { id: 'oficinas', label: 'Oficinas', count: quantidadeOficinas },
         // { id: 'historico', label: 'Histórico', count: null },
     ];
 
     function handleTrocarAba(idAba) {
         setSearchParams({ aba: idAba });
+    }
+
+    function atualizarDados() {
+        setRefreshToken((token) => token + 1);
     }
 
     return (
@@ -88,7 +108,7 @@ export function AlunoDetalhes() {
                             {aluno?.status ?? 'Status'}
                         </span>
                         <p className="text-sm text-text-muted">
-                            Período: {aluno?.turno ?? 'Turno'} <span className="mx-1">•</span>
+                            Período: {formatarTurno(aluno?.turno) ?? 'Turno'} <span className="mx-1">•</span>
                             {turmaRegular?.turma_nome ?? 'Turma'}
                         </p>
                     </div>
@@ -114,9 +134,17 @@ export function AlunoDetalhes() {
             </div>
 
             <div className="mt-lg">
-                {abaAtiva === 'visao-geral' && <VisaoGeral dadosAluno={aluno} agenda={agenda} />}
+                {abaAtiva === 'visao-geral' && <VisaoGeral dadosAluno={aluno} agenda={agenda} turmaRegular={turmaRegular} />}
+                {abaAtiva === 'oficinas' && (
+                    <Oficinas
+                        oficinas={oficinas}
+                        oficinasDisponiveis={oficinasDisponiveis}
+                        turno={aluno?.turno}
+                        idAluno={id}
+                        onSuccess={atualizarDados}
+                    />
+                )}
                 {/* {abaAtiva === 'atendimentos' && <AbaAtendimentos alunoId={id} />} */}
-                {/* {abaAtiva === 'oficinas' && <Oficinas alunoId={id} />} */}
                 {/* {abaAtiva === 'historico' && <AbaHistorico alunoId={id} />} */}
             </div>
         </div>
