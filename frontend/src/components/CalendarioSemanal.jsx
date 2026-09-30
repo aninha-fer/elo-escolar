@@ -1,3 +1,5 @@
+import { converterHora, formatarHora } from "../utils/formatters";
+
 const DIAS_SEMANA = [
     { numero: 1, nome: 'Seg' },
     { numero: 2, nome: 'Ter' },
@@ -27,19 +29,6 @@ const CORES_EVENTO = {
         texto: 'text-emerald-600',
     },
 };
-
-function converterHora(hora) {
-    if (!hora) return null;
-
-    const [horas, minutos] = hora.split(':').map(Number);
-    if (Number.isNaN(horas) || Number.isNaN(minutos)) return null;
-
-    return horas + minutos / 60;
-}
-
-function formatarHora(hora) {
-    return hora?.slice(0, 5) ?? '--:--';
-}
 
 function obterEstiloEvento(evento) {
     const inicio = converterHora(evento.hora_inicio);

@@ -1,44 +1,14 @@
 import { useNavigate } from 'react-router-dom';
+import { formatarFrequencia, formatarStatus, formatarTurno } from '../utils/formatters';
 
 export function TabelaAlunos({ alunos = [], onAcao }) {
     const navigate = useNavigate();
-    const diasDaSemana = {
-        1: 'Seg',
-        2: 'Ter',
-        3: 'Qua',
-        4: 'Qui',
-        5: 'Sex',
-        6: 'Sáb',
-        7: 'Dom',
-    };
 
     const estilosStatus = {
         ATIVO: 'bg-emerald-50 text-emerald-600 before:bg-emerald-600',
         INATIVO: 'bg-slate-100 text-slate-500 before:bg-slate-400',
         RASCUNHO: 'bg-amber-50 text-amber-600 before:bg-amber-500',
     };
-
-    function formatarTurno(turno) {
-        if (turno === 'MANHA' || turno === 'MANHÃ') return 'Manhã';
-        if (turno === 'TARDE') return 'Tarde';
-        return 'Não definido';
-    }
-
-    function formatarFrequencia(dias = []) {
-        return dias
-            .map((dia) => diasDaSemana[dia] ?? dia)
-            .join(', ');
-    }
-
-    function formatarStatus(status) {
-        const rotulos = {
-            ATIVO: 'Ativo',
-            INATIVO: 'Inativo',
-            RASCUNHO: 'Rascunho',
-        };
-
-        return rotulos[status] ?? status ?? 'Não definido';
-    }
 
     function obterIniciais(nome) {
         return nome
@@ -48,9 +18,9 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
             .map((parte) => parte[0])
             .join('')
             .toLocaleUpperCase('pt-BR');
-        }
+    }
 
-        function obterTurma(aluno) {
+    function obterTurma(aluno) {
         const matriculaAtiva = aluno.matriculas_turmas?.find(
             (matricula) => matricula.status === 'ATIVO',
         );

@@ -22,5 +22,13 @@ export const alunoService = {
   async buscarAgendaPorId(id, signal) {
     const response = await api.get(`/alunos/${id}/agenda`, { signal });
     return response.data;
+  },
+
+  async listarOficinasDisponiveis(signal) {
+    const response = await api.get('/turmas', {
+      params: { tipo: 'OFICINA' },
+      signal,
+    });
+    return response.data;
   }
 };
