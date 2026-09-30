@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { alunoService } from '../services/alunoService';
 import { Modal } from "../components/Modal";
 import { Input } from "../components/Input";
+import { SelecaoOpcao } from "../components/SelecaoOpcao";
+import { SelecaoDiasSemana } from "../components/SelecaoDiasSemana";
 
 export function Alunos() {
     const [alunos, setAlunos] = useState([]);
@@ -112,7 +114,27 @@ export function Alunos() {
                     </div>
                     <div className="border-gray-200 border-b w-full py-sm mb-md">
                         <h3 className="font-semibold text-[14px] text-text-main px-1">Frequência</h3>
-                    </div>            
+                    </div>
+                    <SelecaoOpcao label='período' required onChange={(valor) => console.log(valor)}
+                    options={[
+                        { value: "MANHA", title: "Manhã" },
+                        { value: "TARDE", title: "Tarde" },
+                    ]}/> 
+                    <SelecaoDiasSemana 
+                        label="Dias de frequência"
+                        required
+                        value={['SEG', 'TER']}
+                        onChange={(dias) => console.log(dias)}
+                        options={[
+                            { value: 'SEG', label: 'Seg' },
+                            { value: 'TER', label: 'Ter' },
+                            { value: 'QUA', label: 'Qua' },
+                            { value: 'QUI', label: 'Qui' },
+                            { value: 'SEX', label: 'Sex' },
+                            { value: 'TODOS', label: 'Todos' },
+                        ]}
+                    />
+                    
                 </Modal>
             </div>
             <TabelaAlunos alunos={alunos} />
