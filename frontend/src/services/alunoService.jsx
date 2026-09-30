@@ -19,6 +19,11 @@ export const alunoService = {
     return response.data;
   },
 
+  // async criarAluno(signal) {
+  //   const response = await api.post('/alunos', { signal });
+  //   return response.data;
+  // },
+
   async buscarAgendaPorId(id, signal) {
     const response = await api.get(`/alunos/${id}/agenda`, { signal });
     return response.data;

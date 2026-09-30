@@ -22,7 +22,7 @@ export function Modal({
 
       <div className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-hidden">
         
-        <div className="flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-white">
+        <div className="flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-bg-main">
           <div>
             <h2 className="text-lg font-bold text-text-main">{title}</h2>
             {subtitle && <p className="text-xs text-text-muted mt-1">{subtitle}</p>}
@@ -30,7 +30,7 @@ export function Modal({
           <button 
             type="button" 
             onClick={onClose}
-            className="p-1 bg-bg-surface text-text-main rounded-sm hover:bg-bg-main"
+            className="p-1 bg-bg-main text-text-main rounded-sm hover:bg-bg-surface"
           >
             ✕
           </button>
@@ -41,7 +41,7 @@ export function Modal({
         </div>
 
         {showFooter && (
-          <div className="flex items-center justify-end gap-3 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+          <div className="flex items-center justify-end gap-3 p-4 bg-bg-main border-t border-slate-100 shrink-0">
             <button
               type="button"
               onClick={onClose}

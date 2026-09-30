@@ -17,7 +17,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                         PERÍODO
                     </label>
                     <p className={estilos.dado}>
-                        {formatarTurno(dadosAluno?.turno ?? 'Turno')}
+                        {formatarTurno(dadosAluno?.turno ?? 'Turno não Informado')}
                     </p>
                 </div>
                 <div className={estilos.bloco}>
@@ -25,7 +25,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                         FREQUÊNCIA
                     </label>
                     <p className={estilos.dado}>
-                        {formatarFrequencia(dadosAluno?.dias_frequencia) ?? 'Frequência'}
+                        {formatarFrequencia(dadosAluno?.dias_frequencia) ?? 'Frequência não Informada'}
                     </p>
                 </div>
                 <div className={estilos.bloco}>
@@ -42,7 +42,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                         TURMA
                     </label>
                     <p className={estilos.dado}>
-                        {turmaRegular?.turma_nome ?? 'Turma'}
+                        {turmaRegular?.turma_nome ?? 'Turma não Informada'}
                     </p>
                 </div>
                 <div className={estilos.bloco}>
@@ -50,7 +50,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                         NASCIMENTO
                     </label>
                     <p className={estilos.dado}>
-                        {formatarDataBR(dadosAluno?.pessoa?.data_nascimento ?? 'Data Nascimento')}
+                        {formatarDataBR(dadosAluno?.pessoa?.data_nascimento) ?? 'Data Nascimento não Informada'}
                     </p>
                 </div>
                 <div className={estilos.bloco}>
@@ -66,7 +66,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                         RESPONSÁVEL
                     </label>
                     <p className={estilos.dado}>
-                        {dadosAluno?.nome_responsavel ?? 'Nome responsável'}
+                        {dadosAluno?.nome_responsavel ?? 'Nome não Informado'}
                         <p className="text-[12px] tracking-wider text-text-muted">
                             {formatarTelefone(dadosAluno?.telefone_responsavel) ?? 'Telefone não Informado'}
                         </p>

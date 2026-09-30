@@ -66,19 +66,60 @@ export function formatarTelefone(telefone) {
 }
 
 export function formatarMensagemConflito(conflito) {
-  if (!conflito || !conflito.codigo) return 'Conflito não identificado.';
+    if (typeof conflito === 'string') {
+        return conflito;
+    }
 
-  switch (conflito.codigo) {
-    case 'TURNO_INCOMPATIVEL':
-      return `A oficina ${conflito.oficina_nome} é realizada no turno da ${formatarTurno(conflito.detalhes.turno_oficina)}, incompatível com o turno da ${formatarTurno(conflito.detalhes.turno_aluno)} do aluno.`;
+    if (!conflito || (!conflito.codigo && !conflito.mensagem)) {
+        return 'Conflito de agenda não identificado.';
+    }
 
-    case 'FREQUENCIA_INSUFICIENTE':
-      return `A oficina ${conflito.oficina_nome} exige presença em dias em que o aluno não possui frequência registrada: ${conflito.detalhes.dias_faltantes}.`;
+    const prefixoOficina = conflito.oficina_nome ? `[${conflito.oficina_nome}] ` : '';
 
-    case 'CHOQUE_HORARIO_ATENDIMENTO':
-      return `A oficina ${conflito.oficina_nome} possui choque de horário com o atendimento clínico (${conflito.detalhes.atendimento_nome}) às ${conflito.detalhes.horario}.`;
+    switch (conflito.codigo) {
+        case 'TURNO_INCOMPATIVEL': {
+            const turnoOficina = formatarTurno(conflito.detalhes?.turno_oficina);
+            const turnoAluno = formatarTurno(conflito.detalhes?.turno_aluno);
+            return `${prefixoOficina}Ocorre no turno ${turnoOficina}, incompatível com o turno ${turnoAluno} do aluno.`;
+        }
 
-    default:
-      return `Conflito detectado na oficina ${conflito.oficina_nome || ''}.`;
-  }
+        case 'FREQUENCIA_INSUFICIENTE': {
+            const diasExigidos = conflito.detalhes?.dias_exigidos;
+            const diasFormatados = Array.isArray(diasExigidos)
+                ? formatarDiasSemana(diasExigidos)
+                : diasExigidos;
+            return `${prefixoOficina}Exige presença em dias em que o aluno não frequenta a instituição: ${diasFormatados}.`;
+        }
+
+        case 'CAPACIDADE_MAXIMA': {
+            const capacidade = conflito.detalhes?.capacidade;
+            return `${prefixoOficina}Turma sem vagas disponíveis (Capacidade máxima: ${capacidade}).`;
+        }
+
+        case 'MATRICULA_DUPLICADA': {
+            return `${prefixoOficina}O aluno já possui uma matrícula ativa nesta oficina.`;
+        }
+
+        case 'OFICINAS_SIMULTANEAS': {
+            const { oficina_1, oficina_2, dia_semana } = conflito.detalhes || {};
+            const diaFormatado = dia_semana ? ` (${formatarFrequencia([dia_semana])})` : '';
+            return `Choque de horário: As oficinas "${oficina_1}" e "${oficina_2}" ocorrem no mesmo horário${diaFormatado}.`;
+        }
+
+        case 'CHOQUE_HORARIO_OFICINA': {
+            const { oficina_matriculada, dia_semana } = conflito.detalhes || {};
+            const diaFormatado = dia_semana ? ` (${formatarFrequencia([dia_semana])})` : '';
+            return `${prefixoOficina} - Possui choque de horário com a oficina "${oficina_matriculada}", na qual o aluno já está matriculado${diaFormatado}.`;
+        }
+
+        case 'CHOQUE_HORARIO_ATENDIMENTO':
+        case 'CHOQUE_HORARIO_CLINICO': {
+            const atendimento = conflito.detalhes?.atendimento_nome || conflito.detalhes?.conflito_com || 'Atendimento Clínico';
+            const horario = conflito.detalhes?.horario ? ` às ${conflito.detalhes.horario}` : '';
+            return `${prefixoOficina}Possui choque de horário com o atendimento de saúde (${atendimento})${horario}.`;
+        }
+
+        default:
+            return conflito.mensagem || `${prefixoOficina}Conflito identificado na solicitação.`;
+    }
 }

@@ -6,7 +6,8 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
         .map((dia) => dia.nome)
         .join(', ');
 
-    const horario = `${formatarTurno(turno ?? oficina.turno)}: ${formatarHora(oficina.hora_inicio)} - ${formatarHora(oficina.hora_fim)}`;
+    const turnoDaOficina = oficina.turno ?? turno;
+    const horario = `${formatarTurno(turnoDaOficina)}: ${formatarHora(oficina.hora_inicio)} - ${formatarHora(oficina.hora_fim)}`;
 
     if (modo === 'selecao') {
         return (
