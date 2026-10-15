@@ -4,7 +4,7 @@ import { NavLink } from 'react-router-dom';
 function Sidebar() {
     const botaoBase = 'rounded-sm flex items-center gap-sm p-sm font-inter text-[14px] [&_path]:stroke-current [&_path]:[stroke-opacity:1] ';
     const botaoVariantes = {
-        normal: 'text-white/58 [&_svg]:text-white hover:bg-secondary/20 hover:border-l-secondary hover:border-l-[2px]',
+        normal: 'text-white/58 [&_svg]:text-white hover:bg-bg-surface/10',
         clicado: 'text-secondary [&_svg]:text-secondary bg-secondary/20 font-bold border-l-secondary border-l-[2px]',
     };
 
@@ -17,7 +17,7 @@ function Sidebar() {
                     <p className="text-sm text-bg-main/35 tracking-widest">APAE - Gestão</p>
                 </div>
             </div>
-            <div className="flex flex-col gap-md px-md py-md">
+            <div className="flex flex-col gap-xs px-md py-md">
                 <NavLink
                     to="/"
                     end

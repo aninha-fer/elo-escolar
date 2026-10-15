@@ -7,6 +7,9 @@ export function Modal({
   confirmText,
   cancelText = "Cancelar",
   onConfirm,
+  confirmFormId,
+  secondaryText,
+  onSecondaryAction,
   isConfirmLoading,
   isConfirmDisabled,
   showFooter = true
@@ -20,7 +23,7 @@ export function Modal({
         onClick={onClose} 
       />
 
-      <div className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-hidden">
+      <div className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-clip">
         
         <div className="flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-bg-main">
           <div>
@@ -49,11 +52,23 @@ export function Modal({
             >
               {cancelText}
             </button>
+
+            {onSecondaryAction && (
+              <button
+                type="button"
+                onClick={onSecondaryAction}
+                disabled={isConfirmLoading}
+                className="px-4 py-2 text-sm font-semibold text-text-main bg-bg-surface border border-slate-300 rounded-md hover:bg-bg-main disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {secondaryText}
+              </button>
+            )}
             
             {onConfirm && (
               <button
-                type="button"
-                onClick={onConfirm}
+                type={confirmFormId ? 'submit' : 'button'}
+                form={confirmFormId}
+                onClick={confirmFormId ? undefined : onConfirm}
                 disabled={isConfirmDisabled || isConfirmLoading}
                 className="px-4 py-2 text-sm font-semibold text-secondary bg-bg-surface border border-secondary rounded-md hover:bg-secondary hover:text-bg-surface disabled:opacity-50"
               >

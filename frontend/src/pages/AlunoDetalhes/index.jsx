@@ -1,6 +1,7 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { alunoService } from '../../services/alunoService';
+import { turmasService } from '../../services/turmasService';
 import { VisaoGeral } from './components/VisaoGeral';
 import { Oficinas } from './components/Oficinas';
 import { formatarTurno } from '../../utils/formatters';
@@ -51,7 +52,7 @@ export function AlunoDetalhes() {
 
         async function carregarOficinasDisponiveis() {
             try {
-                const dados = await alunoService.listarOficinasDisponiveis(controller.signal);
+                const dados = await turmasService.listarOficinasDisponiveis(controller.signal);
                 setOficinasDisponiveis(dados);
             } catch (err) {
                 if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
@@ -93,7 +94,7 @@ export function AlunoDetalhes() {
             <div className="flex items-center gap-md">
                 <button
                     onClick={() => navigate('/alunos')}
-                    className="px-sm py-sm text-sm font-medium text-gray-600 bg-bg-surface border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    className="px-sm py-sm text-sm font-medium text-tertiary font-semibold bg-bg-surface border border-tertiary rounded-md hover:bg-gray-50 transition-colors"
                 >
                     ← Voltar
                 </button>

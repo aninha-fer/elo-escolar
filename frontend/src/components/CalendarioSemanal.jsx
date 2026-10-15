@@ -19,9 +19,9 @@ const CORES_EVENTO = {
         texto: 'text-blue-600',
     },
     OFICINA: {
-        fundo: 'bg-violet-50',
-        borda: 'border-violet-500',
-        texto: 'text-violet-600',
+        fundo: 'bg-tertiary/40',
+        borda: 'border-tertiary',
+        texto: 'text-tertiary',
     },
     ATENDIMENTO: {
         fundo: 'bg-emerald-50',

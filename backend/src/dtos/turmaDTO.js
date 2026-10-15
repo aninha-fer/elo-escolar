@@ -6,4 +6,10 @@ const listarTurmasQueryDTO = z.object({
   }).optional()
 });
 
-module.exports = { listarTurmasQueryDTO };
+const listarTurmasRegularesQueryDTO = z.object({
+  turno: z.enum(['MANHA', 'TARDE'], {
+    invalid_type_error: "O turno deve ser MANHA ou TARDE."
+  }).optional()
+});
+
+module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO };

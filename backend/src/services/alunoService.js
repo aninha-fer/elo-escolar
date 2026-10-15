@@ -3,29 +3,47 @@ const prisma = require('../prismaClient');
 async function criarAlunoService(dadosAluno) {
   const { nome, telefone, data_nascimento, nome_responsavel, telefone_responsavel, turno, dias_frequencia, participa_almoco, status, turma_id } = dadosAluno;
 
+  if (!nome || nome.trim() === '') {
+    throw new Error('Informe ao menos o nome do aluno.');
+  }
+
+  const isRascunho = status === 'RASCUNHO';
+  if (!isRascunho) {
+    if (!turno) {
+      throw new Error('O turno é obrigatório para cadastros ativos.');
+    }
+    if (!dias_frequencia || !Array.isArray(dias_frequencia) || dias_frequencia.length === 0) {
+      throw new Error('Selecione ao menos um dia de frequência.');
+    }
+  }
+
   const novoAluno = await prisma.$transaction(async (tx) => {
     const pessoa = await tx.pessoa.create({
       data: {
         nome,
-        telefone,
+        telefone: telefone || null,
         data_nascimento: data_nascimento ? new Date(data_nascimento) : null,
-        status_geral: 'ATIVO'
+        status_geral: isRascunho ? 'INATIVO' : 'ATIVO'
       }
     });
 
     const aluno = await tx.aluno.create({
       data: {
         pessoa_id: pessoa.id,
-        nome_responsavel,
-        telefone_responsavel,
-        turno,
-        dias_frequencia,
-        participa_almoco,
+        nome_responsavel: nome_responsavel || null,
+        telefone_responsavel: telefone_responsavel || null,
+        turno: turno || null,
+        dias_frequencia: dias_frequencia || [],
+        participa_almoco: participa_almoco ?? false,
         status
       }
     });
 
     if (turma_id) {
+      if (isRascunho) {
+        throw new Error('Alunos em rascunho não podem ser matriculados em turmas.');
+      }
+
       const turma = await tx.turma.findUnique({ where: { id: turma_id } });
 
       if (!turma) {
@@ -38,19 +56,12 @@ async function criarAlunoService(dadosAluno) {
         throw new Error('O turno da turma regular deve coincidir com o turno do aluno.');
       }
 
-      let data_matricula = null;
-      let status_matricula = 'INATIVO';
-      if (status === 'ATIVO') {
-        data_matricula = new Date();
-        status_matricula = 'ATIVO';
-      }
-
       await tx.matricula_turma.create({
         data: {
           aluno_id: aluno.id,
           turma_id: turma.id,
-          data_inicio: data_matricula,
-          status: status_matricula
+          data_inicio: new Date(),
+          status: 'ATIVO'
         }
       });
     }

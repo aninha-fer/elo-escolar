@@ -2,9 +2,8 @@ import { api } from './api';
 
 export const alunoService = {
   /**
-   * Busca a lista de alunos com suporte a filtro e cancelamento de requisição
-   * @param {Object} params - Filtros como { nome, status, pagina }
-   * @param {AbortSignal} signal - Token de cancelamento
+   * @param {Object} params
+   * @param {AbortSignal} signal
    */
   async listarTodos(params = {}, signal) {
     const response = await api.get('/alunos', { 
@@ -19,21 +18,13 @@ export const alunoService = {
     return response.data;
   },
 
-  // async criarAluno(signal) {
-  //   const response = await api.post('/alunos', { signal });
-  //   return response.data;
-  // },
+  async criarAluno(dadosAluno, signal) {
+    const response = await api.post('/alunos', dadosAluno, { signal });
+    return response.data;
+  },
 
   async buscarAgendaPorId(id, signal) {
     const response = await api.get(`/alunos/${id}/agenda`, { signal });
     return response.data;
   },
-
-  async listarOficinasDisponiveis(signal) {
-    const response = await api.get('/turmas', {
-      params: { tipo: 'OFICINA' },
-      signal,
-    });
-    return response.data;
-  }
 };
