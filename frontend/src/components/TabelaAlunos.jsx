@@ -97,7 +97,7 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                                     )}
                                 </td>
                                 <td className="whitespace-nowrap px-6 py-4">
-                                    <span className={`inline-flex min-w-44 items-center rounded-full px-4 py-2 text-sm font-semibold before:mr-2 before:size-2 before:shrink-0 before:rounded-full ${estilosStatus[status] ?? estilosStatus.RASCUNHO}`}>
+                                    <span className={`inline-flex min-w-30 items-center rounded-full px-4 py-2 text-sm font-semibold before:mr-2 before:size-2 before:shrink-0 before:rounded-full ${estilosStatus[status] ?? estilosStatus.RASCUNHO}`}>
                                         {formatarStatus(status)}
                                     </span>
                                 </td>

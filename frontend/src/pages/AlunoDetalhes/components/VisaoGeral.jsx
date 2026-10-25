@@ -65,11 +65,11 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                     <label className={estilos.titulo}>
                         RESPONSÁVEL
                     </label>
-                    <p className={estilos.dado}>
+                    <p className={`${estilos.dado} flex flex-col gap-xs`}>
                         {dadosAluno?.nome_responsavel ?? 'Nome não Informado'}
-                        <p className="text-[12px] tracking-wider text-text-muted">
+                        <span className="text-[12px] tracking-wider text-text-muted">
                             {formatarTelefone(dadosAluno?.telefone_responsavel) ?? 'Telefone não Informado'}
-                        </p>
+                        </span>
                     </p>
                 </div>
             </DivInformacoes>

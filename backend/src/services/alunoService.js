@@ -144,4 +144,14 @@ async function obterOficinasService(aluno_id) {
   return oficinas;
 }
 
-module.exports = { criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService };
+async function obterAtendimentosService(aluno_id) {
+  const atendimentos = await prisma.atendimento_clinico.findMany({
+    where: {
+      aluno_id: aluno_id,
+      status: 'ATIVO',
+    },
+  });
+  return atendimentos;
+}
+
+module.exports = { criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService };

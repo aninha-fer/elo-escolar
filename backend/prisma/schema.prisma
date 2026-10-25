@@ -149,7 +149,7 @@ model atendimento_clinico {
   duracao_minutos  Int
   frequencia       Int?
   dias_semana      Int[]
-  data_termino     DateTime        @db.Date
+  data_termino     DateTime?       @db.Date
   status           status   @default(ATIVO)
   createdAt        DateTime        @default(now())
 

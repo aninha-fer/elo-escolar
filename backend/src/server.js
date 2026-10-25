@@ -4,6 +4,7 @@ const cors = require('cors');
 const alunoRoutes = require('./routes/alunoRoutes');
 const turmaRoutes = require('./routes/turmaRoutes');
 const matriculaRoutes = require('./routes/matriculaRoutes');
+const atendimentosRoutes = require('./routes/atendimentosRoutes');
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 app.use('/api', alunoRoutes);
 app.use('/api', turmaRoutes);
 app.use('/api', matriculaRoutes);
+app.use('/api', atendimentosRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API Elo Escolar operando.' });

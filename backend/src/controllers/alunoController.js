@@ -1,5 +1,5 @@
 const { criarAlunoDTO, getAlunoDTO } = require('../dtos/alunoDTO');
-const { criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService } = require('../services/alunoService');
+const { criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService } = require('../services/alunoService');
 
 
 async function criarAluno(req, res) {
@@ -56,4 +56,16 @@ async function obterOficinas(req, res) {
   }
 }
 
-module.exports = { criarAluno, listarAlunos, obterAluno, obterOficinas };
+async function obterAtendimentos(req, res) {
+  try {
+    const { id } = getAlunoDTO.parse(req.params);
+
+    const atendimentos = await obterAtendimentosService(id);
+    return res.status(200).json(atendimentos);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ erro: 'Erro interno ao obter atendimentos.' });
+  }
+}
+
+module.exports = { criarAluno, listarAlunos, obterAluno, obterOficinas, obterAtendimentos };

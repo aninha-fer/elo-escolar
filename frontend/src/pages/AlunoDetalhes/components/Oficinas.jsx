@@ -3,7 +3,7 @@ import { Button } from "../../../components/Button";
 import { Modal } from "../../../components/Modal";
 import { OficinaItem } from "../../../components/OficinaItem";
 import { matriculasService } from "../../../services/matriculasService";
-import { ConflitosOficinas } from "./ConflitosOficinas";
+import { ConflitosOficinas } from "../../../components/ConflitosOficinas";
 
 const DIAS_SEMANA = {
     1: 'Segunda',

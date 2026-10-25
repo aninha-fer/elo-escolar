@@ -5,6 +5,7 @@ import { turmasService } from '../../services/turmasService';
 import { VisaoGeral } from './components/VisaoGeral';
 import { Oficinas } from './components/Oficinas';
 import { formatarTurno } from '../../utils/formatters';
+import { Atendimentos } from './components/Atendimentos';
 
 export function AlunoDetalhes() {
     const { id } = useParams();
@@ -76,8 +77,8 @@ export function AlunoDetalhes() {
 
     const TABS = [
         { id: 'visao-geral', label: 'Visão Geral', count: null },
-        // { id: 'atendimentos', label: 'Atendimentos', count: null },
         { id: 'oficinas', label: 'Oficinas', count: quantidadeOficinas },
+        { id: 'atendimentos', label: 'Atendimentos', count: null },
         // { id: 'historico', label: 'Histórico', count: null },
     ];
 
@@ -145,7 +146,9 @@ export function AlunoDetalhes() {
                         onSuccess={atualizarDados}
                     />
                 )}
-                {/* {abaAtiva === 'atendimentos' && <AbaAtendimentos alunoId={id} />} */}
+                {abaAtiva === 'atendimentos' && (
+                    <Atendimentos/>
+                )}
                 {/* {abaAtiva === 'historico' && <AbaHistorico alunoId={id} />} */}
             </div>
         </div>

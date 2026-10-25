@@ -1,4 +1,4 @@
-import { formatarMensagemConflito } from "../../../utils/formatters";
+import { formatarMensagemConflito } from "../utils/formatters";
 
 export function ConflitosOficinas({ conflitos = [] }) {
     return (
