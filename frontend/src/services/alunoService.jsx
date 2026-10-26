@@ -23,8 +23,18 @@ export const alunoService = {
     return response.data;
   },
 
-  async buscarAgendaPorId(id, signal) {
-    const response = await api.get(`/alunos/${id}/agenda`, { signal });
+  async buscarAgendaPorId(id, signal, data) {
+    const response = await api.get(`/alunos/${id}/agenda`, { signal, params: { data: data || undefined } });
+    return response.data;
+  },
+
+  async buscarOficinasPorId(id, signal) {
+    const response = await api.get(`/alunos/${id}/oficinas`, { signal });
+    return response.data;
+  },
+
+  async buscarAtendimentosPorId(id, signal) {
+    const response = await api.get(`/alunos/${id}/atendimentos`, { signal });
     return response.data;
   },
 };

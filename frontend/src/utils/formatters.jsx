@@ -4,6 +4,15 @@ export function formatarDataBR(dataIso) {
     return `${dia}/${mes}/${ano}`;
 }
 
+export function formatarDataHoraInstituicao(data = new Date()) {
+    const partes = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    }).formatToParts(data);
+    const valor = (tipo) => partes.find((parte) => parte.type === tipo).value;
+    return `${valor('year')}-${valor('month')}-${valor('day')}T${valor('hour')}:${valor('minute')}:${valor('second')}.${String(data.getUTCMilliseconds()).padStart(3, '0')}`;
+}
+
 export function formatarTurno(turno) {
     if (turno === 'MANHA' || turno === 'MANHÃ') return 'Manhã';
     if (turno === 'TARDE') return 'Tarde';
@@ -84,9 +93,13 @@ export function formatarMensagemConflito(conflito) {
         }
 
         case 'FREQUENCIA_INSUFICIENTE': {
+            if (conflito.detalhes?.data) {
+                const { data, dia_semana } = conflito.detalhes;
+                return `O aluno não possui frequência registrada em ${formatarDataBR(data)} (${formatarFrequencia([dia_semana])}).`;
+            }
             const diasExigidos = conflito.detalhes?.dias_exigidos;
             const diasFormatados = Array.isArray(diasExigidos)
-                ? formatarDiasSemana(diasExigidos)
+                ? formatarFrequencia(diasExigidos)
                 : diasExigidos;
             return `${prefixoOficina}Exige presença em dias em que o aluno não frequenta a instituição: ${diasFormatados}.`;
         }
@@ -107,6 +120,11 @@ export function formatarMensagemConflito(conflito) {
         }
 
         case 'CHOQUE_HORARIO_OFICINA': {
+            if (conflito.detalhes?.oficina_nome) {
+                const { oficina_nome, hora_inicio, hora_fim } = conflito.detalhes;
+                const data = conflito.data_sessao ? ` em ${formatarDataBR(conflito.data_sessao)}` : '';
+                return `O atendimento${data} coincide com a oficina "${oficina_nome}" (${formatarHora(hora_inicio)} até ${formatarHora(hora_fim)}).`;
+            }
             const { oficina_matriculada, dia_semana } = conflito.detalhes || {};
             const diaFormatado = dia_semana ? ` (${formatarFrequencia([dia_semana])})` : '';
             return `${prefixoOficina} - Possui choque de horário com a oficina "${oficina_matriculada}", na qual o aluno já está matriculado${diaFormatado}.`;
@@ -114,9 +132,15 @@ export function formatarMensagemConflito(conflito) {
 
         case 'CHOQUE_HORARIO_ATENDIMENTO':
         case 'CHOQUE_HORARIO_CLINICO': {
-            const atendimento = conflito.detalhes?.atendimento_nome || conflito.detalhes?.conflito_com || 'Atendimento Clínico';
-            const horario = conflito.detalhes?.horario ? ` às ${conflito.detalhes.horario}` : '';
-            return `${prefixoOficina}Possui choque de horário com o atendimento de saúde (${atendimento})${horario}.`;
+            const detalhes = conflito.detalhes || {};
+            const atendimento = detalhes.modalidade || detalhes.atendimento_nome || detalhes.conflito_com || 'Atendimento Clínico';
+            const data = detalhes.data_sessao ? ` em ${formatarDataBR(detalhes.data_sessao)}` : '';
+            const dataFim = detalhes.data_fim && detalhes.data_fim !== detalhes.data_sessao
+                ? `${formatarDataBR(detalhes.data_fim)} às ` : '';
+            const horario = detalhes.hora_inicio && detalhes.hora_fim
+                ? ` (${formatarHora(detalhes.hora_inicio)} até ${dataFim}${formatarHora(detalhes.hora_fim)})`
+                : detalhes.horario ? ` às ${detalhes.horario}` : '';
+            return `${prefixoOficina}Possui choque de horário com o atendimento de saúde (${atendimento})${data}${horario}.`;
         }
 
         default:

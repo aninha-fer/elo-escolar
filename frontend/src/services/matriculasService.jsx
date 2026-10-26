@@ -23,4 +23,14 @@ export const matriculasService = {
     );
     return response.data;
   },
+
+  async cancelarOficina(id, matriculaId, signal) {
+    const aluno_id = Number(id);
+    const matricula_id = Number(matriculaId);
+    if (!Number.isInteger(aluno_id) || aluno_id <= 0 || !Number.isInteger(matricula_id) || matricula_id <= 0) {
+      throw new Error('Aluno ou inscrição inválidos.');
+    }
+    const response = await api.patch(`/matriculas/oficinas/${matricula_id}/cancelamento`, { aluno_id }, { signal });
+    return response.data;
+  },
 };

@@ -18,13 +18,13 @@ const DIAS_SEMANA = {
 function agruparOficinas(oficinas) {
     return Object.values(
         oficinas.reduce((grupos, oficina) => {
-            const chave = oficina.turma_id ?? oficina.turma_nome;
+            const chave = oficina.matricula_id ?? oficina.turma_id ?? oficina.turma_nome;
             const grupoAtual = grupos[chave] ?? {
                 ...oficina,
                 dias: [],
             };
 
-            if (!grupoAtual.dias.some((dia) => dia.numero === oficina.dia_semana)) {
+            if (oficina.dia_semana && !grupoAtual.dias.some((dia) => dia.numero === oficina.dia_semana)) {
                 grupoAtual.dias.push({
                     numero: oficina.dia_semana,
                     nome: DIAS_SEMANA[oficina.dia_semana] ?? 'Dia não informado',
@@ -37,17 +37,18 @@ function agruparOficinas(oficinas) {
     ).sort((primeira, segunda) => primeira.turma_nome.localeCompare(segunda.turma_nome));
 }
 
-function normalizarOficinasDisponiveis(turmas) {
+function normalizarTurmas(turmas) {
     return (Array.isArray(turmas) ? turmas : []).flatMap((turma) => {
-        const horarios = Array.isArray(turma.horarios) ? turma.horarios : [];
+        const horarios = turma.horarios?.length ? turma.horarios : [{}];
 
         return horarios.map((horario) => ({
+            matricula_id: turma.matricula_id,
             turma_id: turma.id,
             turma_nome: turma.nome,
             turno: turma.turno,
             dia_semana: horario.dia_semana,
-            hora_inicio: String(horario.hora_inicio).slice(11, 16),
-            hora_fim: String(horario.hora_fim).slice(11, 16),
+            hora_inicio: horario.hora_inicio ? String(horario.hora_inicio).slice(11, 16) : null,
+            hora_fim: horario.hora_fim ? String(horario.hora_fim).slice(11, 16) : null,
             capacidade_maxima: turma.capacidade_maxima,
             vagas_ocupadas: turma.vagas_ocupadas,
         }));
@@ -56,13 +57,44 @@ function normalizarOficinasDisponiveis(turmas) {
 
 
 export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAluno, onSuccess }) {
-    const oficinasAgrupadas = agruparOficinas(oficinas);
-    const oficinasParaSelecao = agruparOficinas(normalizarOficinasDisponiveis(oficinasDisponiveis));
+    const oficinasAgrupadas = agruparOficinas(normalizarTurmas(oficinas.map((matricula) => ({
+        ...matricula.turma, matricula_id: matricula.id,
+    }))));
+    const oficinasParaSelecao = agruparOficinas(normalizarTurmas(oficinasDisponiveis));
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selecionadas, setSelecionadas] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [conflitos, setConflitos] = useState([]);
     const [modalView, setModalView] = useState('selecao');
+    const [inscricaoParaCancelar, setInscricaoParaCancelar] = useState(null);
+    const [cancelando, setCancelando] = useState(false);
+    const [erroCancelamento, setErroCancelamento] = useState('');
+
+    function abrirCancelamento(oficina) {
+        setErroCancelamento('');
+        setInscricaoParaCancelar(oficina);
+    }
+
+    function fecharCancelamento() {
+        if (cancelando) return;
+        setInscricaoParaCancelar(null);
+        setErroCancelamento('');
+    }
+
+    async function confirmarCancelamento() {
+        if (cancelando || !inscricaoParaCancelar) return;
+        try {
+            setCancelando(true);
+            setErroCancelamento('');
+            await matriculasService.cancelarOficina(idAluno, inscricaoParaCancelar.matricula_id);
+            setInscricaoParaCancelar(null);
+            onSuccess?.();
+        } catch (err) {
+            setErroCancelamento(err.response?.data?.erro || err.message || 'Não foi possível cancelar a inscrição.');
+        } finally {
+            setCancelando(false);
+        }
+    }
 
     function alternarOficina(oficina) {
         setSelecionadas((atuais) => atuais.includes(oficina.turma_id)
@@ -175,9 +207,11 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                 <ul>
                     {oficinasAgrupadas.map((oficina) => (
                         <OficinaItem
-                            key={oficina.turma_id ?? oficina.turma_nome}
+                            key={oficina.matricula_id}
                             oficina={oficina}
                             turno={turno}
+                            onCancelar={abrirCancelamento}
+                            cancelando={cancelando || isSubmitting}
                         />
                     ))}
                 </ul>
@@ -186,6 +220,21 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                     Nenhuma oficina ativa encontrada para este aluno.
                 </p>
             )}
+            <Modal isOpen={Boolean(inscricaoParaCancelar)}
+                onClose={fecharCancelamento}
+                title="Cancelar inscrição em oficina"
+                confirmText="Confirmar cancelamento"
+                cancelText="Manter inscrição"
+                onConfirm={confirmarCancelamento}
+                isConfirmLoading={cancelando}>
+                <p className="text-sm text-text-main">
+                    Deseja cancelar a inscrição em <strong>{inscricaoParaCancelar?.turma_nome}</strong>?
+                </p>
+                <p className="mt-sm text-sm text-text-muted">
+                    O cancelamento vale a partir de hoje. As atividades até ontem continuarão disponíveis no calendário.
+                </p>
+                {erroCancelamento && <p role="alert" className="mt-md text-sm text-red-700">{erroCancelamento}</p>}
+            </Modal>
         </section>
     );
 }

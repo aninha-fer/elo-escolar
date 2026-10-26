@@ -4,7 +4,7 @@ import { alunoService } from '../../services/alunoService';
 import { turmasService } from '../../services/turmasService';
 import { VisaoGeral } from './components/VisaoGeral';
 import { Oficinas } from './components/Oficinas';
-import { formatarTurno } from '../../utils/formatters';
+import { formatarDataHoraInstituicao, formatarTurno } from '../../utils/formatters';
 import { Atendimentos } from './components/Atendimentos';
 
 export function AlunoDetalhes() {
@@ -12,78 +12,126 @@ export function AlunoDetalhes() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [aluno, setAluno] = useState(null);
-    const [agenda, setAgenda] = useState([]);
+    const [agenda, setAgenda] = useState(null);
+    const [oficinas, setOficinas] = useState([]);
+    const [atendimentos, setAtendimentos] = useState([]);
+    const [carregandoAgenda, setCarregandoAgenda] = useState(true);
+    const [erroAgenda, setErroAgenda] = useState(null);
     const [oficinasDisponiveis, setOficinasDisponiveis] = useState([]);
     const [refreshToken, setRefreshToken] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const dataReferencia = searchParams.get('data') || '';
+
+    useEffect(() => {
+        let diaConsultado = formatarDataHoraInstituicao().slice(0, 10);
+        let timer;
+
+        function verificarMudancaDeDia() {
+            clearTimeout(timer);
+            const [dia, horario] = formatarDataHoraInstituicao().split('T');
+            if (dia !== diaConsultado) {
+                diaConsultado = dia;
+                setRefreshToken((token) => token + 1);
+            }
+            const [horas, minutos, segundos] = horario.split(':').map(Number);
+            const ateMeiaNoite = 86400000 - (horas * 3600000 + minutos * 60000 + segundos * 1000);
+            timer = setTimeout(verificarMudancaDeDia, Math.min(60000, Math.ceil(ateMeiaNoite)));
+        }
+
+        verificarMudancaDeDia();
+        window.addEventListener('focus', verificarMudancaDeDia);
+        document.addEventListener('visibilitychange', verificarMudancaDeDia);
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('focus', verificarMudancaDeDia);
+            document.removeEventListener('visibilitychange', verificarMudancaDeDia);
+        };
+    }, []);
 
     useEffect(() => {
         const controller = new AbortController();
 
         async function carregarAluno() {
             try {
-                const dados = await alunoService.buscarPorId(id, controller.signal);
+                setLoading(true);
+                setError(null);
+                const [dados, inscricoes, disponiveis, atendimentosAluno] = await Promise.all([
+                    alunoService.buscarPorId(id, controller.signal),
+                    alunoService.buscarOficinasPorId(id, controller.signal),
+                    turmasService.listarOficinasDisponiveis(controller.signal),
+                    alunoService.buscarAtendimentosPorId(id, controller.signal),
+                ]);
+                if (controller.signal.aborted) return;
                 setAluno(dados);
+                setOficinas(inscricoes);
+                setOficinasDisponiveis(disponiveis);
+                setAtendimentos(atendimentosAluno);
             } catch (err) {
                 if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
 
                 const mensagemErro = err.response?.data?.erro || 'Não foi possível carregar os dados do aluno.';
                 setError(mensagemErro);
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         }
         carregarAluno();
 
+        return () => controller.abort();
+    }, [id, refreshToken]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+
         async function carregarAgenda() {
             try {
-                const dados = await alunoService.buscarAgendaPorId(id, controller.signal);
+                setCarregandoAgenda(true);
+                setErroAgenda(null);
+                const dados = await alunoService.buscarAgendaPorId(id, controller.signal, dataReferencia);
+                if (controller.signal.aborted) return;
                 setAgenda(dados);
             } catch (err) {
                 if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
 
                 const mensagemErro = err.response?.data?.erro || 'Não foi possível carregar a agenda do aluno.';
-                setError(mensagemErro);
+                setErroAgenda(mensagemErro);
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setCarregandoAgenda(false);
             }
         }
         carregarAgenda();
 
-        async function carregarOficinasDisponiveis() {
-            try {
-                const dados = await turmasService.listarOficinasDisponiveis(controller.signal);
-                setOficinasDisponiveis(dados);
-            } catch (err) {
-                if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-                setError('Não foi possível carregar as oficinas disponíveis.');
-            }
-        }
-        carregarOficinasDisponiveis();
-
         return () => controller.abort();
-    }, [id, refreshToken]);
+    }, [id, refreshToken, dataReferencia]);
 
     if (loading) return <div className="p-4">Carregando dados do aluno...</div>;
     if (error) return <div className="p-4 text-red-600 bg-red-50 rounded">{error}</div>;
 
-    const turmaRegular = agenda.find(item => item.tipo === 'REGULAR');
-    const oficinas = agenda.filter(item => item.tipo === 'OFICINA');
-    const quantidadeOficinas = new Set(
-        oficinas.map((oficina) => oficina.turma_id ?? oficina.turma_nome),
-    ).size;
+    const turmaRegular = aluno?.turma_regular;
+    const quantidadeOficinas = new Set(oficinas.map((oficina) => oficina.turma_id)).size;
     const abaAtiva = searchParams.get('aba') || 'visao-geral';
 
     const TABS = [
         { id: 'visao-geral', label: 'Visão Geral', count: null },
         { id: 'oficinas', label: 'Oficinas', count: quantidadeOficinas },
-        { id: 'atendimentos', label: 'Atendimentos', count: null },
+        { id: 'atendimentos', label: 'Atendimentos', count: atendimentos.length },
         // { id: 'historico', label: 'Histórico', count: null },
     ];
 
     function handleTrocarAba(idAba) {
-        setSearchParams({ aba: idAba });
+        setSearchParams((atuais) => {
+            atuais.set('aba', idAba);
+            return atuais;
+        });
+    }
+
+    function selecionarSemana(data) {
+        setSearchParams((atuais) => {
+            if (data) atuais.set('data', data);
+            else atuais.delete('data');
+            return atuais;
+        });
     }
 
     function atualizarDados() {
@@ -111,7 +159,7 @@ export function AlunoDetalhes() {
                         </span>
                         <p className="text-sm text-text-muted">
                             Período: {formatarTurno(aluno?.turno) ?? 'Turno'} <span className="mx-1">•</span>
-                            {turmaRegular?.turma_nome ?? 'Turma'}
+                            {turmaRegular?.nome ?? 'Sem turma regular'}
                         </p>
                     </div>
                 </div>
@@ -136,7 +184,11 @@ export function AlunoDetalhes() {
             </div>
 
             <div className="mt-lg">
-                {abaAtiva === 'visao-geral' && <VisaoGeral dadosAluno={aluno} agenda={agenda} turmaRegular={turmaRegular} />}
+                {abaAtiva === 'visao-geral' && (
+                    <VisaoGeral dadosAluno={aluno} agenda={agenda} turmaRegular={turmaRegular}
+                        dataReferencia={dataReferencia} onSelecionarSemana={selecionarSemana}
+                        carregandoAgenda={carregandoAgenda} erroAgenda={erroAgenda} />
+                )}
                 {abaAtiva === 'oficinas' && (
                     <Oficinas
                         oficinas={oficinas}
@@ -147,7 +199,7 @@ export function AlunoDetalhes() {
                     />
                 )}
                 {abaAtiva === 'atendimentos' && (
-                    <Atendimentos/>
+                    <Atendimentos atendimentos={atendimentos} idAluno={id} onSuccess={atualizarDados} />
                 )}
                 {/* {abaAtiva === 'historico' && <AbaHistorico alunoId={id} />} */}
             </div>

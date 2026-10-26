@@ -1,0 +1,13 @@
+import { api } from './api';
+
+export const atendimentosService = {
+  async listarProfissionais(signal) {
+    const response = await api.get('/atendimentos/profissionais', { signal });
+    return response.data;
+  },
+
+  async criar(dadosAtendimento, signal) {
+    const response = await api.post('/atendimentos', dadosAtendimento, { signal });
+    return response.data;
+  },
+};

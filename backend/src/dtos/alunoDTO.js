@@ -50,4 +50,12 @@ const getAgendaAlunoDTO = z.object({
   id: z.coerce.number().int().positive("O ID do aluno deve ser um número positivo.")
 });
 
-module.exports = { criarAlunoDTO, getAgendaAlunoDTO, getAlunoDTO };
+const getAgendaQueryDTO = z.object({
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A data deve estar no formato AAAA-MM-DD.')
+    .refine((valor) => {
+      const data = new Date(`${valor}T00:00:00.000Z`);
+      return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
+    }, 'Data inválida.').optional()
+});
+
+module.exports = { criarAlunoDTO, getAgendaAlunoDTO, getAgendaQueryDTO, getAlunoDTO };

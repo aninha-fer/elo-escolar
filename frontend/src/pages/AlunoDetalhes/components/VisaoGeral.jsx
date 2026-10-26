@@ -8,9 +8,9 @@ const estilos = {
     bloco: 'flex flex-col gap-xs py-sm'
 };
 
-export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
+export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, onSelecionarSemana, carregandoAgenda, erroAgenda }) {
     return (
-        <div className="flex gap-lg">
+        <div className="flex flex-col gap-lg xl:flex-row [&>div:first-child]:w-full xl:[&>div:first-child]:w-1/4 xl:[&>div:first-child]:shrink-0">
             <DivInformacoes>
                 <div className={estilos.bloco}>
                     <label className={estilos.titulo}>
@@ -33,8 +33,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                         ALMOÇO
                     </label>
                     <p className={estilos.dado}>
-                        {dadosAluno?.participa_almoco ? 'Sim' : 'Não'
-                            ?? 'Almoço'}
+                        {dadosAluno?.participa_almoco ? 'Sim' : 'Não'}
                     </p>
                 </div>
                 <div className={estilos.bloco}>
@@ -42,7 +41,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                         TURMA
                     </label>
                     <p className={estilos.dado}>
-                        {turmaRegular?.turma_nome ?? 'Turma não Informada'}
+                        {turmaRegular?.nome ?? 'Turma não Informada'}
                     </p>
                 </div>
                 <div className={estilos.bloco}>
@@ -73,7 +72,8 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular }) {
                     </p>
                 </div>
             </DivInformacoes>
-            <CalendarioSemanal agenda={agenda} />
+            <CalendarioSemanal agenda={agenda} dataReferencia={dataReferencia}
+                onSelecionarSemana={onSelecionarSemana} carregando={carregandoAgenda} erro={erroAgenda} />
         </div>
     )
 }

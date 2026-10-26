@@ -373,6 +373,7 @@ export function Alunos() {
                                 value={formulario.turma_id}
                                 onChange={(event) => atualizarCampo('turma_id', event.target.value)}
                                 required
+                                className="ml-30"
                                 disabled={!formulario.turno}
                                 options={turmas
                                     .filter((turma) => turma.turno === formulario.turno)

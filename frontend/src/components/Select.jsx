@@ -18,7 +18,7 @@ export function Select({
     const errorId = `${selectId}-error`;
 
     return (
-        <div className={`mb-md w-70 ${className}`.trim()}>
+        <div className={`mb-md w-full ${className}`.trim()}>
             {label && (
                 <label
                     htmlFor={selectId}
