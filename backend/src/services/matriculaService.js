@@ -2,6 +2,58 @@ const prisma = require('../prismaClient');
 
 const DIA_MS = 86400000;
 
+function obterStatusVinculo(aluno) {
+    if (!aluno || !['ATIVO', 'RASCUNHO'].includes(aluno.status)) {
+        const erro = new Error('Aluno não encontrado ou inativo.');
+        erro.statusCode = 404;
+        throw erro;
+    }
+    return aluno.status === 'RASCUNHO' ? 'PROVISORIO' : 'ATIVO';
+}
+
+async function bloquearTurmas(tx, ids) {
+    for (const id of [...new Set(ids)].sort((a, b) => a - b)) {
+        await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${id} FOR UPDATE`;
+    }
+}
+
+async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }) {
+    await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
+    const aluno = await tx.aluno.findUnique({ where: { id: aluno_id } });
+    const status = obterStatusVinculo(aluno);
+    if (status === 'ATIVO') await bloquearTurmas(tx, [turma_id]);
+    const turma = await tx.turma.findUnique({ where: { id: turma_id }, include: { horarios: true } });
+    if (!turma || turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
+        const erro = new Error('A turma regular informada não existe ou está inativa.');
+        erro.statusCode = 400;
+        throw erro;
+    }
+    const detalhes = [];
+    if (turma.turno !== aluno.turno) detalhes.push({ codigo: 'TURNO_INCOMPATIVEL', mensagem: 'O turno da turma regular deve coincidir com o turno do aluno.' });
+    if (aluno.dias_frequencia.some((dia) => !turma.horarios.some((horario) => horario.dia_semana === dia))) {
+        detalhes.push({ codigo: 'FREQUENCIA_INSUFICIENTE', mensagem: 'A turma regular não oferece todos os dias de frequência do aluno.' });
+    }
+    const existente = await tx.matricula_turma.findFirst({
+        where: { aluno_id, status: { in: ['ATIVO', 'PROVISORIO'] }, turma: { tipo: 'REGULAR' } }
+    });
+    if (existente) detalhes.push({ codigo: 'MATRICULA_DUPLICADA', mensagem: 'O aluno já possui uma turma regular.' });
+    if (status === 'ATIVO' && turma.capacidade_maxima != null) {
+        const ocupacao = await tx.matricula_turma.count({ where: { turma_id, status: 'ATIVO' } });
+        if (ocupacao >= turma.capacidade_maxima) detalhes.push({ codigo: 'CAPACIDADE_MAXIMA', mensagem: 'Turma regular sem vagas disponíveis.' });
+    }
+    if (detalhes.length) {
+        const erro = new Error('Conflitos de agenda identificados.');
+        erro.isConflict = true;
+        erro.detalhes = detalhes;
+        throw erro;
+    }
+    return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: obterDataInicioMatricula() } });
+}
+
+async function matricularTurmaRegularService(dados) {
+    return prisma.$transaction((tx) => matricularTurmaRegularNaTransacao(tx, dados), { isolationLevel: 'ReadCommitted' });
+}
+
 function obterDataInicioMatricula() {
     const partes = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -15,9 +67,10 @@ function obterInicio(data, hora) {
         hora.getUTCMinutes() * 60000 + hora.getUTCSeconds() * 1000;
 }
 
-async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio) {
+async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, statusVinculo) {
+    const status = statusVinculo === 'PROVISORIO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO';
     const sessoes = await tx.atendimento_sessao.findMany({
-        where: { status: 'ATIVO', atendimento_clinico: { aluno_id, status: 'ATIVO' } },
+        where: { status, atendimento_clinico: { aluno_id, status } },
         select: {
             id: true, atendimento_clinico_id: true, data_sessao: true,
             hora_inicio: true, duracao_minutos: true,
@@ -82,9 +135,8 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
         where: { id: aluno_id }
     });
 
-    if (!aluno || aluno.status !== 'ATIVO') {
-        throw new Error('Aluno não encontrado ou inativo.');
-    }
+    const statusVinculo = obterStatusVinculo(aluno);
+    if (statusVinculo === 'ATIVO') await bloquearTurmas(tx, oficinas_ids);
 
     const dataInicio = obterDataInicioMatricula();
     const oficinas = await tx.turma.findMany({
@@ -140,7 +192,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
         }
 
         const ocupacaoAtual = contagemVagas[oficina.id] || 0;
-        if (ocupacaoAtual >= oficina.capacidade_maxima) {
+        if (statusVinculo === 'ATIVO' && oficina.capacidade_maxima != null && ocupacaoAtual >= oficina.capacidade_maxima) {
             conflitos.push({
                 codigo: 'CAPACIDADE_MAXIMA',
                 oficina_nome: oficina.nome,
@@ -155,7 +207,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
     const matriculasAtuais = await tx.matricula_turma.findMany({
         where: {
             aluno_id: aluno.id,
-            status: 'ATIVO'
+            status: statusVinculo === 'PROVISORIO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO'
         },
         include: {
             turma: {
@@ -248,7 +300,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
 
     // --- Fim: Validação de Choque de Horários ---
 
-    conflitos.push(...await obterConflitosAtendimentos(tx, aluno.id, oficinas, dataInicio));
+    conflitos.push(...await obterConflitosAtendimentos(tx, aluno.id, oficinas, dataInicio, statusVinculo));
 
     if (conflitos.length > 0) {
         const erroConflito = new Error('Conflitos de agenda identificados.');
@@ -264,7 +316,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
                 aluno_id: aluno.id,
                 turma_id: oficina.id,
                 data_inicio: dataInicio,
-                status: 'ATIVO'
+                status: statusVinculo
             }
         }));
     }
@@ -293,6 +345,11 @@ async function cancelarOficinaService({ aluno_id, matricula_id }) {
         if (matricula.status === 'INATIVO') {
             return { mensagem: 'A inscrição já está cancelada.', matricula };
         }
+        if (matricula.status !== 'ATIVO') {
+            const erro = new Error('Use a remoção de vínculo provisório para retirar esta inscrição do planejamento.');
+            erro.statusCode = 409;
+            throw erro;
+        }
 
         const ontem = new Date(obterDataInicioMatricula().getTime() - DIA_MS);
         // Um cancelamento não pode estender um período que já tinha término anterior.
@@ -306,4 +363,26 @@ async function cancelarOficinaService({ aluno_id, matricula_id }) {
     }, { isolationLevel: 'ReadCommitted' });
 }
 
-module.exports = { matricularOficinasService, cancelarOficinaService };
+async function removerMatriculaProvisoriaService({ aluno_id, matricula_id }) {
+    return prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
+        const matricula = await tx.matricula_turma.findFirst({
+            where: { id: matricula_id, aluno_id }, include: { aluno: { select: { status: true } } }
+        });
+        if (!matricula) {
+            const erro = new Error('Matrícula não encontrada para este aluno.');
+            erro.statusCode = 404;
+            throw erro;
+        }
+        if (matricula.status !== 'PROVISORIO' || matricula.aluno.status !== 'RASCUNHO') {
+            const erro = new Error('Somente vínculos provisórios de um rascunho podem ser removidos do planejamento.');
+            erro.statusCode = 409;
+            throw erro;
+        }
+        await tx.matricula_turma.delete({ where: { id: matricula_id } });
+        return { mensagem: 'Vínculo provisório removido do planejamento.' };
+    }, { isolationLevel: 'ReadCommitted' });
+}
+
+module.exports = { matricularOficinasService, cancelarOficinaService, obterStatusVinculo,
+    matricularTurmaRegularNaTransacao, matricularTurmaRegularService, removerMatriculaProvisoriaService };

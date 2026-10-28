@@ -19,6 +19,7 @@ function atendimento(alteracoes = {}) {
 // Executa os filtros de leitura sobre registros, sem um banco externo.
 function corresponde(registro, filtro) {
   return Object.entries(filtro).every(([campo, esperado]) => {
+    if (campo === 'AND') return esperado.every((item) => corresponde(registro, item));
     if (campo === 'OR') return esperado.some((item) => corresponde(registro, item));
     const atual = registro[campo];
     if (esperado === null || typeof esperado !== 'object') return atual === esperado;

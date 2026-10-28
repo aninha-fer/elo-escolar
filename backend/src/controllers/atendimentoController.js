@@ -1,5 +1,5 @@
-const { criarAtendimentoDTO } = require('../dtos/atendimentoDTO');
-const { agendarAtendimentoService, listarProfissionaisAtendimentoService } = require('../services/atendimentoService');
+const { criarAtendimentoDTO, removerAtendimentoProvisorioDTO } = require('../dtos/atendimentoDTO');
+const { agendarAtendimentoService, listarProfissionaisAtendimentoService, removerAtendimentoProvisorioService } = require('../services/atendimentoService');
 
 async function criarAtendimento(req, res) {
   try {
@@ -33,4 +33,16 @@ async function listarProfissionais(req, res) {
   }
 }
 
-module.exports = { criarAtendimento, listarProfissionais };
+async function removerAtendimentoProvisorio(req, res) {
+  try {
+    const dados = removerAtendimentoProvisorioDTO.parse(req.params);
+    return res.status(200).json(await removerAtendimentoProvisorioService(dados));
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if ([404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    console.error(error);
+    return res.status(500).json({ erro: 'Erro interno ao remover o atendimento provisório.' });
+  }
+}
+
+module.exports = { criarAtendimento, listarProfissionais, removerAtendimentoProvisorio };

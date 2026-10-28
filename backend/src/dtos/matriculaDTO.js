@@ -13,4 +13,15 @@ const cancelarOficinaDTO = z.object({
   aluno_id: z.number().int().positive('ID do aluno inválido.')
 });
 
-module.exports = { matricularOficinasDTO, cancelarOficinaParamsDTO, cancelarOficinaDTO };
+const matricularRegularDTO = z.object({
+  aluno_id: z.number().int().positive('ID do aluno inválido.'),
+  turma_id: z.number().int().positive('ID da turma inválido.')
+});
+
+const removerMatriculaProvisoriaDTO = z.object({
+  aluno_id: z.coerce.number().int().positive('ID do aluno inválido.'),
+  matricula_id: z.coerce.number().int().positive('ID da matrícula inválido.')
+});
+
+module.exports = { matricularOficinasDTO, cancelarOficinaParamsDTO, cancelarOficinaDTO,
+  matricularRegularDTO, removerMatriculaProvisoriaDTO };

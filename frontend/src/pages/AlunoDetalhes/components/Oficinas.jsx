@@ -43,6 +43,7 @@ function normalizarTurmas(turmas) {
 
         return horarios.map((horario) => ({
             matricula_id: turma.matricula_id,
+            status_vinculo: turma.status_vinculo,
             turma_id: turma.id,
             turma_nome: turma.nome,
             turno: turma.turno,
@@ -56,11 +57,12 @@ function normalizarTurmas(turmas) {
 }
 
 
-export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAluno, onSuccess }) {
+export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAluno, statusAluno, onSuccess }) {
     const oficinasAgrupadas = agruparOficinas(normalizarTurmas(oficinas.map((matricula) => ({
-        ...matricula.turma, matricula_id: matricula.id,
+        ...matricula.turma, matricula_id: matricula.id, status_vinculo: matricula.status,
     }))));
     const oficinasParaSelecao = agruparOficinas(normalizarTurmas(oficinasDisponiveis));
+    const quantidadeAtivas = oficinasAgrupadas.filter((oficina) => oficina.status_vinculo === 'ATIVO').length;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selecionadas, setSelecionadas] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,7 +88,11 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
         try {
             setCancelando(true);
             setErroCancelamento('');
-            await matriculasService.cancelarOficina(idAluno, inscricaoParaCancelar.matricula_id);
+            if (inscricaoParaCancelar.status_vinculo === 'PROVISORIO') {
+                await matriculasService.removerProvisoria(idAluno, inscricaoParaCancelar.matricula_id);
+            } else {
+                await matriculasService.cancelarOficina(idAluno, inscricaoParaCancelar.matricula_id);
+            }
             setInscricaoParaCancelar(null);
             onSuccess?.();
         } catch (err) {
@@ -162,7 +168,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
         <section className="overflow-hidden rounded-md border border-gray-300 bg-bg-surface">
             <header className="flex items-center justify-between gap-md border-b border-gray-300 px-lg py-md">
                 <h2 className="text-base font-bold text-text-main">
-                    Inscrições Ativas ({oficinasAgrupadas.length})
+                    Inscrições Ativas ({quantidadeAtivas})
                 </h2>
                 <Button onClick={abrirModal}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -190,6 +196,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                                     oficina={oficina}
                                     turno={turno}
                                     modo="selecao"
+                                    planejando={statusAluno === 'RASCUNHO'}
                                     selecionada={selecionadas.includes(oficina.turma_id)}
                                     onToggle={alternarOficina}
                                 />
@@ -231,7 +238,9 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                     Deseja cancelar a inscrição em <strong>{inscricaoParaCancelar?.turma_nome}</strong>?
                 </p>
                 <p className="mt-sm text-sm text-text-muted">
-                    O cancelamento vale a partir de hoje. As atividades até ontem continuarão disponíveis no calendário.
+                    {inscricaoParaCancelar?.status_vinculo === 'PROVISORIO'
+                        ? 'Este vínculo provisório será removido por completo do planejamento. Ele não representa uma inscrição efetiva.'
+                        : 'O cancelamento vale a partir de hoje. As atividades até ontem continuarão disponíveis no calendário.'}
                 </p>
                 {erroCancelamento && <p role="alert" className="mt-md text-sm text-red-700">{erroCancelamento}</p>}
             </Modal>

@@ -19,6 +19,7 @@ export function AtendimentoItem({ atendimento, onCancelar, cancelando = false })
             <div className="min-w-0 space-y-xs">
                 <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-text-main">{atendimento.modalidade}</h3>
+                    {atendimento.status === 'PROVISORIO' && <span className="text-xs text-text-muted">Provisório</span>}
                     <p className="text-tertiary bg-tertiary/20 rounded-lg py-xs px-sm border text-xs">{recorrencia}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -32,6 +33,7 @@ export function AtendimentoItem({ atendimento, onCancelar, cancelando = false })
                         📅 {periodo}
                     </p>
                 </div>
+                {mensal && <p className="text-xs text-text-muted">Confira na agenda as datas de cada sessão mensal.</p>}
             </div>
             {onCancelar && <button
                 type="button"

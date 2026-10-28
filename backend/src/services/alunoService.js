@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
 
 async function criarAlunoService(dadosAluno) {
   const { nome, telefone, data_nascimento, nome_responsavel, telefone_responsavel, turno, dias_frequencia, participa_almoco, status, turma_id } = dadosAluno;
@@ -23,7 +24,7 @@ async function criarAlunoService(dadosAluno) {
         nome,
         telefone: telefone || null,
         data_nascimento: data_nascimento ? new Date(data_nascimento) : null,
-        status_geral: isRascunho ? 'INATIVO' : 'ATIVO'
+        status_geral: status === 'ATIVO' ? 'ATIVO' : 'INATIVO'
       }
     });
 
@@ -40,34 +41,11 @@ async function criarAlunoService(dadosAluno) {
     });
 
     if (turma_id) {
-      if (isRascunho) {
-        throw new Error('Alunos em rascunho não podem ser matriculados em turmas.');
-      }
-
-      const turma = await tx.turma.findUnique({ where: { id: turma_id } });
-
-      if (!turma) {
-        throw new Error('A turma informada não existe.');
-      }
-      if (turma.tipo !== 'REGULAR') {
-        throw new Error('A matrícula inicial só pode ser feita em uma turma REGULAR.');
-      }
-      if (turma.turno !== turno) {
-        throw new Error('O turno da turma regular deve coincidir com o turno do aluno.');
-      }
-
-      await tx.matricula_turma.create({
-        data: {
-          aluno_id: aluno.id,
-          turma_id: turma.id,
-          data_inicio: new Date(),
-          status: 'ATIVO'
-        }
-      });
+      await matricularTurmaRegularNaTransacao(tx, { aluno_id: aluno.id, turma_id });
     }
 
     return { ...pessoa, ...aluno };
-  });
+  }, { isolationLevel: 'ReadCommitted' });
 
   return novoAluno;
 }
@@ -78,7 +56,7 @@ async function listarAlunosService() {
       pessoa: true,
       matriculas_turmas: {
         where: {
-          status: 'ATIVO',
+          OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', aluno: { status: 'RASCUNHO' } }],
           turma: {
             is: { tipo: 'REGULAR' }
           }
@@ -86,6 +64,7 @@ async function listarAlunosService() {
         orderBy: { created_at: 'desc' },
         take: 1,
         select: {
+          id: true, status: true,
           turma: {
             select: { id: true, nome: true, turno: true }
           }
@@ -109,7 +88,8 @@ async function listarAlunosService() {
       turno: aluno.turno,
       dias_frequencia: aluno.dias_frequencia,
       status: aluno.status,
-      turma_regular: matriculaRegular?.turma ?? null
+      turma_regular: matriculaRegular?.turma ?? null,
+      matricula_regular: matriculaRegular ? { id: matriculaRegular.id, status: matriculaRegular.status } : null
     };
   });
 }
@@ -120,23 +100,25 @@ async function obterAlunoService(aluno_id) {
     include: {
       pessoa: true,
       matriculas_turmas: {
-        where: { status: 'ATIVO', turma: { tipo: 'REGULAR', status: 'ATIVO' } },
+        where: { OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR', status: 'ATIVO' } },
         orderBy: { created_at: 'desc' },
         take: 1,
-        select: { turma: { select: { id: true, nome: true, turno: true } } }
+        select: { id: true, status: true, turma: { select: { id: true, nome: true, turno: true } } }
       }
     },
   });
   if (!aluno) return null;
   const { matriculas_turmas, ...dados } = aluno;
-  return { ...dados, turma_regular: matriculas_turmas[0]?.turma ?? null };
+  const regular = matriculas_turmas[0];
+  return { ...dados, turma_regular: regular?.turma ?? null,
+    matricula_regular: regular ? { id: regular.id, status: regular.status } : null };
 }
 
 async function obterOficinasService(aluno_id) {
   const oficinas = await prisma.matricula_turma.findMany({
     where: {
       aluno_id: aluno_id,
-      status: 'ATIVO',
+      OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', aluno: { status: 'RASCUNHO' } }],
       turma: {
         tipo: 'OFICINA'
       }
@@ -162,7 +144,7 @@ async function obterAtendimentosService(aluno_id) {
   const atendimentos = await prisma.atendimento_clinico.findMany({
     where: {
       aluno_id: aluno_id,
-      status: 'ATIVO',
+      AND: [{ OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', aluno: { status: 'RASCUNHO' } }] }],
       OR: [
         { tipo_recorrencia: 'EVENTUAL', data_inicio: { gte: hoje } },
         {

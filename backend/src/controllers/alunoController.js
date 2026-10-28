@@ -13,6 +13,8 @@ async function criarAluno(req, res) {
     if (error.name === 'ZodError') {
       return res.status(400).json({ erros: error.issues });
     }
+    if (error.isConflict) return res.status(409).json({ erro: error.message, conflitos: error.detalhes });
+    if ([400, 404].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
     if (error.message.includes('turma') || error.message.includes('turno')) {
       return res.status(400).json({ erro: error.message });
     }

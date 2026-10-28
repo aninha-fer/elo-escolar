@@ -195,11 +195,12 @@ export function AlunoDetalhes() {
                         oficinasDisponiveis={oficinasDisponiveis}
                         turno={aluno?.turno}
                         idAluno={id}
+                        statusAluno={aluno?.status}
                         onSuccess={atualizarDados}
                     />
                 )}
                 {abaAtiva === 'atendimentos' && (
-                    <Atendimentos atendimentos={atendimentos} idAluno={id} onSuccess={atualizarDados} />
+                    <Atendimentos atendimentos={atendimentos} idAluno={id} statusAluno={aluno?.status} onSuccess={atualizarDados} />
                 )}
                 {/* {abaAtiva === 'historico' && <AbaHistorico alunoId={id} />} */}
             </div>

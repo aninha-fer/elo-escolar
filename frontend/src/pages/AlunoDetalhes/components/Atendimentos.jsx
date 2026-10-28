@@ -16,8 +16,9 @@ const formularioInicial = {
 };
 
 const erroInicioPassado = 'Não é possível agendar um atendimento em uma data ou horário no passado.';
+const erroInicioMensal = 'A data de início da recorrência mensal deve ser de segunda a sexta-feira.';
 
-export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
+export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSuccess }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRecorrente, setIsRecorrente] = useState(false);
@@ -30,10 +31,18 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
     const [conflitos, setConflitos] = useState([]);
     const [agora, setAgora] = useState(() => new Date());
     const enviando = useRef(false);
+    const removendo = useRef(false);
+    const [atendimentoParaCancelar, setAtendimentoParaCancelar] = useState(null);
+    const [isRemoving, setIsRemoving] = useState(false);
+    const [erroRemocao, setErroRemocao] = useState('');
     const inicioMinimo = formatarDataHoraInstituicao(new Date(Math.ceil(agora.getTime() / 60000) * 60000));
     const dataMinima = inicioMinimo.slice(0, 10);
     const inicioNoPassado = Boolean(formulario.data_inicio && formulario.hora_inicio &&
         `${formulario.data_inicio}T${formulario.hora_inicio}:00.000` < formatarDataHoraInstituicao(agora));
+    const recorrenciaMensal = isRecorrente && formulario.tipo_recorrencia === 'MENSAL';
+    const inicioMensalNoFimDeSemana = Boolean(recorrenciaMensal && formulario.data_inicio &&
+        [0, 6].includes(new Date(`${formulario.data_inicio}T00:00:00.000Z`).getUTCDay()));
+    const erroInicio = inicioNoPassado ? erroInicioPassado : inicioMensalNoFimDeSemana ? erroInicioMensal : '';
 
     useEffect(() => {
         if (!isModalOpen) return;
@@ -83,6 +92,7 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
     }
 
     function abrirModal() {
+        if (removendo.current) return;
         setAgora(new Date());
         resetarFormulario();
         setProfissionais([]);
@@ -123,6 +133,7 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
             setAgora(instanteEnvio);
             return;
         }
+        if (inicioMensalNoFimDeSemana) return;
         if (isRecorrente && (!Number.isInteger(frequencia) || frequencia < 1 || !formulario.data_termino)) {
             setSubmitError('Informe a frequência e a data de término da recorrência.');
             return;
@@ -161,6 +172,35 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
         }
     }
 
+    function abrirCancelamento(atendimento) {
+        if (enviando.current || removendo.current) return;
+        setErroRemocao('');
+        setAtendimentoParaCancelar(atendimento);
+    }
+
+    function fecharCancelamento() {
+        if (removendo.current) return;
+        setAtendimentoParaCancelar(null);
+        setErroRemocao('');
+    }
+
+    async function confirmarCancelamento() {
+        if (removendo.current || !atendimentoParaCancelar) return;
+        removendo.current = true;
+        setIsRemoving(true);
+        setErroRemocao('');
+        try {
+            await atendimentosService.removerProvisorio(idAluno, atendimentoParaCancelar.id);
+            setAtendimentoParaCancelar(null);
+            onSuccess?.();
+        } catch (err) {
+            setErroRemocao(err.response?.data?.erro || 'Não foi possível remover o atendimento provisório.');
+        } finally {
+            removendo.current = false;
+            setIsRemoving(false);
+        }
+    }
+
     return (
         <section className="overflow-hidden rounded-md border border-gray-300 bg-bg-surface">
             <header className="flex items-center justify-between gap-md border-b border-gray-300 px-lg py-md">
@@ -183,7 +223,7 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
                     confirmFormId="form-criar-atendimento"
                     onConfirm={confirmarModal}
                     isConfirmLoading={isSubmitting}
-                    isConfirmDisabled={inicioNoPassado || carregandoProfissionais || Boolean(erroProfissionais) || profissionais.length === 0}>
+                    isConfirmDisabled={Boolean(erroInicio) || carregandoProfissionais || Boolean(erroProfissionais) || profissionais.length === 0}>
 
                     <form id="form-criar-atendimento" onSubmit={confirmarModal}>
                         <fieldset disabled={isSubmitting} className="min-w-0">
@@ -305,6 +345,11 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
                                             ]}
                                         />
                                     </div>
+                                    {recorrenciaMensal && (
+                                        <p className="mb-md text-sm text-text-muted">
+                                            A data inicial deve ser de segunda a sexta-feira. Nas próximas sessões, sábados e domingos serão antecipados para a sexta-feira anterior.
+                                        </p>
+                                    )}
                                     <div className="flex flex-row justify-between gap-md items-center">
                                         {formulario.tipo_recorrencia === 'SEMANAL' && <SelecaoDiasSemana
                                             label="Dias da Semana"
@@ -337,10 +382,10 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
                                     </div>
                                 </div>
                             )}
-                            {(submitError || inicioNoPassado) && (
+                            {(submitError || erroInicio) && (
                                 <div role="alert" className="mt-md rounded-sm border border-red-200 bg-red-50 p-md text-sm text-red-700">
-                                    <p>{inicioNoPassado ? erroInicioPassado : submitError}</p>
-                                    {!inicioNoPassado && conflitos.length > 0 && (
+                                    <p>{erroInicio || submitError}</p>
+                                    {!erroInicio && conflitos.length > 0 && (
                                         <ul className="mt-sm list-disc space-y-xs pl-md">
                                             {conflitos.map((conflito, indice) => <li key={indice}>{formatarMensagemConflito(conflito)}</li>)}
                                         </ul>
@@ -357,6 +402,8 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
                         <AtendimentoItem
                             key={atendimento.id}
                             atendimento={atendimento}
+                            onCancelar={statusAluno === 'RASCUNHO' && atendimento.status === 'PROVISORIO' ? abrirCancelamento : undefined}
+                            cancelando={isRemoving || isSubmitting}
                         />
                     ))}
                 </ul>
@@ -365,6 +412,17 @@ export function Atendimentos({ atendimentos = [], idAluno, onSuccess }) {
                     Nenhum atendimento vigente encontrado para este aluno.
                 </p>
             )}
+            <Modal isOpen={Boolean(atendimentoParaCancelar)}
+                onClose={fecharCancelamento}
+                title="Cancelar atendimento"
+                confirmText="Confirmar"
+                onConfirm={confirmarCancelamento}
+                isConfirmLoading={isRemoving}>
+                <p className="text-sm text-text-main">
+                    Este atendimento provisório será removido por completo do planejamento, incluindo todas as sessões da recorrência.
+                </p>
+                {erroRemocao && <p role="alert" className="mt-md text-sm text-red-700">{erroRemocao}</p>}
+            </Modal>
         </section>
     )
 }

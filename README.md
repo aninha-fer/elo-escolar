@@ -59,6 +59,14 @@ O início informado não pode estar no passado, considerando a data e a hora jun
 `America/Sao_Paulo`, inclusive para recorrências. Como o formulário usa precisão de minutos,
 um minuto que já começou não pode ser escolhido. A API revalida o início antes de gravar.
 
+Na recorrência mensal, a data inicial deve ser de segunda a sexta-feira. As próximas
+ocorrências mantêm o dia original como referência a cada intervalo de meses. Em meses
+mais curtos, usa-se o último dia do mês; se a ocorrência cair no sábado ou domingo,
+ela é antecipada para a sexta-feira anterior, inclusive quando essa sexta pertence ao
+mês anterior. O limite de término, inclusivo, é aplicado sobre a data ajustada.
+Frequência do aluno e conflitos são validados nas datas efetivamente agendadas.
+A regra vale para novas criações; as sessões já gravadas mantêm suas datas.
+
 `GET /api/atendimentos/profissionais` retorna os funcionários com pessoa ativa no formato
 `{ id, nome, cargo }`, ordenados por nome. A seleção não filtra especialidade por modalidade,
 pois esse relacionamento não existe no modelo atual.
@@ -74,3 +82,42 @@ antigos de recorrências sem término continuam visíveis enquanto ativos.
 A tela atualiza os dados na virada do dia e verifica a mudança de data ao retomar o
 foco ou a visibilidade. A lista e seus contadores usam a mesma resposta da API.
 Os registros e as sessões são preservados para consulta na agenda de semanas anteriores.
+
+## Planejamento de alunos em rascunho
+
+Alunos `RASCUNHO` podem ter turma regular, inscrições em oficinas e atendimentos
+eventuais, semanais ou mensais. O backend determina o status dos vínculos a partir
+do aluno: `PROVISORIO` para rascunhos e `ATIVO` para alunos ativos. A pessoa do
+rascunho permanece `INATIVO`. Alunos inativos não recebem novos vínculos.
+
+O planejamento usa as mesmas tabelas e validações de frequência, turno das turmas,
+duplicidade e conflitos da agenda. Atendimentos clínicos mantêm a regra atual de
+turno e não exigem turma regular. A turma regular pode sobrepor oficinas e clínica.
+As regras de recorrência e de bloqueio de horários passados continuam em vigor.
+
+Matrículas provisórias não ocupam vagas, inclusive quando a turma ou oficina já
+está lotada. As contagens continuam considerando somente `ATIVO`. Capacidade
+`null` significa sem limite, com `vagas_disponiveis: null`; capacidade `0` impede
+matrículas efetivas. Operações que ocupam vagas bloqueiam as turmas envolvidas
+para evitar que alunos distintos ocupem simultaneamente a última vaga.
+
+A turma regular pode ser escolhida ao salvar o cadastro como rascunho. A API
+também oferece `POST /api/matriculas/regular` com `{ "aluno_id": 1, "turma_id": 2 }`.
+A resposta dos detalhes do aluno inclui `matricula_regular` com `id` e `status`.
+O calendário identifica o planejamento com texto `Provisório` e borda tracejada,
+mantendo a grade e os controles existentes da Visão Geral.
+
+As remoções de planejamento são separadas do cancelamento efetivo:
+
+- `DELETE /api/alunos/:aluno_id/matriculas/:matricula_id/provisorio` remove apenas a matrícula provisória indicada.
+- `DELETE /api/alunos/:aluno_id/atendimentos/:atendimento_id/provisorio` remove o atendimento provisório inteiro e todas as suas sessões, em uma transação.
+
+Essas operações exigem vínculo pertencente ao rascunho e status `PROVISORIO`.
+Atendimentos com sessões efetivas não podem ser removidos por esse fluxo.
+O cancelamento efetivo de oficinas preserva sua vigência e histórico e rejeita
+vínculos provisórios. As confirmações da interface distinguem os dois casos.
+
+Ativação e tratamento específico de planejamento vencido não fazem parte desta
+entrega; as listagens mantêm os filtros de vigência existentes. A migration
+`20261028000000_status_provisorio` adiciona o valor ao enum compartilhado, sem
+alterar o status ou as datas de registros já existentes.

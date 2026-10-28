@@ -32,6 +32,7 @@ enum tipo_recorrencia {
 enum status {
   ATIVO
   INATIVO
+  PROVISORIO
 }
 
 model pessoa {

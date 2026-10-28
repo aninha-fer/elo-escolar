@@ -33,4 +33,9 @@ export const matriculasService = {
     const response = await api.patch(`/matriculas/oficinas/${matricula_id}/cancelamento`, { aluno_id }, { signal });
     return response.data;
   },
+
+  async removerProvisoria(id, matriculaId, signal) {
+    const response = await api.delete(`/alunos/${Number(id)}/matriculas/${Number(matriculaId)}/provisorio`, { signal });
+    return response.data;
+  },
 };

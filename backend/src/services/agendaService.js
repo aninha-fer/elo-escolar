@@ -40,6 +40,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
         aluno_id, turma: { status: 'ATIVO' },
         OR: [
           { status: 'ATIVO' },
+          ...(aluno.status === 'RASCUNHO' ? [{ status: 'PROVISORIO' }] : []),
           { status: 'INATIVO', data_fim: { not: null }, turma: { tipo: 'OFICINA' } }
         ],
         AND: [
@@ -53,7 +54,8 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
     }),
     prisma.atendimento_sessao.findMany({
       where: {
-        status: 'ATIVO', atendimento_clinico: { aluno_id, status: 'ATIVO' },
+        status: aluno.status === 'RASCUNHO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO',
+        atendimento_clinico: { aluno_id, status: aluno.status === 'RASCUNHO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO' },
         // Sessões anteriores podem atravessar o início da semana; o intervalo é filtrado abaixo.
         data_sessao: { lt: fimSemana }
       },
@@ -99,6 +101,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
           id: `turma-${matricula.id}-${horario.id}-${dia.toISOString().slice(0, 10)}`,
           matricula_id: matricula.id, turma_id: turma.id, turma_nome: turma.nome,
           titulo: turma.nome, tipo: turma.tipo,
+          status: matricula.status,
           ambiente: turma.ambiente?.nome || 'Não definido',
           profissional: turma.profissional?.pessoa?.nome || 'Não definido'
         }, inicio, fim);
@@ -114,6 +117,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
       id: `atendimento-${sessao.id}`,
       sessao_id: sessao.id, atendimento_id: sessao.atendimento_clinico_id,
       titulo: atendimento.modalidade, modalidade: atendimento.modalidade, tipo: 'ATENDIMENTO',
+      status: sessao.status,
       ambiente: null, profissional: atendimento.profissional?.pessoa?.nome || 'Não definido'
     }, inicio, fim);
   }

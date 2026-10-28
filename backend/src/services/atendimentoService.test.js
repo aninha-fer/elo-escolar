@@ -25,13 +25,77 @@ test('gera exatamente uma sessão para um atendimento eventual', () => {
   }).map((data) => data.toISOString().slice(0, 10)), ['2026-10-26']);
 });
 
-test('mantém o dia mensal e usa o último dia em meses mais curtos', () => {
+test('mantém o dia mensal e antecipa o último dia de meses curtos quando cair no fim de semana', () => {
   assert.deepEqual(datasDaRecorrencia({
     tipo_recorrencia: 'MENSAL',
-    data_inicio: '2026-01-31',
-    data_termino: '2026-03-31',
+    data_inicio: '2026-12-31',
+    data_termino: '2027-03-31',
     frequencia: 1
-  }), ['2026-01-31', '2026-02-28', '2026-03-31']);
+  }), ['2026-12-31', '2027-01-29', '2027-02-26', '2027-03-31']);
+});
+
+test('antecipa sábado e domingo para sexta sem alterar o dia de referência dos meses seguintes', () => {
+  assert.deepEqual(datasDaRecorrencia({
+    tipo_recorrencia: 'MENSAL', data_inicio: '2026-10-30', data_termino: '2027-03-30', frequencia: 1
+  }), ['2026-10-30', '2026-11-30', '2026-12-30', '2027-01-29', '2027-02-26', '2027-03-30']);
+});
+
+test('preserva fevereiro bissexto e retorna ao dia original em março', () => {
+  assert.deepEqual(datasDaRecorrencia({
+    tipo_recorrencia: 'MENSAL', data_inicio: '2028-01-31', data_termino: '2028-03-31', frequencia: 1
+  }), ['2028-01-31', '2028-02-29', '2028-03-31']);
+});
+
+test('mantém o intervalo de meses quando uma ocorrência é antecipada', () => {
+  assert.deepEqual(datasDaRecorrencia({
+    tipo_recorrencia: 'MENSAL', data_inicio: '2026-10-30', data_termino: '2027-04-30', frequencia: 2
+  }), ['2026-10-30', '2026-12-30', '2027-02-26', '2027-04-30']);
+});
+
+test('antecipa para o mês anterior e inclui a sexta que coincide com o término', () => {
+  assert.deepEqual(datasDaRecorrencia({
+    tipo_recorrencia: 'MENSAL', data_inicio: '2027-04-01', data_termino: '2027-04-30', frequencia: 1
+  }), ['2027-04-01', '2027-04-30']);
+  assert.deepEqual(datasDaRecorrencia({
+    tipo_recorrencia: 'MENSAL', data_inicio: '2027-04-01', data_termino: '2027-06-01', frequencia: 1
+  }), ['2027-04-01', '2027-04-30', '2027-06-01']);
+});
+
+for (const [termino, incluiJaneiro] of [['2027-01-28', false], ['2027-01-29', true]]) {
+  test(`aplica o término ${termino} após antecipar a ocorrência de janeiro`, () => {
+    assert.deepEqual(datasDaRecorrencia({
+      tipo_recorrencia: 'MENSAL', data_inicio: '2026-10-30', data_termino: termino, frequencia: 1
+    }), ['2026-10-30', '2026-11-30', '2026-12-30', ...(incluiJaneiro ? ['2027-01-29'] : [])]);
+  });
+}
+
+for (const inicio of ['2026-10-31', '2026-11-01']) {
+  test(`rejeita início mensal no fim de semana: ${inicio}, sem gravar`, async (t) => {
+    const { tx } = simularBanco(t);
+    const dados = { ...dadosBase, tipo_recorrencia: 'MENSAL', data_inicio: inicio,
+      data_termino: '2026-12-31', frequencia: 1 };
+    assert.throws(() => obterDatasRecorrentes(dados), {
+      statusCode: 400, message: 'A data de início da recorrência mensal deve ser de segunda a sexta-feira.'
+    });
+    await assert.rejects(() => agendarAtendimentoService(dados), { statusCode: 400 });
+    assert.equal(prisma.$transaction.mock.callCount(), 0);
+    verificarSemGravacao(tx);
+  });
+}
+
+for (const inicio of ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30']) {
+  test(`aceita início mensal em dia útil: ${inicio}`, () => {
+    assert.deepEqual(datasDaRecorrencia({
+      tipo_recorrencia: 'MENSAL', data_inicio: inicio, data_termino: inicio, frequencia: 1
+    }), [inicio]);
+  });
+}
+
+test('preserva a possibilidade de recorrência semanal aos domingos', () => {
+  assert.deepEqual(datasDaRecorrencia({
+    tipo_recorrencia: 'SEMANAL', data_inicio: '2026-11-01', data_termino: '2026-11-08',
+    frequencia: 1, dias_semana: [7]
+  }), ['2026-11-01', '2026-11-08']);
 });
 
 test('inclui a data de término quando coincide com uma sessão semanal', () => {
@@ -97,7 +161,7 @@ function simularBanco(t, {
     }),
     aluno: { findUnique: t.mock.fn(async () => {
       eventos.push('aluno');
-      return aluno;
+      return aluno ? { status: 'ATIVO', ...aluno } : aluno;
     }) },
     atendimento_sessao: {
       findMany: t.mock.fn(async () => sessoes),
@@ -174,6 +238,61 @@ test('verifica frequência em cada data mensal, cujo dia da semana varia', async
     ...dadosBase, tipo_recorrencia: 'MENSAL', frequencia: 1, data_termino: '2026-11-26'
   }), 'FREQUENCIA_INSUFICIENTE');
   assert.equal(conflito.data_sessao, '2026-11-26');
+  verificarSemGravacao(tx);
+});
+
+test('grava as datas mensais ajustadas e mantém a configuração original da série', async (t) => {
+  const { tx } = simularBanco(t);
+  await agendarAtendimentoService({ ...dadosBase, tipo_recorrencia: 'MENSAL', data_inicio: '2026-10-30',
+    frequencia: 1, data_termino: '2027-03-30' });
+  const configuracao = tx.atendimento_clinico.create.mock.calls[0].arguments[0].data;
+  assert.deepEqual(configuracao.data_inicio, data('2026-10-30'));
+  assert.deepEqual(configuracao.data_termino, data('2027-03-30'));
+  assert.equal(configuracao.frequencia, 1);
+  const sessoes = tx.atendimento_sessao.createMany.mock.calls[0].arguments[0].data;
+  assert.deepEqual(sessoes.map((item) => item.data_sessao.toISOString().slice(0, 10)),
+    ['2026-10-30', '2026-11-30', '2026-12-30', '2027-01-29', '2027-02-26', '2027-03-30']);
+  assert.equal(new Set(sessoes.map((item) => item.data_sessao.getTime())).size, sessoes.length);
+  assert.ok(sessoes.every((item) => item.data_sessao.getUTCDay() >= 1 && item.data_sessao.getUTCDay() <= 5));
+});
+
+test('exige frequência na sexta efetiva da sessão mensal antecipada', async (t) => {
+  const { tx } = simularBanco(t, { aluno: { dias_frequencia: [1, 4] } });
+  const conflito = await verificarConflito(() => agendarAtendimentoService({ ...dadosBase,
+    tipo_recorrencia: 'MENSAL', frequencia: 1, data_termino: '2026-12-26'
+  }), 'FREQUENCIA_INSUFICIENTE');
+  assert.equal(conflito.data_sessao, '2026-12-25');
+  assert.deepEqual(conflito.detalhes, { data: '2026-12-25', dia_semana: 5 });
+  verificarSemGravacao(tx);
+});
+
+test('detecta conflito clínico na sexta de uma sessão mensal antecipada', async (t) => {
+  const { tx } = simularBanco(t, { sessoes: [sessaoExistente({ data_sessao: data('2027-01-29') })] });
+  const conflito = await verificarConflito(() => agendarAtendimentoService({ ...dadosBase,
+    tipo_recorrencia: 'MENSAL', data_inicio: '2026-10-30', frequencia: 1, data_termino: '2027-01-30'
+  }), 'CHOQUE_HORARIO_ATENDIMENTO');
+  assert.equal(conflito.data_sessao, '2027-01-29');
+  verificarSemGravacao(tx);
+});
+
+test('detecta oficina na sexta antecipada, respeitando a vigência da inscrição', async (t) => {
+  const { tx } = simularBanco(t, { matriculas: [oficinaExistente({
+    data_inicio: data('2027-01-29'), data_fim: data('2027-01-29'),
+    turma: { nome: 'Música', horarios: [{ dia_semana: 5, hora_inicio: hora('09:30'), hora_fim: hora('10:30') }] }
+  })] });
+  const conflito = await verificarConflito(() => agendarAtendimentoService({ ...dadosBase,
+    tipo_recorrencia: 'MENSAL', data_inicio: '2026-10-30', frequencia: 1, data_termino: '2027-01-30'
+  }), 'CHOQUE_HORARIO_OFICINA');
+  assert.equal(conflito.data_sessao, '2027-01-29');
+  verificarSemGravacao(tx);
+});
+
+test('API responde 400 quando a data inicial mensal cai no fim de semana', async (t) => {
+  const { tx } = simularBanco(t);
+  const resposta = await chamarController({ ...dadosBase, tipo_recorrencia: 'MENSAL', frequencia: 1,
+    data_inicio: '2026-10-31', data_termino: '2026-12-31' });
+  assert.equal(resposta.statusCode, 400);
+  assert.equal(resposta.body.erro, 'A data de início da recorrência mensal deve ser de segunda a sexta-feira.');
   verificarSemGravacao(tx);
 });
 

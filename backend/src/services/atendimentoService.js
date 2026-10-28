@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const { obterStatusVinculo } = require('./matriculaService');
 
 const DIAS_DA_SEMANA = new Set([1, 2, 3, 4, 5, 6, 7]);
 
@@ -80,6 +81,9 @@ function obterDatasRecorrentes({ tipo_recorrencia, data_inicio, data_termino, fr
       }
     }
   } else {
+    if (inicio.getUTCDay() === 0 || inicio.getUTCDay() === 6) {
+      throw criarErroValidacao('A data de início da recorrência mensal deve ser de segunda a sexta-feira.');
+    }
     const diaDoMes = inicio.getUTCDate();
     let incrementoMeses = 0;
 
@@ -99,6 +103,10 @@ function obterDatasRecorrentes({ tipo_recorrencia, data_inicio, data_termino, fr
         dataDoMes.getUTCMonth(),
         Math.min(diaDoMes, ultimoDiaDoMes)
       ));
+      const diaSemana = dataOcorrencia.getUTCDay();
+      if (diaSemana === 0 || diaSemana === 6) {
+        dataOcorrencia.setUTCDate(dataOcorrencia.getUTCDate() - (diaSemana === 6 ? 1 : 2));
+      }
 
       if (dataOcorrencia > termino) {
         break;
@@ -149,13 +157,15 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
 
   const aluno = await tx.aluno.findUnique({
     where: { id: aluno_id },
-    select: { dias_frequencia: true }
+    select: { dias_frequencia: true, status: true }
   });
   if (!aluno) {
     const erro = new Error('Aluno não encontrado.');
     erro.statusCode = 404;
     throw erro;
   }
+  const statusVinculo = obterStatusVinculo(aluno);
+  const status = statusVinculo === 'PROVISORIO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO';
 
   const intervalos = datasSessoes.map((data) => {
     const inicio = obterInicioSessao(data, hora_inicio);
@@ -166,8 +176,8 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
 
   const sessoes = await tx.atendimento_sessao.findMany({
     where: {
-      status: 'ATIVO',
-      atendimento_clinico: { aluno_id, status: 'ATIVO' },
+      status,
+      atendimento_clinico: { aluno_id, status },
       // Sem limite inferior: uma sessão iniciada antes pode avançar para o período solicitado.
       data_sessao: { lte: obterDia(ultimoFim - 1) }
     },
@@ -185,7 +195,8 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
   const matriculas = await tx.matricula_turma.findMany({
     where: {
       aluno_id,
-      OR: [{ status: 'ATIVO' }, { status: 'INATIVO', data_fim: { not: null } }],
+      OR: [{ status: 'ATIVO' }, { status: 'INATIVO', data_fim: { not: null } },
+        ...(statusVinculo === 'PROVISORIO' ? [{ status: 'PROVISORIO' }] : [])],
       turma: { tipo: 'OFICINA', status: 'ATIVO' },
       AND: [
         { OR: [{ data_inicio: null }, { data_inicio: { lte: obterDia(ultimoFim - 1) } }] },
@@ -258,6 +269,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
     erro.detalhes = conflitos;
     throw erro;
   }
+  return statusVinculo;
 }
 
 async function agendarAtendimentoService(dadosAtendimento) {
@@ -303,7 +315,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
   });
 
   return prisma.$transaction(async (tx) => {
-    await validarDisponibilidade(tx, {
+    const statusVinculo = await validarDisponibilidade(tx, {
       aluno_id, datasSessoes, hora_inicio: horaInicioConvertida, duracao_minutos
     });
 
@@ -320,7 +332,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
         frequencia: recorrente ? frequencia : null,
         dias_semana: tipo_recorrencia === 'SEMANAL' ? [...new Set(dias_semana)] : [],
         data_termino: recorrente ? converterData(data_termino) : null,
-        status: 'ATIVO'
+        status: statusVinculo
       }
     });
 
@@ -330,7 +342,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
         data_sessao,
         hora_inicio: horaInicioConvertida,
         duracao_minutos,
-        status: 'ATIVO'
+        status: statusVinculo
       }))
     });
 
@@ -350,4 +362,35 @@ async function listarProfissionaisAtendimentoService() {
   return profissionais.map(({ id, cargo, pessoa }) => ({ id, nome: pessoa.nome, cargo }));
 }
 
-module.exports = { agendarAtendimentoService, gerarDatasSessoes, obterDatasRecorrentes, listarProfissionaisAtendimentoService };
+async function removerAtendimentoProvisorioService({ aluno_id, atendimento_id }) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
+    const atendimento = await tx.atendimento_clinico.findFirst({
+      where: { id: atendimento_id, aluno_id }, include: { aluno: { select: { status: true } } }
+    });
+    if (!atendimento) {
+      const erro = new Error('Atendimento não encontrado para este aluno.');
+      erro.statusCode = 404;
+      throw erro;
+    }
+    if (atendimento.status !== 'PROVISORIO' || atendimento.aluno.status !== 'RASCUNHO') {
+      const erro = new Error('Somente atendimentos provisórios de um rascunho podem ser removidos do planejamento.');
+      erro.statusCode = 409;
+      throw erro;
+    }
+    const sessoesEfetivas = await tx.atendimento_sessao.count({
+      where: { atendimento_clinico_id: atendimento_id, status: { not: 'PROVISORIO' } }
+    });
+    if (sessoesEfetivas) {
+      const erro = new Error('O atendimento possui sessões efetivas e não pode ser removido do planejamento.');
+      erro.statusCode = 409;
+      throw erro;
+    }
+    await tx.atendimento_sessao.deleteMany({ where: { atendimento_clinico_id: atendimento_id, status: 'PROVISORIO' } });
+    await tx.atendimento_clinico.delete({ where: { id: atendimento_id } });
+    return { mensagem: 'Atendimento provisório e suas sessões removidos do planejamento.' };
+  }, { isolationLevel: 'ReadCommitted' });
+}
+
+module.exports = { agendarAtendimentoService, gerarDatasSessoes, obterDatasRecorrentes,
+  listarProfissionaisAtendimentoService, removerAtendimentoProvisorioService };

@@ -68,6 +68,10 @@ function simularBanco(t, {
         let liberar;
         const tx = {
             $queryRaw: t.mock.fn(async (sql, id) => {
+                if (sql.join('?').includes('FROM "turma"')) {
+                    assert.ok(oficinas.some((item) => item.id === id));
+                    return [];
+                }
                 assert.match(sql.join('?'), /SELECT "id" FROM "aluno" WHERE "id" = \? FOR UPDATE/);
                 assert.equal(id, 1);
                 const anterior = fila;
@@ -109,11 +113,7 @@ function simularBanco(t, {
                 })
             },
             atendimento_sessao: {
-                findMany: t.mock.fn(async ({ where }) => [...sessoes, ...estado.sessoes].filter((item) =>
-                    item.status === where.status &&
-                    item.atendimento_clinico.aluno_id === where.atendimento_clinico.aluno_id &&
-                    item.atendimento_clinico.status === where.atendimento_clinico.status &&
-                    (!where.data_sessao || item.data_sessao <= where.data_sessao.lte))),
+                findMany: t.mock.fn(async ({ where }) => [...sessoes, ...estado.sessoes].filter((item) => corresponde(item, where))),
                 createMany: t.mock.fn(async ({ data: registros }) => {
                     pendentes.sessoes.push(...registros.map((registro, indice) => ({
                         id: 200 + indice, ...registro,
@@ -185,6 +185,30 @@ for (const tipo of ['EVENTUAL', 'SEMANAL', 'MENSAL']) {
         assert.equal(conflito.detalhes.hora_inicio, '09:30');
         assert.equal(conflito.detalhes.hora_fim, '10:30');
         verificarSemGravacao(banco);
+    });
+}
+
+for (const [dia_semana, impede] of [[5, true], [6, false]]) {
+    test(`oficina no dia ${dia_semana} ${impede ? 'conflita com' : 'não conflita com'} sessão mensal antecipada para sexta`, async (t) => {
+        const banco = simularBanco(t, { oficinas: [oficina({
+            horarios: [{ dia_semana, hora_inicio: hora('09:00'), hora_fim: hora('10:00') }]
+        })] });
+        await agendarAtendimentoService({
+            aluno_id: 1, profissional_id: 2, modalidade: 'Fisioterapia',
+            tipo_recorrencia: 'MENSAL', data_inicio: '2026-11-30', data_termino: '2027-01-30',
+            hora_inicio: '09:30', duracao_minutos: 60, frequencia: 1
+        });
+        assert.deepEqual(banco.sessoes.map((registro) => registro.data_sessao.toISOString().slice(0, 10)),
+            ['2026-11-30', '2026-12-30', '2027-01-29']);
+        if (impede) {
+            const conflito = await verificarConflito(() => matricularOficinasService(pedido), 'CHOQUE_HORARIO_ATENDIMENTO');
+            assert.equal(conflito.detalhes.data_sessao, '2027-01-29');
+            assert.equal(banco.matriculas.length, 0);
+            assert.equal(banco.transacoes.at(-1).matricula_turma.create.mock.callCount(), 0);
+        } else {
+            await matricularOficinasService(pedido);
+            assert.equal(banco.matriculas.length, 1);
+        }
     });
 }
 

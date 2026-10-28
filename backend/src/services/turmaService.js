@@ -25,7 +25,7 @@ async function listarTurmasService(tipo) {
     return turmas.map((turma) => ({
         ...turma,
         vagas_ocupadas: turma._count.matriculas,
-        vagas_disponiveis: Math.max(turma.capacidade_maxima - turma._count.matriculas, 0),
+        vagas_disponiveis: turma.capacidade_maxima == null ? null : Math.max(turma.capacidade_maxima - turma._count.matriculas, 0),
         _count: undefined,
     }));
 }
@@ -59,7 +59,7 @@ async function listarTurmasRegularesPorTurnoService(turno) {
     return turmas.map((turma) => ({
         ...turma,
         vagas_ocupadas: turma._count.matriculas,
-        vagas_disponiveis: Math.max(turma.capacidade_maxima - turma._count.matriculas, 0),
+        vagas_disponiveis: turma.capacidade_maxima == null ? null : Math.max(turma.capacidade_maxima - turma._count.matriculas, 0),
         _count: undefined,
     }));
 }

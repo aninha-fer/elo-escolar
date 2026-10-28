@@ -6,8 +6,6 @@ const DIAS_SEMANA = [
     { numero: 3, nome: 'Qua' },
     { numero: 4, nome: 'Qui' },
     { numero: 5, nome: 'Sex' },
-    { numero: 6, nome: 'Sáb' },
-    { numero: 7, nome: 'Dom' },
 ];
 
 const ALTURA_HORA = 48;
@@ -83,14 +81,15 @@ function EventoAgenda({ evento, horaInicial }) {
 
     const cores = CORES_EVENTO[evento.tipo] ?? CORES_EVENTO.ATENDIMENTO;
     const turmaRegular = evento.tipo === 'REGULAR';
+    const provisorio = evento.status === 'PROVISORIO';
 
     return (
         <div
-            className={`absolute overflow-hidden rounded-sm px-1 py-1 ${turmaRegular ? 'z-0 border' : 'z-10 border-2'} ${cores.fundo} ${cores.borda} ${cores.texto}`}
+            className={`absolute overflow-hidden rounded-sm px-1 py-1 ${turmaRegular ? 'z-0 border' : 'z-10 border-2'} ${provisorio ? 'border-dashed' : ''} ${cores.fundo} ${cores.borda} ${cores.texto}`}
             style={{ ...estilo, left: `calc(${evento.coluna * 100 / evento.totalColunas}% + 2px)`, width: `calc(${100 / evento.totalColunas}% - 4px)` }}
-            title={`${evento.titulo} - ${formatarHora(evento.hora_inicio)} - ${formatarHora(evento.hora_fim)} · ${evento.profissional}`}
+            title={`${provisorio ? 'Provisório · ' : ''}${evento.titulo} - ${formatarHora(evento.hora_inicio)} - ${formatarHora(evento.hora_fim)} · ${evento.profissional}`}
         >
-            <p className="truncate text-xs font-bold">{evento.titulo}</p>
+            <p className="truncate text-xs font-bold">{provisorio ? 'Provisório · ' : ''}{evento.titulo}</p>
             {turmaRegular && <p className="truncate text-[10px] opacity-70">Turma Regular</p>}
             <p className={`truncate text-[10px] ${turmaRegular ? 'opacity-70' : ''}`}>
                 {formatarHora(evento.hora_inicio)} - {formatarHora(evento.hora_fim)}
@@ -100,7 +99,8 @@ function EventoAgenda({ evento, horaInicial }) {
 }
 
 export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, carregando, erro }) {
-    const eventos = agenda?.eventos ?? [];
+    const eventos = (agenda?.eventos ?? []).filter((evento) =>
+        DIAS_SEMANA.some((dia) => dia.numero === evento.dia_semana));
     const eventosPorDia = DIAS_SEMANA.reduce((porDia, dia) => {
         porDia[dia.numero] = posicionarEventos(eventos.filter((evento) => evento.dia_semana === dia.numero));
         return porDia;
@@ -118,7 +118,7 @@ export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, 
             <header className="bg-bg-main flex flex-wrap items-center justify-between gap-sm border-b border-gray-300 px-md py-sm">
                 <div>
                     <h2 className="text-base font-bold text-text-main">Calendário Semanal</h2>
-                    {agenda && <p className="text-xs text-text-muted">{formatarDataBR(agenda.semana_inicio)} a {formatarDataBR(agenda.semana_fim)}</p>}
+                    {agenda && <p className="text-xs text-text-muted">{formatarDataBR(agenda.semana_inicio)} a {formatarDataBR(adicionarDias(agenda.semana_inicio, 4))}</p>}
                 </div>
                 <div className="flex flex-wrap gap-md text-xs text-text-muted">
                     {Object.entries(CORES_EVENTO).map(([tipo, cores]) => (
@@ -151,8 +151,8 @@ export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, 
             {carregando ? <p role="status" className="p-md text-sm text-text-muted">Carregando agenda...</p>
                 : erro ? <p role="alert" className="p-md text-sm text-red-700">{erro}</p>
                 : <div className="overflow-x-auto">
-                <div className="min-w-[760px]">
-                <div className="grid grid-cols-[56px_repeat(7,minmax(96px,1fr))] border-b border-gray-300 bg-bg-main">
+                <div className="min-w-[560px]">
+                <div className="grid grid-cols-[56px_repeat(5,minmax(96px,1fr))] border-b border-gray-300 bg-bg-main">
                     <div />
                     {DIAS_SEMANA.map((dia) => (
                         <div key={dia.numero} className="border-l border-slate-200 px-2 py-sm text-center text-sm font-bold text-text-main">
@@ -162,7 +162,7 @@ export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, 
                     ))}
                 </div>
 
-                <div className="grid grid-cols-[56px_repeat(7,minmax(96px,1fr))]">
+                <div className="grid grid-cols-[56px_repeat(5,minmax(96px,1fr))]">
                     <div>
                         {horas.slice(0, -1).map((hora) => (
                             <div key={hora} className="h-12 border-b border-slate-200 px-1 pt-2 text-right text-xs text-slate-400">
@@ -187,7 +187,7 @@ export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, 
 
             {!carregando && !erro && eventos.length === 0 && (
                 <p className="border-t border-slate-200 px-md py-lg text-center text-sm text-text-muted">
-                    Nenhum compromisso encontrado nesta semana.
+                    Nenhum compromisso encontrado nos dias exibidos.
                 </p>
             )}
         </section>

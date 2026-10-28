@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../prismaClient');
 const { obterAgendaAlunoService } = require('./agendaService');
+const { gerarDatasSessoes } = require('./atendimentoService');
 const { obterAlunoService } = require('./alunoService');
 const { obterAgenda } = require('../controllers/agendaController');
 
@@ -42,6 +43,7 @@ function corresponde(registro, filtro) {
     if ('not' in esperado) return atual != null && atual !== esperado.not;
     if ('lt' in esperado) return atual !== null && atual < esperado.lt;
     if ('gte' in esperado) return atual !== null && atual >= esperado.gte;
+    if ('in' in esperado) return esperado.in.includes(atual);
     return atual != null && corresponde(atual, esperado);
   });
 }
@@ -139,6 +141,31 @@ test('usa duração e horário próprios da sessão, sem recalcular a recorrênc
 test('não repete sessão eventual ou recorrente em semanas sem ocorrência', async (t) => {
   simularBanco(t, { sessoes: [sessao()] });
   assert.deepEqual((await obterAgendaAlunoService(1, '2026-11-11')).eventos, []);
+});
+
+test('agenda exibe a sessão mensal na sexta do mês anterior e preserva a referência seguinte', async (t) => {
+  const configuracao = { tipo_recorrencia: 'MENSAL', data_inicio: '2027-04-01',
+    data_termino: '2027-06-01', frequencia: 1 };
+  const sessoes = gerarDatasSessoes(configuracao).map((data_sessao, indice) => {
+    const registro = sessao({ id: 10 + indice, data_sessao });
+    registro.atendimento_clinico = { ...registro.atendimento_clinico, ...configuracao };
+    return registro;
+  });
+  simularBanco(t, { sessoes });
+  const { eventos } = await obterAgendaAlunoService(1, '2027-05-01');
+  assert.deepEqual(eventos.map((evento) => [evento.data, evento.dia_semana, evento.hora_inicio]),
+    [['2027-04-30', 5, '09:00']]);
+  assert.deepEqual((await obterAgendaAlunoService(1, '2027-05-03')).eventos, []);
+  assert.deepEqual((await obterAgendaAlunoService(1, '2027-06-01')).eventos.map((evento) => evento.data),
+    ['2027-06-01']);
+});
+
+test('preserva a data de uma sessão mensal antiga já gravada no sábado', async (t) => {
+  const registro = sessao({ data_sessao: data('2027-01-30') });
+  registro.atendimento_clinico.tipo_recorrencia = 'MENSAL';
+  simularBanco(t, { sessoes: [registro] });
+  const { eventos } = await obterAgendaAlunoService(1, '2027-01-30');
+  assert.deepEqual(eventos.map((evento) => [evento.data, evento.dia_semana]), [['2027-01-30', 6]]);
 });
 
 test('respeita vigência inclusiva da matrícula em cada dia da semana', async (t) => {

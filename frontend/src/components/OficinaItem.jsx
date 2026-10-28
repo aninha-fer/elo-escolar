@@ -1,6 +1,6 @@
 import { formatarHora, formatarTurno } from '../utils/formatters';
 
-export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = false, onToggle, onCancelar, cancelando = false }) {
+export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = false, onToggle, onCancelar, cancelando = false, planejando = false }) {
     const dias = (oficina.dias ?? [])
         .sort((primeiro, segundo) => primeiro.numero - segundo.numero)
         .map((dia) => dia.nome)
@@ -43,7 +43,10 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
                     </div>
 
                     <span className="shrink-0 text-sm text-text-muted">
-                        {oficina.vagas_ocupadas ?? 0}/{oficina.capacidade_maxima ?? 0} vagas
+                        {oficina.capacidade_maxima == null ? 'Sem limite' : `${oficina.vagas_ocupadas ?? 0}/${oficina.capacidade_maxima} vagas`}
+                        {planejando && oficina.capacidade_maxima != null && (oficina.vagas_ocupadas ?? 0) >= oficina.capacidade_maxima && (
+                            <span className="block text-xs text-amber-700">Lotada · planejamento não reserva vaga</span>
+                        )}
                     </span>
                 </div>
             </li>
@@ -54,6 +57,7 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
         <li className="flex items-center justify-between gap-lg border-t border-gray-300 px-lg py-md first:border-t-0">
             <div>
                 <h3 className="text-base font-bold text-text-main">{oficina.turma_nome ?? oficina.nome}</h3>
+                {oficina.status_vinculo === 'PROVISORIO' && <span className="text-xs text-text-muted">Provisório</span>}
                 <p className="truncate text-text-muted text-[14px]">
                     {horario}
                     {' · '}{dias}

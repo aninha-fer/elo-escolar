@@ -63,4 +63,9 @@ const criarAtendimentoDTO = z.object({
   }
 });
 
-module.exports = { criarAtendimentoDTO };
+const removerAtendimentoProvisorioDTO = z.object({
+  aluno_id: z.coerce.number().int().positive('ID do aluno inválido.'),
+  atendimento_id: z.coerce.number().int().positive('ID do atendimento inválido.')
+});
+
+module.exports = { criarAtendimentoDTO, removerAtendimentoProvisorioDTO };

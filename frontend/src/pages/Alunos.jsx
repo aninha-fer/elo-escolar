@@ -160,6 +160,10 @@ export function Alunos() {
             setSubmitError('Selecione uma turma regular disponível para salvar o aluno como ativo.');
             return;
         }
+        if (status === 'ATIVO' && turmaSelecionada.capacidade_maxima != null && turmaSelecionada.vagas_disponiveis === 0) {
+            setSubmitError('A turma regular está sem vagas disponíveis.');
+            return;
+        }
 
         const dadosAluno = {
             nome,
@@ -171,7 +175,7 @@ export function Alunos() {
             dias_frequencia: formulario.dias_frequencia,
             participa_almoco: formulario.participa_almoco,
             status,
-            ...(status === 'ATIVO' ? { turma_id: Number(formulario.turma_id) } : {}),
+            ...(turmaSelecionada ? { turma_id: turmaSelecionada.id } : {}),
         };
 
         try {
@@ -185,7 +189,7 @@ export function Alunos() {
                 turno: criado.turno,
                 dias_frequencia: criado.dias_frequencia,
                 status: criado.status,
-                turma_regular: status === 'ATIVO'
+                turma_regular: turmaSelecionada
                     ? { id: turmaSelecionada.id, nome: turmaSelecionada.nome, turno: turmaSelecionada.turno }
                     : null,
             };
@@ -379,8 +383,7 @@ export function Alunos() {
                                     .filter((turma) => turma.turno === formulario.turno)
                                     .map((turma) => ({
                                         value: turma.id,
-                                        label: `${turma.nome} - ${formatarTurno(turma.turno)}`,
-                                        disabled: turma.vagas_disponiveis === 0,
+                                        label: `${turma.nome} - ${formatarTurno(turma.turno)}${turma.capacidade_maxima == null ? ' — Sem limite' : turma.vagas_disponiveis === 0 ? ' — Lotada: rascunho não reserva vaga' : ''}`,
                                     }))}
                             />
                         </div>
@@ -391,7 +394,7 @@ export function Alunos() {
                         )}
                         <div className="w-full rounded-md border border-tertiary bg-tertiary/10 p-md text-[12px] text-[#92400E]">
                             <h3 className="text-[14px] font-semibold">Salvar como rascunho</h3>
-                            <p>Informe nome, período e dias de frequência. O rascunho não será matriculado em uma turma.</p>
+                            <p>Informe nome, período e dias de frequência. A turma regular é opcional para o rascunho e não reserva vaga.</p>
                         </div>
                     </form>
                 </Modal>
