@@ -22,21 +22,20 @@ export function SelecaoDiasSemana({
         { value: 'TODOS', label: selectAllLabel },
     ];
 
-    const opcoes = options.length > 0 ? options : opcoesPadrao;
+    const opcoes = (options.length > 0 ? options : opcoesPadrao).filter(
+        (opcao) => allowSelectAll || (opcao.value !== 'TODOS' && opcao.value !== 'ALL'),
+    );
     const valoresSelecionados = Array.isArray(value) ? value : [];
 
     function alternarSelecao(opcaoValue) {
         if (disabled) return;
 
         if (opcaoValue === 'TODOS' || opcaoValue === 'ALL') {
-            const todosSelecionados = valoresSelecionados.includes('TODOS') || valoresSelecionados.includes('ALL');
+            const opcoesIndividuais = opcoes.filter((opcao) => opcao.value !== 'TODOS' && opcao.value !== 'ALL');
+            const todosSelecionados = opcoesIndividuais.every((opcao) => valoresSelecionados.includes(opcao.value));
             const proximo = todosSelecionados
-                ? opcoes
-                    .filter((opcao) => opcao.value !== 'TODOS' && opcao.value !== 'ALL')
-                    .map((opcao) => opcao.value)
-                : opcoes
-                    .filter((opcao) => opcao.value !== 'TODOS' && opcao.value !== 'ALL')
-                    .map((opcao) => opcao.value);
+                ? []
+                : opcoesIndividuais.map((opcao) => opcao.value);
 
             onChange?.(proximo);
             return;

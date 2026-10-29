@@ -53,7 +53,8 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                         </tr>
                     ) : alunos.map((aluno, index) => {
                         const nome = aluno.pessoa?.nome ?? aluno.nome ?? 'Nome não informado';
-                        const responsavel = aluno.nome_responsavel ?? aluno.responsavel?.nome;
+                        const responsaveis = aluno.responsaveis ?? [];
+                        const responsavel = responsaveis[0]?.nome;
                         const dias = Array.isArray(aluno.dias_frequencia)
                             ? formatarFrequencia(aluno.dias_frequencia)
                             : '';
@@ -78,9 +79,14 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                                             {obterIniciais(nome)}
                                         </span>
                                         <div className="min-w-max">
-                                            <p className="font-semibold">{nome}</p>
+                                            <div className="flex items-center gap-xs">
+                                                <p className="font-semibold">{nome}</p>
+                                                {aluno.participa_procan && <span className="rounded-sm border border-amber-400 bg-amber-50 px-1 text-[10px] font-semibold text-amber-800">PROCAN</span>}
+                                            </div>
                                             {responsavel && (
-                                                <p className="mt-1 text-sm text-slate-500">Resp.: {responsavel}</p>
+                                                <p className="mt-1 text-sm text-slate-500" title={responsaveis.map((item) => item.nome).join(', ')}>
+                                                    Resp.: {responsavel}{responsaveis.length > 1 ? ` +${responsaveis.length - 1}` : ''}
+                                                </p>
                                             )}
                                         </div>
                                     </div>
@@ -97,7 +103,7 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                                     )}
                                 </td>
                                 <td className="whitespace-nowrap px-6 py-4">
-                                    <span className={`inline-flex min-w-44 items-center rounded-full px-4 py-2 text-sm font-semibold before:mr-2 before:size-2 before:shrink-0 before:rounded-full ${estilosStatus[status] ?? estilosStatus.RASCUNHO}`}>
+                                    <span className={`inline-flex min-w-30 items-center rounded-full px-4 py-2 text-sm font-semibold before:mr-2 before:size-2 before:shrink-0 before:rounded-full ${estilosStatus[status] ?? estilosStatus.RASCUNHO}`}>
                                         {formatarStatus(status)}
                                     </span>
                                 </td>

@@ -1,16 +1,17 @@
-const { getAgendaAlunoDTO } = require('../dtos/alunoDTO');
+const { getAgendaAlunoDTO, getAgendaQueryDTO } = require('../dtos/alunoDTO');
 const { obterAgendaAlunoService } = require('../services/agendaService');
 
 async function obterAgenda(req, res) {
   try {
     const { id } = getAgendaAlunoDTO.parse(req.params);
+    const { data } = getAgendaQueryDTO.parse(req.query);
     
-    const agenda = await obterAgendaAlunoService(id);
+    const agenda = await obterAgendaAlunoService(id, data);
     
     return res.status(200).json(agenda);
   } catch (error) {
     if (error.name === 'ZodError') {
-      return res.status(400).json({ erros: error.errors });
+      return res.status(400).json({ erros: error.issues });
     }
     
     if (error.status) {
