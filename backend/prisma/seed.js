@@ -7,6 +7,8 @@ async function main() {
   console.log('Limpando banco de dados para o seed...');
   await prisma.turma_horario.deleteMany(); 
   await prisma.matricula_turma.deleteMany(); 
+  await prisma.aluno_responsavel.deleteMany();
+  await prisma.aluno_dados_medicos.deleteMany();
   await prisma.aluno.deleteMany(); 
   await prisma.turma.deleteMany();
   await prisma.ambiente.deleteMany();

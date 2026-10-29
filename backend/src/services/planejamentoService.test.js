@@ -42,7 +42,8 @@ function corresponde(registro, filtro = {}) {
 function simularBanco(t, inicial = {}) {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-02T12:00:00.000Z') });
   const estado = { aluno: [aluno(1), aluno(2, 'ATIVO'), aluno(3, 'ATIVO')], pessoa: [],
-    turma: [turma(10), turma(20, 'REGULAR')], matricula_turma: [], atendimento_clinico: [], atendimento_sessao: [], ...inicial };
+    turma: [turma(10), turma(20, 'REGULAR')], matricula_turma: [], atendimento_clinico: [], atendimento_sessao: [],
+    aluno_responsavel: [], aluno_dados_medicos: [], ...inicial };
   let sequencia = 100;
   const filas = new Map();
 
@@ -159,9 +160,12 @@ test('cadastro de rascunho aceita regular lotada e mantém pessoa inativa e vín
 
 test('regular lotada bloqueia cadastro ativo e reverte aluno e pessoa', async (t) => {
   const banco = simularBanco(t, { turma: [turma(20, 'REGULAR', 0)] });
-  await assert.rejects(() => criarAlunoService({ nome: 'Ativo', status: 'ATIVO', turno: 'MANHA', dias_frequencia: [1], turma_id: 20 }), { isConflict: true });
+  await assert.rejects(() => criarAlunoService({ nome: 'Ativo', status: 'ATIVO', turno: 'MANHA', dias_frequencia: [1], turma_id: 20,
+    responsaveis: [{ nome: 'Responsável Teste' }], dados_medicos: { usa_medicamento: false } }), { isConflict: true });
   assert.equal(banco.aluno.length, 3);
   assert.equal(banco.pessoa.length, 0);
+  assert.equal(banco.aluno_responsavel.length, 0);
+  assert.equal(banco.aluno_dados_medicos.length, 0);
   assert.equal(banco.matricula_turma.length, 0);
 });
 

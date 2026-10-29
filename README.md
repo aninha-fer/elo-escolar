@@ -121,3 +121,39 @@ Ativação e tratamento específico de planejamento vencido não fazem parte des
 entrega; as listagens mantêm os filtros de vigência existentes. A migration
 `20261028000000_status_provisorio` adiciona o valor ao enum compartilhado, sem
 alterar o status ou as datas de registros já existentes.
+
+## Responsáveis, Procan e dados médicos
+
+O cadastro (`POST /api/alunos`) aceita `responsaveis`, uma lista opcional de
+`{ nome, telefone, parentesco }`. Cada responsável é uma pessoa independente
+vinculada ao aluno por `aluno_responsavel`; parentesco é opcional e limitado a
+30 caracteres. Nome é obrigatório quando um responsável é informado. Telefone
+é opcional e deve conter 10 ou 11 dígitos, incluindo DDD. A interface permite
+adicionar e remover responsáveis antes de salvar e pesquisa pelo nome de qualquer
+responsável. A tabela mostra o primeiro nome cadastrado e a quantidade dos demais.
+
+`participa_procan` é booleano, com padrão `false`, e `observacoes` é texto opcional.
+O objeto opcional `dados_medicos` contém:
+
+- `restricao_alimentar`: texto opcional;
+- `autorizado_atividade_fisica`: `true`, `false` ou `null`;
+- `usa_medicamento`: `true`, `false` ou `null`;
+- `medicamentos_descricao`: texto obrigatório quando `usa_medicamento` for `true`;
+- `autorizacao_analgesico`: `NENHUM`, `PARACETAMOL`, `DIPIRONA`, `AMBOS` ou `null`.
+
+`null` significa não informado. `false` e `NENHUM` são respostas explícitas e
+não são substituídos por `null`. Selecionar "Não" no uso de medicamento limpa sua
+descrição. Se todos os dados médicos estiverem vazios, o cadastro não cria o
+registro médico. Pessoa do aluno, aluno, responsáveis, dados médicos e eventual
+matrícula são gravados na mesma transação.
+
+`GET /api/alunos` retorna Procan e o resumo dos responsáveis, sem dados médicos,
+observações ou telefones de responsáveis. `GET /api/alunos/:id` retorna todos os
+responsáveis com telefone e parentesco e os dados médicos para os cartões da
+Visão Geral. Não há novas rotas ou fluxo de edição nesta entrega.
+
+A migration `20261028010000_dados_complementares_aluno` cria as novas estruturas
+e remove `nome_responsavel` e `telefone_responsavel` sem transferir os dados
+fictícios antigos. Os timestamps novos seguem o padrão existente (`DateTime`,
+`created_at` com `@default(now())` e `updated_at` com `@updatedAt`). A tabela de
+ocorrências não faz parte desta entrega.

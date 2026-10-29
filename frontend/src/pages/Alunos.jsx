@@ -1,7 +1,7 @@
 import { FiltroEstado } from "../components/FiltroEstado";
 import { Button } from "../components/Button";
 import { TabelaAlunos } from "../components/TabelaAlunos";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { alunoService } from '../services/alunoService';
 import { Modal } from "../components/Modal";
 import { Input } from "../components/Input";
@@ -16,8 +16,13 @@ const formularioInicial = {
     nome: '',
     telefone: '',
     data_nascimento: '',
-    nome_responsavel: '',
-    telefone_responsavel: '',
+    responsaveis: [],
+    participa_procan: false,
+    observacoes: '',
+    dados_medicos: {
+        restricao_alimentar: '', autorizado_atividade_fisica: '', usa_medicamento: '',
+        medicamentos_descricao: '', autorizacao_analgesico: '',
+    },
     turno: '',
     dias_frequencia: [],
     participa_almoco: false,
@@ -43,6 +48,8 @@ export function Alunos() {
     const [submitError, setSubmitError] = useState('');
     const [statusSelecionado, setStatusSelecionado] = useState('TODOS');
     const [termoBusca, setTermoBusca] = useState('');
+    const sequenciaResponsavel = useRef(0);
+    const enviando = useRef(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -97,7 +104,7 @@ export function Alunos() {
             || (aluno.status ?? 'RASCUNHO') === statusSelecionado;
         const nomeCorresponde = !termoNormalizado
             || normalizarTexto(aluno.nome).includes(termoNormalizado)
-            || normalizarTexto(aluno.nome_responsavel).includes(termoNormalizado);
+            || (aluno.responsaveis ?? []).some((responsavel) => normalizarTexto(responsavel.nome).includes(termoNormalizado));
 
         return statusCorresponde && nomeCorresponde;
     });
@@ -118,13 +125,34 @@ export function Alunos() {
         setSubmitError('');
     }
 
+    function adicionarResponsavel() {
+        const chave = sequenciaResponsavel.current++;
+        setFormulario((atual) => ({ ...atual, responsaveis: [...atual.responsaveis, { chave, nome: '', parentesco: '', telefone: '' }] }));
+    }
+
+    function atualizarResponsavel(chave, campo, valor) {
+        setFormulario((atual) => ({ ...atual, responsaveis: atual.responsaveis.map((responsavel) =>
+            responsavel.chave === chave ? { ...responsavel, [campo]: valor } : responsavel) }));
+    }
+
+    function removerResponsavel(chave) {
+        setFormulario((atual) => ({ ...atual, responsaveis: atual.responsaveis.filter((responsavel) => responsavel.chave !== chave) }));
+    }
+
+    function atualizarDadoMedico(campo, valor) {
+        setFormulario((atual) => ({ ...atual, dados_medicos: {
+            ...atual.dados_medicos, [campo]: valor,
+            ...(campo === 'usa_medicamento' && valor !== 'true' ? { medicamentos_descricao: '' } : {}),
+        } }));
+    }
+
     function abrirModal() {
         resetarFormulario();
         setIsModalOpen(true);
     }
 
     function fecharModal() {
-        if (isSubmitting) return;
+        if (enviando.current) return;
         setIsModalOpen(false);
         resetarFormulario();
     }
@@ -134,11 +162,14 @@ export function Alunos() {
     }
 
     async function salvarAluno(status) {
-        if (isSubmitting) return;
+        if (enviando.current) return;
 
         const nome = formulario.nome.trim();
         const telefone = normalizarTelefone(formulario.telefone);
-        const telefoneResponsavel = normalizarTelefone(formulario.telefone_responsavel);
+        const responsaveis = formulario.responsaveis.map((responsavel) => ({
+            nome: responsavel.nome.trim(), parentesco: responsavel.parentesco.trim(),
+            telefone: normalizarTelefone(responsavel.telefone),
+        })).filter((responsavel) => responsavel.nome || responsavel.parentesco || responsavel.telefone);
 
         if (!nome) {
             setSubmitError('Informe o nome do aluno.');
@@ -150,10 +181,20 @@ export function Alunos() {
             return;
         }
 
-        if ([telefone, telefoneResponsavel].some((valor) => valor && !/^\d{10,11}$/.test(valor))) {
+        if ([telefone, ...responsaveis.map((responsavel) => responsavel.telefone)].some((valor) => valor && !/^\d{10,11}$/.test(valor))) {
             setSubmitError('Os telefones devem conter DDD e ter 10 ou 11 dígitos.');
             return;
         }
+        if (responsaveis.some((responsavel) => responsavel.nome.length < 2 || responsavel.parentesco.length > 30)) {
+            setSubmitError('Informe o nome de cada responsável e um parentesco de até 30 caracteres.');
+            return;
+        }
+        const medicos = formulario.dados_medicos;
+        if (medicos.usa_medicamento === 'true' && !medicos.medicamentos_descricao.trim()) {
+            setSubmitError('Informe qual medicamento o aluno utiliza.');
+            return;
+        }
+        const booleanoOpcional = (valor) => valor === '' ? null : valor === 'true';
 
         const turmaSelecionada = turmas.find((turma) => turma.id === Number(formulario.turma_id));
         if (status === 'ATIVO' && !turmaSelecionada) {
@@ -169,8 +210,16 @@ export function Alunos() {
             nome,
             telefone: telefone || undefined,
             data_nascimento: formulario.data_nascimento || undefined,
-            nome_responsavel: formulario.nome_responsavel.trim() || undefined,
-            telefone_responsavel: telefoneResponsavel || undefined,
+            responsaveis,
+            participa_procan: formulario.participa_procan,
+            observacoes: formulario.observacoes.trim() || null,
+            dados_medicos: {
+                restricao_alimentar: medicos.restricao_alimentar.trim() || null,
+                autorizado_atividade_fisica: booleanoOpcional(medicos.autorizado_atividade_fisica),
+                usa_medicamento: booleanoOpcional(medicos.usa_medicamento),
+                medicamentos_descricao: medicos.usa_medicamento === 'true' ? medicos.medicamentos_descricao.trim() : null,
+                autorizacao_analgesico: medicos.autorizacao_analgesico || null,
+            },
             turno: formulario.turno,
             dias_frequencia: formulario.dias_frequencia,
             participa_almoco: formulario.participa_almoco,
@@ -179,13 +228,15 @@ export function Alunos() {
         };
 
         try {
+            enviando.current = true;
             setIsSubmitting(true);
             setSubmitError('');
             const criado = await alunoService.criarAluno(dadosAluno);
             const alunoDaLista = {
                 id: criado.id,
                 nome: criado.nome,
-                nome_responsavel: criado.nome_responsavel,
+                responsaveis: criado.responsaveis ?? [],
+                participa_procan: criado.participa_procan,
                 turno: criado.turno,
                 dias_frequencia: criado.dias_frequencia,
                 status: criado.status,
@@ -198,9 +249,11 @@ export function Alunos() {
             setIsModalOpen(false);
             resetarFormulario();
         } catch (err) {
-            const mensagensValidacao = err.response?.data?.erros?.map((item) => item.message).join(' ');
+            const mensagensValidacao = err.response?.data?.erros?.map((item) =>
+                item.path?.[0] === 'responsaveis' && Number.isInteger(item.path[1]) ? `Responsável ${item.path[1] + 1}: ${item.message}` : item.message).join(' ');
             setSubmitError(err.response?.data?.erro || mensagensValidacao || 'Não foi possível salvar o aluno.');
         } finally {
+            enviando.current = false;
             setIsSubmitting(false);
         }
     }
@@ -287,6 +340,10 @@ export function Alunos() {
                     onConfirm={handleSubmit}
                     isConfirmLoading={isSubmitting}>
                     <form id="form-cadastro-aluno" onSubmit={handleSubmit}>
+                        <fieldset disabled={isSubmitting} className="min-w-0">
+                        <div className="mb-md border-b border-gray-200 pb-sm">
+                            <h3 className="text-sm font-semibold text-text-main">Dados pessoais</h3>
+                        </div>
                         <Input
                             id="nome-aluno"
                             name="nome"
@@ -316,26 +373,61 @@ export function Alunos() {
                                 onChange={(event) => atualizarCampo('data_nascimento', event.target.value)}
                             />
                         </div>
-                        <div className="flex flex-row gap-md">
-                            <Input
-                                id="nome-responsavel"
-                                name="nome_responsavel"
-                                type="text"
-                                label="Nome do Responsável"
-                                placeholder="Ex: Roberto Andrade"
-                                value={formulario.nome_responsavel}
-                                onChange={(event) => atualizarCampo('nome_responsavel', event.target.value)}
-                            />
-                            <Input
-                                id="telefone-responsavel"
-                                name="telefone_responsavel"
-                                type="tel"
-                                label="Telefone do Responsável"
-                                placeholder="(11) 1 1111-1111"
-                                value={formulario.telefone_responsavel}
-                                onChange={(event) => atualizarCampo('telefone_responsavel', event.target.value)}
-                            />
+                        <Toggle label="Procan" name="participa_procan" checked={formulario.participa_procan}
+                            onChange={(valor) => atualizarCampo('participa_procan', valor)} />
+                        <div className="mb-md">
+                            <label htmlFor="observacoes-aluno" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-600">Observações</label>
+                            <textarea id="observacoes-aluno" name="observacoes" rows={3}
+                                placeholder="Informações importantes sobre o aluno, sua rotina ou comportamento"
+                                value={formulario.observacoes} onChange={(event) => atualizarCampo('observacoes', event.target.value)}
+                                className="w-full resize-y rounded-sm border border-slate-200 bg-bg-surface p-sm text-text-main placeholder:text-placeholder focus:outline-none focus:ring-1 focus:ring-secondary" />
                         </div>
+                        <div className="mb-md flex items-center justify-between gap-sm border-b border-gray-200 pb-sm">
+                            <h3 className="text-sm font-semibold text-text-main">Responsáveis <span className="font-normal text-text-muted">(opcional)</span></h3>
+                            <button type="button" onClick={adicionarResponsavel}
+                                className="rounded-sm border border-slate-200 px-sm py-xs text-xs font-semibold text-text-main hover:bg-bg-main">+ Adicionar responsável</button>
+                        </div>
+                        {formulario.responsaveis.map((responsavel, indice) => (
+                            <div key={responsavel.chave} className="mb-md flex items-start gap-sm rounded-md border border-slate-200 bg-bg-main p-sm">
+                                <span className="mt-7 flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-secondary">{indice + 1}</span>
+                                <div className="grid min-w-0 flex-1 grid-cols-1 gap-sm sm:grid-cols-3">
+                                    <Input id={`responsavel-${responsavel.chave}-nome`} name={`responsaveis.${responsavel.chave}.nome`}
+                                        label={`Nome do responsável`} placeholder="Ex: Roberto Andrade"
+                                        value={responsavel.nome} onChange={(event) => atualizarResponsavel(responsavel.chave, 'nome', event.target.value)} />
+                                    <Input id={`responsavel-${responsavel.chave}-parentesco`} name={`responsaveis.${responsavel.chave}.parentesco`}
+                                        label="Parentesco" placeholder="Ex: Mãe" maxLength={30}
+                                        value={responsavel.parentesco} onChange={(event) => atualizarResponsavel(responsavel.chave, 'parentesco', event.target.value)} />
+                                    <Input id={`responsavel-${responsavel.chave}-telefone`} name={`responsaveis.${responsavel.chave}.telefone`}
+                                        label="Telefone" type="tel" placeholder="(11) 99999-9999"
+                                        value={responsavel.telefone} onChange={(event) => atualizarResponsavel(responsavel.chave, 'telefone', event.target.value)} />
+                                </div>
+                                <button type="button" aria-label={`Remover responsável ${indice + 1}`} onClick={() => removerResponsavel(responsavel.chave)}
+                                    className="mt-7 rounded-sm border border-slate-200 px-2 py-1 text-xs text-text-muted hover:bg-bg-surface">×</button>
+                            </div>
+                        ))}
+                        <div className="mb-md border-b border-gray-200 pb-sm">
+                            <h3 className="text-sm font-semibold text-text-main">Saúde e cuidados <span className="font-normal text-text-muted">(opcional)</span></h3>
+                        </div>
+                        <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
+                            <Input id="restricao-alimentar" name="restricao_alimentar" label="Restrição alimentar" placeholder="Ex: intolerância à lactose"
+                                value={formulario.dados_medicos.restricao_alimentar} onChange={(event) => atualizarDadoMedico('restricao_alimentar', event.target.value)} />
+                            <Select id="atividade-fisica" name="autorizado_atividade_fisica" label="Autorização para atividade física" placeholder="— Não informado —"
+                                value={formulario.dados_medicos.autorizado_atividade_fisica} onChange={(event) => atualizarDadoMedico('autorizado_atividade_fisica', event.target.value)}
+                                options={[{ value: 'true', label: 'Autorizado' }, { value: 'false', label: 'Não autorizado' }]} />
+                            <Select id="usa-medicamento" name="usa_medicamento" label="Uso de medicamento" placeholder="— Não informado —"
+                                value={formulario.dados_medicos.usa_medicamento} onChange={(event) => atualizarDadoMedico('usa_medicamento', event.target.value)}
+                                options={[{ value: 'true', label: 'Sim' }, { value: 'false', label: 'Não' }]} />
+                            <Select id="autorizacao-analgesico" name="autorizacao_analgesico" label="Em caso de dor" placeholder="— Não informado —"
+                                value={formulario.dados_medicos.autorizacao_analgesico} onChange={(event) => atualizarDadoMedico('autorizacao_analgesico', event.target.value)}
+                                options={[
+                                    { value: 'NENHUM', label: 'Nenhum' }, { value: 'PARACETAMOL', label: 'Paracetamol' },
+                                    { value: 'DIPIRONA', label: 'Dipirona' }, { value: 'AMBOS', label: 'Ambos' },
+                                ]} />
+                        </div>
+                        {formulario.dados_medicos.usa_medicamento === 'true' && (
+                            <Input id="medicamentos-descricao" name="medicamentos_descricao" label="Qual medicamento?" placeholder="Nome e dosagem, se houver" required
+                                value={formulario.dados_medicos.medicamentos_descricao} onChange={(event) => atualizarDadoMedico('medicamentos_descricao', event.target.value)} />
+                        )}
                         <div className="border-gray-200 border-b w-full py-sm mb-md">
                             <h3 className="font-semibold text-[14px] text-text-main px-1">Frequência</h3>
                         </div>
@@ -396,6 +488,7 @@ export function Alunos() {
                             <h3 className="text-[14px] font-semibold">Salvar como rascunho</h3>
                             <p>Informe nome, período e dias de frequência. A turma regular é opcional para o rascunho e não reserva vaga.</p>
                         </div>
+                        </fieldset>
                     </form>
                 </Modal>
             </div>

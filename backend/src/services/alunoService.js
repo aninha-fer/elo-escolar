@@ -1,8 +1,25 @@
 const prisma = require('../prismaClient');
 const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
 
+const selectResponsavel = {
+  id: true, pessoa_id: true, parentesco: true,
+  pessoa: { select: { nome: true, telefone: true } }
+};
+const selectDadosMedicos = {
+  restricao_alimentar: true, autorizado_atividade_fisica: true, usa_medicamento: true,
+  medicamentos_descricao: true, autorizacao_analgesico: true
+};
+
+function formatarResponsaveis(responsaveis = [], incluirTelefone = true) {
+  return responsaveis.map((vinculo) => ({
+    id: vinculo.id, pessoa_id: vinculo.pessoa_id, nome: vinculo.pessoa.nome, parentesco: vinculo.parentesco,
+    ...(incluirTelefone ? { telefone: vinculo.pessoa.telefone } : {})
+  }));
+}
+
 async function criarAlunoService(dadosAluno) {
-  const { nome, telefone, data_nascimento, nome_responsavel, telefone_responsavel, turno, dias_frequencia, participa_almoco, status, turma_id } = dadosAluno;
+  const { nome, telefone, data_nascimento, responsaveis = [], participa_procan = false, observacoes,
+    dados_medicos, turno, dias_frequencia, participa_almoco, status, turma_id } = dadosAluno;
 
   if (!nome || nome.trim() === '') {
     throw new Error('Informe ao menos o nome do aluno.');
@@ -31,8 +48,8 @@ async function criarAlunoService(dadosAluno) {
     const aluno = await tx.aluno.create({
       data: {
         pessoa_id: pessoa.id,
-        nome_responsavel: nome_responsavel || null,
-        telefone_responsavel: telefone_responsavel || null,
+        participa_procan,
+        observacoes: observacoes || null,
         turno: turno || null,
         dias_frequencia: dias_frequencia || [],
         participa_almoco: participa_almoco ?? false,
@@ -40,11 +57,28 @@ async function criarAlunoService(dadosAluno) {
       }
     });
 
+    const vinculosResponsaveis = [];
+    for (const responsavel of responsaveis) {
+      const pessoaResponsavel = await tx.pessoa.create({
+        data: { nome: responsavel.nome, telefone: responsavel.telefone || null, status_geral: 'ATIVO' }
+      });
+      const vinculo = await tx.aluno_responsavel.create({
+        data: { aluno_id: aluno.id, pessoa_id: pessoaResponsavel.id, parentesco: responsavel.parentesco || null }
+      });
+      vinculosResponsaveis.push({ ...vinculo, pessoa: pessoaResponsavel });
+    }
+    let dadosMedicos = null;
+    if (dados_medicos && Object.values(dados_medicos).some((valor) => valor != null)) {
+      dadosMedicos = await tx.aluno_dados_medicos.create({
+        data: { ...dados_medicos, aluno_id: aluno.id }, select: selectDadosMedicos
+      });
+    }
+
     if (turma_id) {
       await matricularTurmaRegularNaTransacao(tx, { aluno_id: aluno.id, turma_id });
     }
 
-    return { ...pessoa, ...aluno };
+    return { ...pessoa, ...aluno, responsaveis: formatarResponsaveis(vinculosResponsaveis), dados_medicos: dadosMedicos };
   }, { isolationLevel: 'ReadCommitted' });
 
   return novoAluno;
@@ -54,6 +88,10 @@ async function listarAlunosService() {
   const alunos = await prisma.aluno.findMany({
     include: {
       pessoa: true,
+      responsaveis: {
+        orderBy: { id: 'asc' },
+        select: { ...selectResponsavel, pessoa: { select: { nome: true } } }
+      },
       matriculas_turmas: {
         where: {
           OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', aluno: { status: 'RASCUNHO' } }],
@@ -84,7 +122,8 @@ async function listarAlunosService() {
     return {
       id: aluno.id,
       nome: aluno.pessoa.nome,
-      nome_responsavel: aluno.nome_responsavel,
+      responsaveis: formatarResponsaveis(aluno.responsaveis, false),
+      participa_procan: aluno.participa_procan,
       turno: aluno.turno,
       dias_frequencia: aluno.dias_frequencia,
       status: aluno.status,
@@ -99,6 +138,8 @@ async function obterAlunoService(aluno_id) {
     where: { id: aluno_id },
     include: {
       pessoa: true,
+      responsaveis: { orderBy: { id: 'asc' }, select: selectResponsavel },
+      dados_medicos: { select: selectDadosMedicos },
       matriculas_turmas: {
         where: { OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR', status: 'ATIVO' } },
         orderBy: { created_at: 'desc' },
@@ -108,9 +149,10 @@ async function obterAlunoService(aluno_id) {
     },
   });
   if (!aluno) return null;
-  const { matriculas_turmas, ...dados } = aluno;
+  const { matriculas_turmas, responsaveis, ...dados } = aluno;
   const regular = matriculas_turmas[0];
-  return { ...dados, turma_regular: regular?.turma ?? null,
+  return { ...dados, responsaveis: formatarResponsaveis(responsaveis), dados_medicos: aluno.dados_medicos ?? null,
+    turma_regular: regular?.turma ?? null,
     matricula_regular: regular ? { id: regular.id, status: regular.status } : null };
 }
 

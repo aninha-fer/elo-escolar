@@ -58,6 +58,17 @@ export function formatarStatus(status) {
     return rotulos[status] ?? status ?? 'Não definido';
 }
 
+export function formatarSimNao(valor) {
+    if (valor === true) return 'Sim';
+    if (valor === false) return 'Não';
+    return 'Não informado';
+}
+
+export function formatarAutorizacaoAnalgesico(valor) {
+    const rotulos = { NENHUM: 'Nenhum', PARACETAMOL: 'Paracetamol', DIPIRONA: 'Dipirona', AMBOS: 'Paracetamol e dipirona' };
+    return rotulos[valor] ?? 'Não informado';
+}
+
 export function formatarTelefone(telefone) {
     if (!telefone) return null;
 
