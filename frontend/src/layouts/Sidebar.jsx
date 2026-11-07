@@ -77,7 +77,10 @@ function Sidebar() {
                     </svg>
                     <a href="/">Profissionais</a>
                 </button>
-                <button className={`${botaoBase} ${botaoVariantes.normal}`}>
+                <NavLink
+                    to="/usuarios"
+                    className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
+                >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 15 15" fill="none">
                         <g clipPath="url(#clip0_2001_884)">
                             <path d="M10.6084 13.1044V11.8564C10.6084 11.1944 10.3454 10.5595 9.87727 10.0914C9.40916 9.62329 8.77428 9.36031 8.11227 9.36031H3.12011C2.4581 9.36031 1.82322 9.62329 1.35511 10.0914C0.887003 10.5595 0.624023 11.1944 0.624023 11.8564V13.1044" stroke="white" strokeOpacity="0.58" strokeWidth="1.24804" strokeLinecap="round" strokeLinejoin="round" />
@@ -92,7 +95,7 @@ function Sidebar() {
                         </defs>
                     </svg>
                     <a href="/">Usuários</a>
-                </button>
+                </NavLink>
             </div>
             <div className='flex items-center gap-md p-md mt-auto'>
                 <div className='w-10 h-10 bg-tertiary rounded-full flex items-center justify-center font-bold text-white'>S</div>

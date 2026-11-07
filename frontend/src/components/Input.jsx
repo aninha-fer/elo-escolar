@@ -1,10 +1,10 @@
-export function Input({className = '', inputClassName = '', labelClassName = '', label = '', placeholder = '', type = 'text', required = false, icon = null, iconPosition = 'left', children, id, ...props}) {
+export function Input({className = '', wrapperClassName = '', inputClassName = '', labelClassName = '', label = '', placeholder = '', type = 'text', required = false, icon = null, iconPosition = 'left', trailingAdornment = null, children, id, ...props}) {
     const hasLabel = Boolean(label);
     const hasIcon = Boolean(icon || children);
     const iconContent = icon ?? children;
 
     return (
-        <div className="w-full mb-md">
+        <div className={`w-full mb-md ${wrapperClassName}`}>
             {hasLabel && (
                 <label htmlFor={id} className={`mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-600 ${labelClassName}`}>
                     {label}
@@ -38,6 +38,7 @@ export function Input({className = '', inputClassName = '', labelClassName = '',
                     } ${inputClassName}`.trim()}
                     {...props}
                 />
+                {trailingAdornment}
             </div>
         </div>
     );
