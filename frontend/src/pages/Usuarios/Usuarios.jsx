@@ -52,6 +52,7 @@ export function Usuarios() {
 
     return (
         <div className="flex min-w-0 flex-col gap-lg">
+            <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Usuários</h1>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
                 <Input placeholder="Pesquisar por nome ou e-mail..." aria-label="Pesquisar por nome ou e-mail"
                     value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)}

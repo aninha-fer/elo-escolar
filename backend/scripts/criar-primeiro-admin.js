@@ -10,7 +10,7 @@ const prisma = require('../src/prismaClient');
 class ErroComando extends Error {}
 
 const emailSchema = z.string().trim().toLowerCase().max(254).pipe(z.email());
-const senhaSchema = z.string().min(8).max(256);
+const senhaSchema = z.string().min(8).max(100);
 
 function lerArgumentos() {
   let argumentos;
@@ -101,7 +101,7 @@ async function criarAdministrador() {
   const senha = await lerSenhaOculta('Senha inicial: ');
 
   if (!senhaSchema.safeParse(senha).success) {
-    throw new ErroComando('A senha deve ter entre 8 e 256 caracteres.');
+    throw new ErroComando('A senha deve ter entre 8 e 100 caracteres.');
   }
 
   const confirmacao = await lerSenhaOculta('Confirme a senha inicial: ');

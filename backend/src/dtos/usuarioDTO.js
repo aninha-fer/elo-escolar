@@ -3,7 +3,7 @@ const { z } = require('zod');
 const dadosConta = {
   email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
   role: z.enum(['admin', 'professor']),
-  senha: z.string().min(8).max(256),
+  senha: z.string().min(8).max(100),
 };
 
 const criarUsuarioDTO = z.discriminatedUnion('modo', [

@@ -6,6 +6,7 @@ import { Alunos } from '../pages/Alunos/Alunos';
 import { Usuarios } from '../pages/Usuarios/Usuarios';
 import { AlunoDetalhes } from '../pages/AlunoDetalhes';
 import { Login } from '../pages/Login';
+import { Profissionais } from '../pages/Profissionais/Profissionais';
 
 function ExigirSessao() {
   const { status, recarregarSessao } = useAuth();
@@ -38,7 +39,7 @@ function ExigirAdmin() {
 
   return usuario?.role === 'admin'
     ? <Outlet />
-    : <p role="alert">Você não tem acesso à tela de Usuários.</p>;
+    : <p role="alert">Você não tem permissão para acessar esta página.</p>;
 }
 
 export function AppRoutes() {
@@ -55,6 +56,7 @@ export function AppRoutes() {
 
             <Route element={<ExigirAdmin />}>
               <Route path="usuarios" element={<Usuarios />} />
+              <Route path="profissionais" element={<Profissionais />} />
             </Route>
           </Route>
         </Route>
