@@ -17,6 +17,18 @@ const usuarioRoutes = require('./routes/usuarioRoutes');
 const profissionalRoutes = require('./routes/profissionalRoutes');
 
 const app = express();
+
+const trustProxyHops = process.env.TRUST_PROXY_HOPS;
+if (trustProxyHops !== undefined) {
+  const hops = Number(trustProxyHops);
+
+  if (!Number.isSafeInteger(hops) || hops < 1) {
+    throw new Error('TRUST_PROXY_HOPS deve ser um inteiro positivo.');
+  }
+
+  app.set('trust proxy', hops);
+}
+
 const api = express.Router();
 
 app.use(cors({

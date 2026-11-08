@@ -219,6 +219,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                             turno={turno}
                             onCancelar={abrirCancelamento}
                             cancelando={cancelando || isSubmitting}
+                            permissao={permissao}
                         />
                     ))}
                 </ul>
