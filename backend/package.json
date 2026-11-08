@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test src/services/*.test.js",
     "postinstall": "prisma skills sync || exit 0",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "auth:criar-admin": "node scripts/criar-primeiro-admin.js"
   },
   "keywords": [],
   "author": "",
@@ -14,9 +15,13 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "argon2": "^0.45.2",
+    "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.3",
+    "express-session": "^1.19.0",
     "pg": "^8.23.0",
     "zod": "^4.5.4"
   },

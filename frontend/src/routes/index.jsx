@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { DefaultLayout } from '../layouts/DefaultLayout';
 import { Home } from '../pages/Home';
-import { Alunos } from '../pages/Alunos';
-import { Usuarios } from '../pages/Usuarios';
+import { Alunos } from '../pages/Alunos/Alunos';
+import { Usuarios } from '../pages/Usuarios/Usuarios';
 import { AlunoDetalhes } from '../pages/AlunoDetalhes';
 import { Login } from '../pages/Login';
 

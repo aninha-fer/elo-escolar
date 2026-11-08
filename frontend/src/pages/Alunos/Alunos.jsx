@@ -1,16 +1,16 @@
-import { FiltroEstado } from "../components/FiltroEstado";
-import { Button } from "../components/Button";
-import { TabelaAlunos } from "../components/TabelaAlunos";
 import { useState, useEffect, useRef } from 'react';
-import { alunoService } from '../services/alunoService';
-import { Modal } from "../components/Modal";
-import { Input } from "../components/Input";
-import { SelecaoOpcao } from "../components/SelecaoOpcao";
-import { SelecaoDiasSemana } from "../components/SelecaoDiasSemana";
-import { Select } from "../components/Select";
-import { Toggle } from "../components/Toggle";
-import { turmasService } from "../services/turmasService";
-import { formatarTurno } from "../utils/formatters";
+import { FiltroEstado } from "../../components/FiltroEstado";
+import { Button } from "../../components/Button";
+import { TabelaAlunos } from "./TabelaAlunos";
+import { alunoService } from '../../services/alunoService';
+import { Modal } from "../../components/Modal";
+import { Input } from "../../components/Input";
+import { SelecaoOpcao } from "../../components/SelecaoOpcao";
+import { SelecaoDiasSemana } from "../../components/SelecaoDiasSemana";
+import { Select } from "../../components/Select";
+import { Toggle } from "../../components/Toggle";
+import { turmasService } from "../../services/turmasService";
+import { formatarTurno } from "../../utils/formatters";
 
 const formularioInicial = {
     nome: '',

@@ -1,16 +1,9 @@
-import { FiltroEstado } from "../components/FiltroEstado";
-import { Button } from "../components/Button";
-import { TabelaAlunos } from "../components/TabelaAlunos";
-import { useState, useEffect, useRef } from 'react';
-import { alunoService } from '../services/alunoService';
-import { Modal } from "../components/Modal";
-import { Input } from "../components/Input";
-import { SelecaoOpcao } from "../components/SelecaoOpcao";
-import { SelecaoDiasSemana } from "../components/SelecaoDiasSemana";
-import { Select } from "../components/Select";
-import { Toggle } from "../components/Toggle";
-import { turmasService } from "../services/turmasService";
-import { formatarTurno } from "../utils/formatters";
+import { Button } from "../../components/Button";
+import { TabelaUsuarios } from "./TabelaUsuarios";
+import { useState, useRef } from 'react';
+import { Modal } from "../../components/Modal";
+import { Input } from "../../components/Input";
+import { Select } from "../../components/Select";
 
 const formularioInicial = {
     nome: '',
@@ -38,17 +31,13 @@ function normalizarTexto(valor = '') {
 }
 
 export function Usuarios() {
-    const [alunos, setAlunos] = useState([]);
-    const [turmas, setTurmas] = useState([]);
     const [formulario, setFormulario] = useState(formularioInicial);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
-    const [statusSelecionado, setStatusSelecionado] = useState('TODOS');
     const [termoBusca, setTermoBusca] = useState('');
-    const sequenciaResponsavel = useRef(0);
     const enviando = useRef(false);
 
     function atualizarCampo(campo, valor) {
@@ -137,7 +126,7 @@ export function Usuarios() {
                     </form>
                 </Modal>
             </div>
-            {/* <TabelaAlunos alunos={alunosFiltrados} /> */}
+            <TabelaUsuarios usuarios={''} />
         </div>
     )
 }
