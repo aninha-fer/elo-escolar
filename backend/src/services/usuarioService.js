@@ -34,6 +34,7 @@ function buscarPessoasElegiveis(q) {
     where: {
       status_geral: 'ATIVO',
       usuario: { is: null },
+      funcionario: { isNot: null },
       nome: { contains: q, mode: 'insensitive' },
     },
     select: { id: true, nome: true },

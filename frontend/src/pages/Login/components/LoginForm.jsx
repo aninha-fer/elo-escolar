@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { LoginIcon } from './LoginIcon';
@@ -10,6 +12,9 @@ export function LoginForm() {
     const [lembrar, setLembrar] = useState(true);
     const [erros, setErros] = useState({});
     const [aviso, setAviso] = useState('');
+    const navigate = useNavigate();
+    const { entrar } = useAuth();
+    const [enviando, setEnviando] = useState(false);
 
     function alterarCampo(campo, valor) {
         if (campo === 'email') setEmail(valor);
@@ -18,7 +23,7 @@ export function LoginForm() {
         setAviso('');
     }
 
-    function enviar(event) {
+    async function enviar(event) {
         event.preventDefault();
         const campos = event.currentTarget.elements;
         const novosErros = {};
@@ -36,8 +41,26 @@ export function LoginForm() {
             return;
         }
 
-        // Ponto de integração com o futuro fluxo de autenticação.
-        setAviso('O login ainda não está disponível. Aguarde a liberação do acesso pela instituição.');
+        setEnviando(true);
+
+        try {
+            await entrar({ email: email.trim(), senha });
+            navigate('/', { replace: true });
+        } catch (error) {
+            const codigo = error.response?.status;
+
+            if (codigo === 401) {
+                setAviso('E-mail ou senha inválidos.');
+            } else if (codigo === 403) {
+                setAviso('Acesso negado.');
+            } else if (codigo === 429) {
+                setAviso('Muitas tentativas. Tente novamente mais tarde.');
+            } else {
+                setAviso('Não foi possível entrar. Tente novamente.');
+            }
+        } finally {
+            setEnviando(false);
+        }
     }
 
     return (
@@ -67,13 +90,11 @@ export function LoginForm() {
             />
             {erros.senha && <p className="login-error" id="login-senha-error">{erros.senha}</p>}
             <div className="login-options flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <label className="flex cursor-pointer items-center gap-2" htmlFor="login-lembrar">
-                    <input id="login-lembrar" name="lembrar" type="checkbox" checked={lembrar} onChange={(event) => setLembrar(event.target.checked)} />
-                    <span>Lembrar de mim</span>
-                </label>
                 <button type="button" className="login-recovery" onClick={() => setAviso('A recuperação de senha ainda não está disponível. Entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
             </div>
-            <Button type="submit" className="login-submit">Entrar no sistema</Button>
+            <Button type="submit" className="login-submit" disabled={enviando}>
+                {enviando ? 'Entrando...' : 'Entrar no sistema'}
+            </Button>
             <p className="login-notice" role="status" aria-live="polite">{aviso}</p>
         </form>
     );

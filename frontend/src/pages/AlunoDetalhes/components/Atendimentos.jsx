@@ -18,7 +18,7 @@ const formularioInicial = {
 const erroInicioPassado = 'Não é possível agendar um atendimento em uma data ou horário no passado.';
 const erroInicioMensal = 'A data de início da recorrência mensal deve ser de segunda a sexta-feira.';
 
-export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSuccess }) {
+export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSuccess, permissao }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRecorrente, setIsRecorrente] = useState(false);
@@ -207,13 +207,13 @@ export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSucces
                 <h2 className="text-base font-bold text-text-main">
                     Atendimentos Clínicos ({atendimentos.length})
                 </h2>
-                <Button onClick={abrirModal}>
+                {permissao && <Button onClick={abrirModal}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M2.91406 6.99361H11.0733" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Novo Atendimento
-                </Button>
+                </Button>}
                 <Modal isOpen={isModalOpen}
                     onClose={fecharModal}
                     title="Novo Atendimento Clínico"

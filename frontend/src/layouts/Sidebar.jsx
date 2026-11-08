@@ -1,12 +1,34 @@
 import apaeLogo from '../assets/apae.png'
 import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 function Sidebar() {
+    const { usuario, sair } = useAuth();
+    const [saindo, setSaindo] = useState(false);
+    const [erroSaida, setErroSaida] = useState('');
+    const perfil = { admin: 'Administrador', professor: 'Professor' }[usuario?.role] ?? usuario?.role ?? '';
+    const inicial = usuario?.nome?.trim().charAt(0).toLocaleUpperCase('pt-BR') || '?';
     const botaoBase = 'rounded-sm flex items-center gap-sm p-sm font-inter text-[14px] [&_path]:stroke-current [&_path]:[stroke-opacity:1] ';
     const botaoVariantes = {
         normal: 'text-white/58 [&_svg]:text-white hover:bg-bg-surface/10',
         clicado: 'text-secondary [&_svg]:text-secondary bg-secondary/20 font-bold border-l-secondary border-l-[2px]',
     };
+
+    async function encerrarSessao() {
+        if (saindo) return;
+
+        setSaindo(true);
+        setErroSaida('');
+
+        try {
+            await sair();
+        } catch {
+            setErroSaida('Não foi possível sair do sistema. Tente novamente.');
+        } finally {
+            setSaindo(false);
+        }
+    }
 
     return (
         <div className="bg-primary w-[250px] min-h-screen flex flex-col pt-md font-inter">
@@ -77,7 +99,7 @@ function Sidebar() {
                     </svg>
                     <a href="/">Profissionais</a>
                 </button>
-                <NavLink
+                {usuario?.role === 'admin' && <NavLink
                     to="/usuarios"
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
@@ -94,16 +116,32 @@ function Sidebar() {
                             </clipPath>
                         </defs>
                     </svg>
-                    <a href="/">Usuários</a>
-                </NavLink>
+                    <span>Usuários</span>
+                </NavLink>}
             </div>
             <div className='flex items-center gap-md p-md mt-auto'>
-                <div className='w-10 h-10 bg-tertiary rounded-full flex items-center justify-center font-bold text-white'>S</div>
-                <div>
-                    <p className='font-bold text-bg-main/80 text-sm'>User name</p>
-                    <p className='font-bold text-bg-main/35 text-xs tracking-widest'>User role</p>
+                <div className='w-10 h-10 shrink-0 bg-tertiary rounded-full flex items-center justify-center font-bold text-white' aria-hidden="true">{inicial}</div>
+                <div className="min-w-0">
+                    <p className='truncate font-bold text-bg-main/80 text-sm' title={usuario?.nome}>{usuario?.nome}</p>
+                    <p className='truncate font-bold text-bg-main/35 text-xs tracking-widest' title={perfil}>{perfil}</p>
                 </div>
+                <button
+                    type="button"
+                    aria-label={saindo ? 'Saindo do sistema…' : 'Sair do sistema'}
+                    title={saindo ? 'Saindo do sistema…' : 'Sair do sistema'}
+                    aria-busy={saindo}
+                    disabled={saindo}
+                    className="ml-auto flex shrink-0 items-center justify-center rounded-sm p-sm text-white/35 transition-colors hover:bg-bg-surface/10 hover:text-white/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary disabled:cursor-wait disabled:opacity-50"
+                    onClick={encerrarSessao}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.16667" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M5.25 12.25H2.91667C2.60725 12.25 2.3105 12.1271 2.09171 11.9083C1.87292 11.6895 1.75 11.3928 1.75 11.0833V2.91667C1.75 2.60725 1.87292 2.3105 2.09171 2.09171C2.3105 1.87292 2.60725 1.75 2.91667 1.75H5.25" />
+                        <path d="M9.33337 9.91671L12.25 7.00004L9.33337 4.08337" />
+                        <path d="M12.25 7H5.25" />
+                    </svg>
+                </button>
             </div>
+            {erroSaida && <p role="alert" className="px-md pb-md text-sm text-red-300">{erroSaida}</p>}
         </div>
     )
 }

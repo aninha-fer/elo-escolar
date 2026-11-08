@@ -11,6 +11,7 @@ import { Select } from "../../components/Select";
 import { Toggle } from "../../components/Toggle";
 import { turmasService } from "../../services/turmasService";
 import { formatarTurno } from "../../utils/formatters";
+import { useAuth } from '../../contexts/AuthContext';
 
 const formularioInicial = {
     nome: '',
@@ -50,6 +51,8 @@ export function Alunos() {
     const [termoBusca, setTermoBusca] = useState('');
     const sequenciaResponsavel = useRef(0);
     const enviando = useRef(false);
+    const { usuario } = useAuth();
+    const podeEditar = usuario?.role === 'admin';
 
     useEffect(() => {
         const controller = new AbortController();
@@ -321,13 +324,13 @@ export function Alunos() {
                     </svg>
                     }
                 />
-                <Button className="shrink-0" onClick={abrirModal}>
+                {podeEditar && <Button className="shrink-0" onClick={abrirModal}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M2.91406 6.99361H11.0733" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Novo Aluno
-                </Button>
+                </Button> }
                 <Modal isOpen={isModalOpen}
                     onClose={fecharModal}
                     title="Cadastrar Novo Aluno"
