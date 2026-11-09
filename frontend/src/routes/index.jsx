@@ -7,6 +7,7 @@ import { Usuarios } from '../pages/Usuarios/Usuarios';
 import { AlunoDetalhes } from '../pages/AlunoDetalhes';
 import { Login } from '../pages/Login';
 import { Profissionais } from '../pages/Profissionais/Profissionais';
+import { Turmas } from '../pages/Turmas/Turmas';
 
 function ExigirSessao() {
   const { status, recarregarSessao } = useAuth();
@@ -53,6 +54,7 @@ export function AppRoutes() {
             <Route index element={<Home />} />
             <Route path="alunos" element={<Alunos />} />
             <Route path="alunos/:id" element={<AlunoDetalhes />} />
+            <Route path="turmas" element={<Turmas />} />
 
             <Route element={<ExigirAdmin />}>
               <Route path="usuarios" element={<Usuarios />} />

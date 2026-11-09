@@ -158,3 +158,36 @@ export function formatarMensagemConflito(conflito) {
             return conflito.mensagem || `${prefixoOficina}Conflito identificado na solicitação.`;
     }
 }
+
+export function normalizarProfissionais(turma) {
+    const profissionais = Array.isArray(turma.profissionais)
+        ? turma.profissionais
+        : Array.isArray(turma.profissional) ? turma.profissional : turma.profissional ? [turma.profissional] : [];
+
+    return profissionais.filter(Boolean).map((profissional) => ({
+        id: profissional.id,
+        nome: profissional.pessoa?.nome || profissional.nome || 'Profissional não informado',
+    }));
+}
+
+function extrairHora(valor) {
+    if (typeof valor !== 'string') return null;
+    const hora = valor.split('T').pop().slice(0, 5);
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(hora) ? hora : null;
+}
+
+export function agruparHorarios(horarios = []) {
+    const grupos = new Map();
+    for (const horario of horarios ?? []) {
+        const dia = horario.dia_semana;
+        const inicio = extrairHora(horario.hora_inicio);
+        const fim = extrairHora(horario.hora_fim);
+        if (!Number.isInteger(dia) || dia < 1 || dia > 7 || !inicio || !fim) continue;
+        const chave = `${inicio}-${fim}`;
+        if (!grupos.has(chave)) grupos.set(chave, { inicio, fim, dias: new Set() });
+        grupos.get(chave).dias.add(dia);
+    }
+    return [...grupos.values()]
+        .map((grupo) => ({ ...grupo, dias: [...grupo.dias].sort((a, b) => a - b) }))
+        .sort((a, b) => a.dias[0] - b.dias[0] || a.inicio.localeCompare(b.inicio) || a.fim.localeCompare(b.fim));
+}

@@ -92,7 +92,7 @@ export function FormularioUsuario({ onClose, onCriado }) {
                 <fieldset disabled={enviando} className="min-w-0">
                     <SelecaoOpcao label="Usuário" name="modo" required value={formulario.modo} onChange={(valor) => atualizarCampo('modo', valor)}
                         optionClassName="min-w-0" className="[&>div]:flex-col sm:[&>div]:flex-row"
-                        options={[{ value: 'nova', title: 'Novo usuário' }, { value: 'existente', title: 'Cadastrar usuário para funcionário existente' }]} />
+                        options={[{ value: 'nova', title: 'Novo', subtitle: 'Crie um usuário novo'}, { value: 'existente', title: 'Existente', subtitle: 'Crie um usuário para um funcionário já cadastrado' }]} />
                     {formulario.modo === 'nova' ? <>
                         <Input id="usuario-nome" name="nome" label="Nome completo" placeholder="Ex: Maria da Silva" maxLength={200} required
                             value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />

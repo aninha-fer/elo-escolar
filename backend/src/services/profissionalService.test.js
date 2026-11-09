@@ -81,10 +81,71 @@ test('listagem ordena por nome relacionado e preserva o contrato funcao sem expo
     prisma.funcionario.findMany = async (query) => {
         assert.deepEqual(query.orderBy, [{ pessoa: { nome: 'asc' } }, { id: 'asc' }]);
         assert.deepEqual(query.select.pessoa.select, { nome: true, telefone: true, status_geral: true });
-        return [{ id: 7, cargo: 'Professor', pessoa: { nome: 'Maria', telefone: null, status_geral: 'ATIVO' } }];
+        return [
+            { id: 7, cargo: 'Professor', pessoa: { nome: 'Maria', telefone: null, status_geral: 'ATIVO' } },
+            { id: 8, cargo: 'Auxiliar', pessoa: { nome: 'Paulo', telefone: null, status_geral: 'INATIVO' } },
+        ];
     };
     const res = resposta();
     await listarProfissionais({}, res);
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, [{ id: 7, nome: 'Maria', telefone: null, funcao: 'Professor', status_geral: 'ATIVO' }]);
+    assert.deepEqual(res.body, [
+        { id: 7, nome: 'Maria', telefone: null, funcao: 'Professor', status_geral: 'ATIVO' },
+        { id: 8, nome: 'Paulo', telefone: null, funcao: 'Auxiliar', status_geral: 'INATIVO' },
+    ]);
+});
+
+test('listagem oficial responde 200 mesmo sem profissionais cadastrados', async (t) => {
+    const original = prisma.funcionario.findMany;
+    t.after(() => { prisma.funcionario.findMany = original; });
+    prisma.funcionario.findMany = async () => [];
+    const res = resposta();
+    await listarProfissionais({}, res);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body, []);
+});
+
+test('falha na listagem oficial retorna mensagem pública sem detalhes internos', async (t) => {
+    const original = prisma.funcionario.findMany;
+    t.after(() => { prisma.funcionario.findMany = original; });
+    prisma.funcionario.findMany = async () => { throw new Error('Detalhe interno de conexão'); };
+    t.mock.method(console, 'error', () => {});
+    const res = resposta();
+    await listarProfissionais({}, res);
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.body, { erro: 'Erro interno ao listar profissionais.' });
+});
+
+test('rota oficial lista profissionais com permissão e a rota temporária foi removida', async (t) => {
+    const express = require('express');
+    const { createServer } = require('node:http');
+    const profissionalRoutes = require('../routes/profissionalRoutes');
+    const atendimentosRoutes = require('../routes/atendimentosRoutes');
+    const original = prisma.funcionario.findMany;
+    t.after(() => { prisma.funcionario.findMany = original; });
+    prisma.funcionario.findMany = async () => [
+        { id: 7, cargo: 'Terapeuta', pessoa: { nome: 'Ana', telefone: null, status_geral: 'ATIVO' } },
+    ];
+    const app = express();
+    app.use('/api', (req, res, next) => {
+        req.usuario = { role: req.get('x-test-role') || 'admin' };
+        next();
+    }, profissionalRoutes, atendimentosRoutes);
+    const server = createServer(app);
+    await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', resolve);
+    });
+    t.after(() => new Promise((resolve) => server.close(resolve)));
+    const baseUrl = `http://127.0.0.1:${server.address().port}/api`;
+
+    const oficial = await fetch(`${baseUrl}/profissionais`);
+    assert.equal(oficial.status, 200);
+    assert.deepEqual(await oficial.json(), [
+        { id: 7, nome: 'Ana', telefone: null, funcao: 'Terapeuta', status_geral: 'ATIVO' },
+    ]);
+    const semPermissao = await fetch(`${baseUrl}/profissionais`, { headers: { 'x-test-role': 'professor' } });
+    assert.equal(semPermissao.status, 403);
+    const temporaria = await fetch(`${baseUrl}/atendimentos/profissionais`);
+    assert.equal(temporaria.status, 404);
 });

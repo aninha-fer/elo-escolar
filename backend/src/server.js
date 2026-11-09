@@ -15,6 +15,7 @@ const matriculaRoutes = require('./routes/matriculaRoutes');
 const atendimentosRoutes = require('./routes/atendimentosRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const profissionalRoutes = require('./routes/profissionalRoutes');
+const ambienteRoutes = require('./routes/ambienteRoutes');
 
 const app = express();
 
@@ -65,9 +66,10 @@ api.use(exigirPermissao('administracao:acessar'));
 api.use(alunoAdminRoutes);
 api.use(matriculaRoutes);
 api.use(atendimentosRoutes);
-app.use(turmaAdminRoutes);
+api.use(turmaAdminRoutes);
 api.use(usuarioRoutes);
 api.use(profissionalRoutes);
+api.use(ambienteRoutes);
 
 api.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'API Elo Escolar operando.' });

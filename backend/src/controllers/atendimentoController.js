@@ -1,5 +1,5 @@
 const { criarAtendimentoDTO, removerAtendimentoProvisorioDTO } = require('../dtos/atendimentoDTO');
-const { agendarAtendimentoService, listarProfissionaisAtendimentoService, removerAtendimentoProvisorioService } = require('../services/atendimentoService');
+const { agendarAtendimentoService, removerAtendimentoProvisorioService } = require('../services/atendimentoService');
 
 async function criarAtendimento(req, res) {
   try {
@@ -23,16 +23,6 @@ async function criarAtendimento(req, res) {
   }
 }
 
-async function listarProfissionais(req, res) {
-  try {
-    const profissionais = await listarProfissionaisAtendimentoService();
-    return res.status(200).json(profissionais);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ erro: 'Erro interno ao listar profissionais.' });
-  }
-}
-
 async function removerAtendimentoProvisorio(req, res) {
   try {
     const dados = removerAtendimentoProvisorioDTO.parse(req.params);
@@ -45,4 +35,4 @@ async function removerAtendimentoProvisorio(req, res) {
   }
 }
 
-module.exports = { criarAtendimento, listarProfissionais, removerAtendimentoProvisorio };
+module.exports = { criarAtendimento, removerAtendimentoProvisorio };

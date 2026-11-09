@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../prismaClient');
-const { gerarDatasSessoes, obterDatasRecorrentes, agendarAtendimentoService, listarProfissionaisAtendimentoService } = require('./atendimentoService');
-const { criarAtendimento, listarProfissionais } = require('../controllers/atendimentoController');
+const { gerarDatasSessoes, obterDatasRecorrentes, agendarAtendimentoService } = require('./atendimentoService');
+const { criarAtendimento } = require('../controllers/atendimentoController');
 
 function datasDaRecorrencia(dados) {
   return obterDatasRecorrentes(dados).map((data) => data.toISOString().slice(0, 10));
@@ -550,43 +550,6 @@ test('última noite da oficina continua bloqueando até o fim da vigência', asy
   })] });
   await verificarConflito(() => agendarAtendimentoService({ ...dadosBase, hora_inicio: '23:45', duracao_minutos: 30 }),
     'CHOQUE_HORARIO_OFICINA');
-});
-
-test('seletor de profissionais usa IDs reais e retorna somente nome e cargo', async (t) => {
-  const original = prisma.funcionario.findMany;
-  t.after(() => { prisma.funcionario.findMany = original; });
-  prisma.funcionario.findMany = t.mock.fn(async ({ where }) => {
-    assert.deepEqual(where, { pessoa: { status_geral: 'ATIVO' } });
-    return [{ id: 2, cargo: 'Terapeuta', pessoa: { nome: 'Ana', telefone: 'telefone interno' } }];
-  });
-  assert.deepEqual(await listarProfissionaisAtendimentoService(), [{ id: 2, nome: 'Ana', cargo: 'Terapeuta' }]);
-});
-
-test('consulta de profissionais responde 200 mesmo sem cadastros ativos', async (t) => {
-  const original = prisma.funcionario.findMany;
-  t.after(() => { prisma.funcionario.findMany = original; });
-  prisma.funcionario.findMany = t.mock.fn(async () => []);
-  const res = {
-    status(codigo) { this.statusCode = codigo; return this; },
-    json(body) { this.body = body; return this; }
-  };
-  await listarProfissionais({}, res);
-  assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.body, []);
-});
-
-test('falha na consulta de profissionais retorna mensagem pública sem detalhes internos', async (t) => {
-  const original = prisma.funcionario.findMany;
-  t.after(() => { prisma.funcionario.findMany = original; });
-  prisma.funcionario.findMany = t.mock.fn(async () => { throw new Error('Detalhe interno de conexão'); });
-  t.mock.method(console, 'error', () => {});
-  const res = {
-    status(codigo) { this.statusCode = codigo; return this; },
-    json(body) { this.body = body; return this; }
-  };
-  await listarProfissionais({}, res);
-  assert.equal(res.statusCode, 500);
-  assert.deepEqual(res.body, { erro: 'Erro interno ao listar profissionais.' });
 });
 
 for (const [nome, inicio, horario] of [

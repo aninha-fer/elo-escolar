@@ -63,7 +63,7 @@ export function Usuarios() {
                         </svg>
                     } />
                 <Button type="button" className="shrink-0 disabled:cursor-not-allowed disabled:opacity-50" disabled={carregando || Boolean(erro)}
-                    onClick={() => { setAviso(''); setModalAberto(true); }}>
+                    onClick={() => { setModalAberto(true); }}>
                     <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732M2.91406 6.99361H11.0733" stroke="currentColor" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>

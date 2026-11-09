@@ -67,9 +67,12 @@ mês anterior. O limite de término, inclusivo, é aplicado sobre a data ajustad
 Frequência do aluno e conflitos são validados nas datas efetivamente agendadas.
 A regra vale para novas criações; as sessões já gravadas mantêm suas datas.
 
-`GET /api/atendimentos/profissionais` retorna os funcionários com pessoa ativa no formato
-`{ id, nome, cargo }`, ordenados por nome. A seleção não filtra especialidade por modalidade,
-pois esse relacionamento não existe no modelo atual.
+`GET /api/profissionais` é a listagem oficial compartilhada pela gestão de profissionais
+e pelo cadastro de atendimentos. Retorna `{ id, nome, telefone, funcao, status_geral }`,
+ordenados por nome, incluindo ativos e inativos. O formulário de atendimento oferece
+somente os registros com `status_geral: 'ATIVO'`, usando o ID do funcionário e a função
+no rótulo. A seleção não filtra especialidade por modalidade, pois esse relacionamento
+não existe no modelo atual. O acesso à listagem exige perfil de administrador.
 
 ## Listagem de atendimentos do aluno
 

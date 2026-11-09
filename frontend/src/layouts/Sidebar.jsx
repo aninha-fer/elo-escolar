@@ -68,7 +68,11 @@ function Sidebar() {
                     </svg>
                     <span>Alunos</span>
                 </NavLink>
-                <button className={`${botaoBase} ${botaoVariantes.normal}`}>
+                <NavLink
+                    to="/turmas"
+                    className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
+                >
+
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 15 15" fill="none">
                         <g clipPath="url(#clip0_2001_1262)">
                             <path d="M7.48826 1.24805L1.24805 4.36815L7.48826 7.48826L13.7285 4.36815L7.48826 1.24805Z" stroke="white" strokeOpacity="0.58" strokeWidth="1.24804" strokeLinecap="round" strokeLinejoin="round" />
@@ -82,7 +86,7 @@ function Sidebar() {
                         </defs>
                     </svg>
                     <a href="/">Turmas</a>
-                </button>
+                </NavLink>
                 {usuario?.role === 'admin' && <NavLink
                     to="/profissionais"
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
@@ -107,15 +111,13 @@ function Sidebar() {
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 15 15" fill="none">
-                        <g clipPath="url(#clip0_2001_884)">
-                            <path d="M10.6084 13.1044V11.8564C10.6084 11.1944 10.3454 10.5595 9.87727 10.0914C9.40916 9.62329 8.77428 9.36031 8.11227 9.36031H3.12011C2.4581 9.36031 1.82322 9.62329 1.35511 10.0914C0.887003 10.5595 0.624023 11.1944 0.624023 11.8564V13.1044" stroke="white" strokeOpacity="0.58" strokeWidth="1.24804" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M5.6162 6.86424C6.99475 6.86424 8.11228 5.7467 8.11228 4.36815C8.11228 2.9896 6.99475 1.87207 5.6162 1.87207C4.23765 1.87207 3.12012 2.9896 3.12012 4.36815C3.12012 5.7467 4.23765 6.86424 5.6162 6.86424Z" stroke="white" strokeOpacity="0.58" strokeWidth="1.24804" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M14.3525 13.1044V11.8564C14.3521 11.3033 14.168 10.7661 13.8292 10.329C13.4904 9.89189 13.016 9.5797 12.4805 9.44144" stroke="white" strokeOpacity="0.58" strokeWidth="1.24804" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M9.98438 1.95319C10.5213 2.09066 10.9972 2.40292 11.337 2.84074C11.6769 3.27856 11.8613 3.81703 11.8613 4.37127C11.8613 4.9255 11.6769 5.46398 11.337 5.9018C10.9972 6.33961 10.5213 6.65187 9.98438 6.78935" stroke="white" strokeOpacity="0.58" strokeWidth="1.24804" strokeLinecap="round" strokeLinejoin="round" />
+                        <g clip-path="url(#clip0_2166_647)">
+                            <path d="M7.5 13.75C7.5 13.75 12.5 11.25 12.5 7.5V3.125L7.5 1.25L2.5 3.125V7.5C2.5 11.25 7.5 13.75 7.5 13.75Z" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke="#93C5FD" />
+                            <path d="M5.625 7.5L6.875 8.75L9.375 6.25" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke="#93C5FD" />
                         </g>
                         <defs>
-                            <clipPath id="clip0_2001_884">
-                                <rect width="14.9765" height="14.9765" fill="white" />
+                            <clipPath id="clip0_2166_647">
+                                <rect width="15" height="15" fill="white" />
                             </clipPath>
                         </defs>
                     </svg>

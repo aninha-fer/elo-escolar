@@ -8,6 +8,7 @@ import { SelecaoDiasSemana } from "../../../components/SelecaoDiasSemana";
 import { SelecaoOpcao } from "../../../components/SelecaoOpcao";
 import { Toggle } from "../../../components/Toggle";
 import { atendimentosService } from "../../../services/atendimentosService";
+import { profissionaisService } from "../../../services/profissionaisService";
 import { formatarDataHoraInstituicao, formatarMensagemConflito } from "../../../utils/formatters";
 
 const formularioInicial = {
@@ -57,8 +58,8 @@ export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSucces
             try {
                 setCarregandoProfissionais(true);
                 setErroProfissionais('');
-                const dados = await atendimentosService.listarProfissionais(controller.signal);
-                if (!controller.signal.aborted) setProfissionais(dados);
+                const dados = await profissionaisService.listarTodos(controller.signal);
+                if (!controller.signal.aborted) setProfissionais(dados.filter((profissional) => profissional.status_geral === 'ATIVO'));
             } catch (err) {
                 if (controller.signal.aborted || err.code === 'ERR_CANCELED') return;
                 setErroProfissionais(err.response?.data?.erro || 'Não foi possível carregar os profissionais.');
@@ -251,7 +252,7 @@ export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSucces
                                     required
                                     options={profissionais.map((profissional) => ({
                                         value: profissional.id,
-                                        label: `${profissional.nome}${profissional.cargo ? ` · ${profissional.cargo}` : ''}`,
+                                        label: `${profissional.nome}${profissional.funcao ? ` · ${profissional.funcao}` : ''}`,
                                     }))}
                                 />
                             </div>
