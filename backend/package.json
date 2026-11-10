@@ -7,7 +7,8 @@
     "test": "node --test src/services/*.test.js",
     "postinstall": "prisma skills sync || exit 0",
     "dev": "nodemon src/server.js",
-    "auth:criar-admin": "node scripts/criar-primeiro-admin.js"
+    "auth:criar-admin": "node scripts/criar-primeiro-admin.js",
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
