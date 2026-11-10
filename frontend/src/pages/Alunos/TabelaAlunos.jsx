@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { formatarFrequencia, formatarStatus, formatarTurno } from '../utils/formatters';
+import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/formatters';
 
 export function TabelaAlunos({ alunos = [], onAcao }) {
     const navigate = useNavigate();

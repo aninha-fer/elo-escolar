@@ -353,15 +353,6 @@ async function agendarAtendimentoService(dadosAtendimento) {
   }, { isolationLevel: 'ReadCommitted' });
 }
 
-async function listarProfissionaisAtendimentoService() {
-  const profissionais = await prisma.funcionario.findMany({
-    where: { pessoa: { status_geral: 'ATIVO' } },
-    select: { id: true, cargo: true, pessoa: { select: { nome: true } } },
-    orderBy: [{ pessoa: { nome: 'asc' } }, { id: 'asc' }]
-  });
-  return profissionais.map(({ id, cargo, pessoa }) => ({ id, nome: pessoa.nome, cargo }));
-}
-
 async function removerAtendimentoProvisorioService({ aluno_id, atendimento_id }) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
@@ -393,4 +384,4 @@ async function removerAtendimentoProvisorioService({ aluno_id, atendimento_id })
 }
 
 module.exports = { agendarAtendimentoService, gerarDatasSessoes, obterDatasRecorrentes,
-  listarProfissionaisAtendimentoService, removerAtendimentoProvisorioService };
+  removerAtendimentoProvisorioService };

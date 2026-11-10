@@ -1,6 +1,6 @@
 import { formatarHora, formatarTurno } from '../utils/formatters';
 
-export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = false, onToggle, onCancelar, cancelando = false, planejando = false }) {
+export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = false, onToggle, onCancelar, cancelando = false, planejando = false, permissao }) {
     const dias = (oficina.dias ?? [])
         .sort((primeiro, segundo) => primeiro.numero - segundo.numero)
         .map((dia) => dia.nome)
@@ -63,14 +63,14 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
                     {' · '}{dias}
                 </p>
             </div>
-            <button
+            {permissao && <button
                 type="button"
                 className="shrink-0 rounded-sm border-1 border-danger bg-danger/20 px-md py-xs text-sm font-semibold text-danger transition-colors hover:bg-danger/30 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={cancelando || !onCancelar}
                 onClick={() => onCancelar?.(oficina)}
             >
                 Cancelar inscrição
-            </button>
+            </button>}
         </li>
     );
 }

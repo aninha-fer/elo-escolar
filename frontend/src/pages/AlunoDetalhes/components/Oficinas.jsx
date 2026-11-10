@@ -57,7 +57,7 @@ function normalizarTurmas(turmas) {
 }
 
 
-export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAluno, statusAluno, onSuccess }) {
+export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAluno, statusAluno, onSuccess, permissao }) {
     const oficinasAgrupadas = agruparOficinas(normalizarTurmas(oficinas.map((matricula) => ({
         ...matricula.turma, matricula_id: matricula.id, status_vinculo: matricula.status,
     }))));
@@ -170,13 +170,13 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                 <h2 className="text-base font-bold text-text-main">
                     Inscrições Ativas ({quantidadeAtivas})
                 </h2>
-                <Button onClick={abrirModal}>
+                {permissao && <Button onClick={abrirModal}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M2.91406 6.99361H11.0733" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Inscrever em Oficina
-                </Button>
+                </Button>}
                 <Modal isOpen={isModalOpen}
                     onClose={fecharModal}
                     title="Selecionar Oficinas para Inscrição"
@@ -219,6 +219,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                             turno={turno}
                             onCancelar={abrirCancelamento}
                             cancelando={cancelando || isSubmitting}
+                            permissao={permissao}
                         />
                     ))}
                 </ul>

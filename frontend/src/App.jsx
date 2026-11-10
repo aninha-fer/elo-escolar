@@ -1,15 +1,12 @@
-import Sidebar from "./layouts/Sidebar"
 import { AppRoutes } from "./routes"
-
+import { AuthProvider } from './contexts/AuthProvider';
 
 function App() {
 
   return (
-    <>
-      <div>
-        <AppRoutes/>
-      </div>
-    </>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   )
 }
 

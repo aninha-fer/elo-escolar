@@ -6,6 +6,7 @@ import { VisaoGeral } from './components/VisaoGeral';
 import { Oficinas } from './components/Oficinas';
 import { formatarDataHoraInstituicao, formatarTurno } from '../../utils/formatters';
 import { Atendimentos } from './components/Atendimentos';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function AlunoDetalhes() {
     const { id } = useParams();
@@ -22,6 +23,8 @@ export function AlunoDetalhes() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const dataReferencia = searchParams.get('data') || '';
+    const { usuario } = useAuth();
+    const podeEditar = usuario?.role === 'admin';
 
     useEffect(() => {
         let diaConsultado = formatarDataHoraInstituicao().slice(0, 10);
@@ -197,10 +200,11 @@ export function AlunoDetalhes() {
                         idAluno={id}
                         statusAluno={aluno?.status}
                         onSuccess={atualizarDados}
+                        permissao={podeEditar}
                     />
                 )}
                 {abaAtiva === 'atendimentos' && (
-                    <Atendimentos atendimentos={atendimentos} idAluno={id} statusAluno={aluno?.status} onSuccess={atualizarDados} />
+                    <Atendimentos atendimentos={atendimentos} idAluno={id} statusAluno={aluno?.status} onSuccess={atualizarDados} permissao={podeEditar}/>
                 )}
                 {/* {abaAtiva === 'historico' && <AbaHistorico alunoId={id} />} */}
             </div>

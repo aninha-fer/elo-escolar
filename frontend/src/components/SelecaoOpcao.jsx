@@ -32,6 +32,7 @@ export function SelecaoOpcao({
                             type="button"
                             name={name}
                             value={opcao.value}
+                            aria-pressed={isSelected}
                             onClick={() => !isDisabled && onChange?.(opcao.value)}
                             disabled={isDisabled}
                             className={`
