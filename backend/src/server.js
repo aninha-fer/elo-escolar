@@ -44,6 +44,11 @@ app.use('/api', (req, res, next) => {
 
 app.use(express.json());
 
+app.get('/healthz', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ status: 'ok' });
+});
+
 app.use('/api', sessionMiddleware);
 app.use('/api/auth', authPublicas);
 api.use(requireAuth);
