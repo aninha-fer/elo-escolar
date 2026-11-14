@@ -21,4 +21,20 @@ const criarUsuarioDTO = z.discriminatedUnion('modo', [
   }),
 ]);
 
-module.exports = { criarUsuarioDTO };
+const editarUsuarioDTO = z.object({
+  ...dadosConta,
+  status: z.enum(['ATIVO', 'INATIVO']),
+  pessoa: z.strictObject({
+    nome: z.string().trim().min(1).max(200),
+  }).partial()
+}).partial().strict().refine(
+  (dados) => dados.email !== undefined || dados.role !== undefined || dados.senha !== undefined ||
+    dados.status !== undefined || dados.pessoa?.nome !== undefined,
+  { message: "Informe ao menos um campo para atualizar" }
+);
+
+const editarUsuarioParamsDTO = z.object({
+  id: z.coerce.number().int().min(1).max(2147483647),
+});
+
+module.exports = { criarUsuarioDTO, editarUsuarioDTO, editarUsuarioParamsDTO };

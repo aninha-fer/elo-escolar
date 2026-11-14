@@ -35,7 +35,7 @@ export function TabelaProfissionais({ profissionais = [] }) {
                         <tr><td colSpan={6} className="px-lg py-10 text-center text-slate-500">Nenhum profissional encontrado.</td></tr>
                     ) : profissionais.map((profissional) => {
                         const nome = profissional.nome || 'Nome não informado';
-                        const inativo = profissional.status_geral === 'INATIVO';
+                        const inativo = profissional.status === 'INATIVO';
                         return (
                             <tr key={profissional.id} className={inativo ? 'bg-slate-50/50 text-slate-400' : 'text-text-main'}>
                                 <td className="px-lg py-md">

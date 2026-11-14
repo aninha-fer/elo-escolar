@@ -126,7 +126,7 @@ function simularConsultaTurma(t, consultar) {
 for (const tipo of ['REGULAR', 'OFICINA']) {
     test(`detalhe de ${tipo} consulta horários e somente matrículas ativas com dados pessoais limitados`, async (t) => {
         const horario = { id: 1, dia_semana: 2, hora_inicio: new Date('1970-01-01T08:15:00.000Z'), hora_fim: new Date('1970-01-01T09:15:00.000Z') };
-        const aluno = { id: 5, status: 'ATIVO', turno: 'MANHA', dias_frequencia: [2], pessoa: { nome: 'Ana' } };
+        const aluno = { id: 5, dias_frequencia: [2], pessoa: { nome: 'Ana' } };
         const dados = { id: 10, nome: 'Turma A', tipo, capacidade_maxima: 12, turno: 'MANHA',
             ambiente_id: 1, ambiente: { id: 1, nome: 'Sala A' }, descricao: 'Descrição', profissional_id: 2,
             profissional: { id: 2, cargo: 'Professor', pessoa: { nome: 'Maria' } }, ano_letivo: 2026,
@@ -136,7 +136,7 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
             assert.deepEqual(select.matriculas.where, { status: 'ATIVO' });
             assert.deepEqual(select.matriculas.orderBy, [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }]);
             assert.deepEqual(select.matriculas.select, { aluno: { select: {
-                id: true, status: true, turno: true, dias_frequencia: true, pessoa: { select: { nome: true } }
+                id: true, dias_frequencia: true, pessoa: { select: { nome: true } }
             } } });
             assert.deepEqual(select.horarios.orderBy, [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]);
             assert.deepEqual(select.profissional, { select: { id: true, cargo: true, pessoa: { select: { nome: true } } } });

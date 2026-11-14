@@ -35,6 +35,11 @@ enum status {
   PROVISORIO
 }
 
+enum status_simples {
+  ATIVO
+  INATIVO
+}
+
 enum autorizacao_analgesico {
   NENHUM
   PARACETAMOL
@@ -117,12 +122,13 @@ model usuario {
   email      String @unique
   senha_hash String
   role       String
+  status     status_simples @default(ATIVO)
 }
 
 model ambiente {
   id     Int     @id @default(autoincrement())
   nome   String
-  status status  @default(ATIVO)
+  status status_simples  @default(ATIVO)
   turmas turma[]
 }
 
@@ -138,7 +144,7 @@ model turma {
   profissional_id   Int
   profissional      funcionario  @relation(fields: [profissional_id], references: [id])
   ano_letivo        Int?
-  status            status       @default(ATIVO)
+  status            status_simples       @default(ATIVO)
   created_at        DateTime     @default(now())
 
   horarios   turma_horario[]

@@ -130,7 +130,6 @@ async function obterTurmaService(turma_id) {
       profissional: { select: { id: true, cargo: true, pessoa: { select: { nome: true } } } },
       ano_letivo: true,
       status: true,
-    //   created_at: true,
       horarios: {
         select: { id: true, dia_semana: true, hora_inicio: true, hora_fim: true },
         orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]

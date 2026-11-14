@@ -6,6 +6,7 @@ const camposPublicosUsuario = {
   pessoa_id: true,
   email: true,
   role: true,
+  status: true,
   pessoa: { select: { nome: true } },
 };
 
@@ -17,8 +18,8 @@ class ErroUsuario extends Error {
   }
 }
 
-function formatarUsuario({ id, pessoa_id, email, role, pessoa }) {
-  return { id, pessoa_id, nome: pessoa.nome, email, role };
+function formatarUsuario({ id, pessoa_id, email, role, status, pessoa }) {
+  return { id, pessoa_id, nome: pessoa.nome, email, role, status };
 }
 
 async function listarUsuarios() {
@@ -78,6 +79,7 @@ async function criarUsuario(dados) {
         email: dados.email,
         role: dados.role,
         senha_hash: senhaHash,
+        status: 'ATIVO',
         pessoa,
       },
       select: camposPublicosUsuario,
@@ -104,4 +106,56 @@ async function criarUsuario(dados) {
   }
 }
 
-module.exports = { ErroUsuario, listarUsuarios, criarUsuario };
+async function editarUsuario(id, dados) {
+  const existente = await prisma.usuario.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!existente) {
+    throw new ErroUsuario(404, 'Usuário não encontrado.');
+  }
+
+  if (dados.email !== undefined) {
+    const contaComEmail = await prisma.usuario.findFirst({
+      where: { id: { not: id }, email: { equals: dados.email, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (contaComEmail) {
+      throw new ErroUsuario(409, 'O e-mail informado já está em uso.', 'email');
+    }
+  }
+
+  const data = {
+    ...(dados.email !== undefined ? { email: dados.email } : {}),
+    ...(dados.role !== undefined ? { role: dados.role } : {}),
+    ...(dados.status !== undefined ? { status: dados.status } : {}),
+    ...(dados.pessoa?.nome !== undefined ? { pessoa: { update: { nome: dados.pessoa.nome } } } : {}),
+  };
+  if (dados.senha !== undefined) {
+    data.senha_hash = await argon2.hash(dados.senha, { type: argon2.argon2id });
+  }
+
+  try {
+    const usuario = await prisma.usuario.update({
+      where: { id },
+      data,
+      select: camposPublicosUsuario,
+    });
+
+    return formatarUsuario(usuario);
+  } catch (erro) {
+    if (erro.code === 'P2025') {
+      throw new ErroUsuario(404, 'Usuário não encontrado.');
+    }
+    if (erro.code === 'P2002') {
+      const campos = Array.isArray(erro.meta?.target) ? erro.meta.target : [erro.meta?.target];
+      if (campos.some((campo) => typeof campo === 'string' && campo.includes('email'))) {
+        throw new ErroUsuario(409, 'O e-mail informado já está em uso.', 'email');
+      }
+    }
+    throw erro;
+  }
+}
+
+module.exports = { ErroUsuario, listarUsuarios, criarUsuario, editarUsuario };

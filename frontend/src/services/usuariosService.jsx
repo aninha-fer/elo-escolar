@@ -9,4 +9,8 @@ export const usuariosService = {
         const { data } = await api.post('/usuarios', dadosUsuario);
         return data;
     },
+    async editar(id, dadosUsuario) {
+        const { data } = await api.patch(`/usuarios/${id}`, dadosUsuario);
+        return data;
+    },
 };

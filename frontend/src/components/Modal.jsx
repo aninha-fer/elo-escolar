@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 export function Modal({
   isOpen,
   onClose,
@@ -12,8 +14,12 @@ export function Modal({
   onSecondaryAction,
   isConfirmLoading,
   isConfirmDisabled,
-  showFooter = true
+  showFooter = true,
+  showHeader = true,
+  ariaLabelledBy,
+  ariaDescribedBy,
 }) {
+  const titleId = useId();
   if (!isOpen) return null;
 
   return (
@@ -23,17 +29,19 @@ export function Modal({
         onClick={onClose} 
       />
 
-      <div className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-clip">
+      <div role="dialog" aria-modal="true" aria-labelledby={ariaLabelledBy ?? (showHeader ? titleId : undefined)} aria-describedby={ariaDescribedBy}
+        className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-clip">
         
-        <div className="flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-bg-main">
-          <div>
-            <h2 className="text-lg font-bold text-text-main">{title}</h2>
+        <div className={showHeader ? 'flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-bg-main' : 'absolute right-5 top-5 z-10'}>
+          {showHeader && <div>
+            <h2 id={titleId} className="text-lg font-bold text-text-main">{title}</h2>
             {subtitle && <p className="text-xs text-text-muted mt-1">{subtitle}</p>}
-          </div>
+          </div>}
           <button 
             type="button" 
             onClick={onClose}
-            className="p-1 bg-bg-main text-text-main rounded-sm hover:bg-bg-surface"
+            aria-label="Fechar modal"
+            className={`p-1 text-text-main rounded-sm ${showHeader ? 'bg-bg-main hover:bg-bg-surface' : 'bg-bg-surface hover:bg-bg-main'}`}
           >
             ✕
           </button>

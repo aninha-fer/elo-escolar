@@ -1,4 +1,4 @@
-const { criarUsuarioDTO } = require('../dtos/usuarioDTO');
+const { criarUsuarioDTO, editarUsuarioDTO, editarUsuarioParamsDTO } = require('../dtos/usuarioDTO');
 const usuariosService = require('../services/usuarioService');
 
 function responderErro(res, erro) {
@@ -46,4 +46,28 @@ async function criarUsuario(req, res) {
   }
 }
 
-module.exports = { listarUsuarios, criarUsuario };
+async function editarUsuario(req, res) {
+  const parametros = editarUsuarioParamsDTO.safeParse(req.params);
+  if (!parametros.success) {
+    return res.status(400).json({ erro: 'ID do usuário inválido.' });
+  }
+  const resultado = editarUsuarioDTO.safeParse(req.body);
+
+  if (!resultado.success) {
+    const erros = resultado.error.issues.map(({ path, code, message }) => ({
+      campo: path.join('.'),
+      mensagem: code === 'unrecognized_keys' ? 'Há campos não permitidos.' : message,
+    }));
+
+    return res.status(400).json({ erro: 'Dados inválidos para editar o usuário.', erros });
+  }
+
+  try {
+    const usuario = await usuariosService.editarUsuario(parametros.data.id, resultado.data);
+    return res.status(200).json(usuario);
+  } catch (erro) {
+    return responderErro(res, erro);
+  }
+}
+
+module.exports = { listarUsuarios, criarUsuario, editarUsuario };
