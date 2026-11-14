@@ -23,6 +23,7 @@ export function TabelaProfissionais({ profissionais = [] }) {
                 <thead className="bg-bg-main text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <tr>
                         <th scope="col" className="px-lg py-md">Profissional</th>
+                        <th scope="col" className="px-lg py-md">Matrícula</th>
                         <th scope="col" className="px-md py-md">Função</th>
                         <th scope="col" className="px-md py-md">Telefone</th>
                         <th scope="col" className="px-md py-md">Status</th>
@@ -31,7 +32,7 @@ export function TabelaProfissionais({ profissionais = [] }) {
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                     {profissionais.length === 0 ? (
-                        <tr><td colSpan={5} className="px-lg py-10 text-center text-slate-500">Nenhum profissional encontrado.</td></tr>
+                        <tr><td colSpan={6} className="px-lg py-10 text-center text-slate-500">Nenhum profissional encontrado.</td></tr>
                     ) : profissionais.map((profissional) => {
                         const nome = profissional.nome || 'Nome não informado';
                         const inativo = profissional.status_geral === 'INATIVO';
@@ -43,6 +44,7 @@ export function TabelaProfissionais({ profissionais = [] }) {
                                         <span className="font-semibold">{nome}</span>
                                     </div>
                                 </td>
+                                <td className={`whitespace-nowrap px-md py-md font-mono text-xs ${inativo ? 'text-slate-400' : 'text-slate-500'}`}>{profissional.pessoa_id ?? '—'}</td>
                                 <td className="px-md py-md">
                                     <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${coresFuncao[profissional.funcao] ?? 'bg-slate-100 text-slate-500'} ${inativo ? 'opacity-60' : ''}`}>{profissional.funcao}</span>
                                 </td>

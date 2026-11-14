@@ -3,6 +3,7 @@ import { api } from './api';
 function normalizarProfissional(profissional) {
     return {
         id: profissional.id,
+        pessoa_id: profissional.pessoa_id,
         nome: profissional.nome,
         telefone: profissional.telefone,
         funcao: profissional.funcao ?? profissional.cargo,

@@ -3,11 +3,10 @@ import { z } from 'zod';
 import { Modal } from '../../components/Modal';
 import { Input } from '../../components/Input';
 import { Select } from '../../components/Select';
-import { SelecaoOpcao } from '../../components/SelecaoOpcao';
+import { Toggle } from '../../components/Toggle';
 import { usuariosService } from '../../services/usuariosService';
-import { SeletorFuncionario } from './SeletorFuncionario';
 
-const formularioInicial = { modo: 'nova', nome: '', pessoa_id: '', email: '', role: '', senha: '', confirmacao: '' };
+const formularioInicial = { modo: 'existente', nome: '', pessoa_id: '', email: '', role: '', senha: '', confirmacao: '' };
 const emailSchema = z.string().email().max(254);
 
 export function FormularioUsuario({ onClose, onCriado }) {
@@ -18,7 +17,7 @@ export function FormularioUsuario({ onClose, onCriado }) {
     const envioEmAndamento = useRef(false);
 
     function atualizarCampo(campo, valor) {
-        setFormulario((atual) => ({ ...atual, [campo]: valor, ...(campo === 'modo' ? { nome: '', pessoa_id: '' } : {}) }));
+        setFormulario((atual) => ({ ...atual, [campo]: valor }));
         setErros((atuais) => campo === 'modo' ? {} : { ...atuais, [campo]: undefined, ...(campo === 'senha' ? { confirmacao: undefined } : {}) });
         setErroEnvio('');
     }
@@ -34,10 +33,12 @@ export function FormularioUsuario({ onClose, onCriado }) {
         const novosErros = {};
         if (formulario.modo === 'nova' && !formulario.nome.trim()) novosErros.nome = 'Informe o nome completo.';
         if (formulario.modo === 'nova' && formulario.nome.trim().length > 200) novosErros.nome = 'O nome deve ter até 200 caracteres.';
-        if (formulario.modo === 'existente' && !formulario.pessoa_id) novosErros.pessoa_id = 'Busque e selecione um funcionário.';
+        if (formulario.modo === 'existente' && (!/^\d+$/.test(formulario.pessoa_id.trim()) || Number(formulario.pessoa_id) < 1 || Number(formulario.pessoa_id) > 2147483647)) {
+            novosErros.pessoa_id = 'Informe um código de pessoa inteiro e positivo válido.';
+        }
         if (!emailSchema.safeParse(formulario.email.trim()).success) novosErros.email = 'Informe um e-mail válido de até 254 caracteres.';
         if (!['admin', 'professor'].includes(formulario.role)) novosErros.role = 'Selecione a função do usuário.';
-        if (formulario.senha.length < 8 || formulario.senha.length > 256) novosErros.senha = 'A senha deve ter entre 8 e 256 caracteres.';
+        if (formulario.senha.length < 8 || formulario.senha.length > 100) novosErros.senha = 'A senha deve ter entre 8 e 100 caracteres.';
         if (!formulario.confirmacao || formulario.confirmacao !== formulario.senha) novosErros.confirmacao = 'A confirmação deve ser igual à senha.';
 
         setErros(novosErros);
@@ -45,8 +46,7 @@ export function FormularioUsuario({ onClose, onCriado }) {
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
             const campo = form.elements.namedItem(primeiroErro);
-            if (campo?.disabled) form.querySelector('#busca-funcionario')?.focus();
-            else campo?.focus();
+            campo?.focus();
             return;
         }
 
@@ -90,14 +90,21 @@ export function FormularioUsuario({ onClose, onCriado }) {
             confirmText="Criar usuário" cancelText="Cancelar" confirmFormId="form-cadastro-usuario" onConfirm={enviar} isConfirmLoading={enviando}>
             <form id="form-cadastro-usuario" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando} className="min-w-0">
-                    <SelecaoOpcao label="Usuário" name="modo" required value={formulario.modo} onChange={(valor) => atualizarCampo('modo', valor)}
-                        optionClassName="min-w-0" className="[&>div]:flex-col sm:[&>div]:flex-row"
-                        options={[{ value: 'nova', title: 'Novo', subtitle: 'Crie um usuário novo'}, { value: 'existente', title: 'Existente', subtitle: 'Crie um usuário para um funcionário já cadastrado' }]} />
-                    {formulario.modo === 'nova' ? <>
-                        <Input id="usuario-nome" name="nome" label="Nome completo" placeholder="Ex: Maria da Silva" maxLength={200} required
-                            value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />
-                        {erroCampo('nome')}
-                    </> : <SeletorFuncionario value={formulario.pessoa_id} onChange={(valor) => atualizarCampo('pessoa_id', valor)} error={erros.pessoa_id} />}
+                    <div className="grid grid-cols-1 items-start gap-md sm:grid-cols-2">
+                        <div>
+                            {formulario.modo === 'nova' ? <>
+                                <Input id="usuario-nome" name="nome" label="Nome completo" placeholder="Ex: Maria da Silva" maxLength={200} required
+                                    value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />
+                                {erroCampo('nome')}
+                            </> : <>
+                                <Input id="usuario-pessoa" name="pessoa_id" label="Código da pessoa" placeholder="Ex: 123" inputMode="numeric" maxLength={10} required
+                                    value={formulario.pessoa_id} onChange={(event) => atualizarCampo('pessoa_id', event.target.value)} {...acessibilidadeCampo('pessoa_id')} />
+                                {erroCampo('pessoa_id')}
+                            </>}
+                        </div>
+                        <Toggle label="Criar usuário sem vínculo no sistema" name="sem_vinculo" checked={formulario.modo === 'nova'}
+                            disabled={enviando} onChange={(checked) => atualizarCampo('modo', checked ? 'nova' : 'existente')} />
+                    </div>
                     <Input id="usuario-email" name="email" label="E-mail" type="email" placeholder="Ex: nome@apae.com" maxLength={254}
                         autoComplete="off" autoCapitalize="none" spellCheck={false} required value={formulario.email}
                         onChange={(event) => atualizarCampo('email', event.target.value)} {...acessibilidadeCampo('email')} />
@@ -107,12 +114,12 @@ export function FormularioUsuario({ onClose, onCriado }) {
                         options={[{ value: 'professor', label: 'Professor' }, { value: 'admin', label: 'Administrador' }]} />
                     <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
                         <div>
-                            <Input id="usuario-senha" name="senha" label="Senha" type="password" placeholder="Mínimo de 8 caracteres" minLength={8} maxLength={256}
+                            <Input id="usuario-senha" name="senha" label="Senha" type="password" placeholder="Mínimo de 8 caracteres" minLength={8} maxLength={100}
                                 autoComplete="new-password" required value={formulario.senha} onChange={(event) => atualizarCampo('senha', event.target.value)} {...acessibilidadeCampo('senha')} />
                             {erroCampo('senha')}
                         </div>
                         <div>
-                            <Input id="usuario-confirmacao" name="confirmacao" label="Confirmar senha" type="password" placeholder="Digite a senha novamente" maxLength={256}
+                            <Input id="usuario-confirmacao" name="confirmacao" label="Confirmar senha" type="password" placeholder="Digite a senha novamente" maxLength={100}
                                 autoComplete="new-password" required value={formulario.confirmacao} onChange={(event) => atualizarCampo('confirmacao', event.target.value)} {...acessibilidadeCampo('confirmacao')} />
                             {erroCampo('confirmacao')}
                         </div>

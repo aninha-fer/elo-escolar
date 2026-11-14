@@ -80,18 +80,19 @@ test('listagem ordena por nome relacionado e preserva o contrato funcao sem expo
     t.after(() => { prisma.funcionario.findMany = original; });
     prisma.funcionario.findMany = async (query) => {
         assert.deepEqual(query.orderBy, [{ pessoa: { nome: 'asc' } }, { id: 'asc' }]);
+        assert.equal(query.select.pessoa_id, true);
         assert.deepEqual(query.select.pessoa.select, { nome: true, telefone: true, status_geral: true });
         return [
-            { id: 7, cargo: 'Professor', pessoa: { nome: 'Maria', telefone: null, status_geral: 'ATIVO' } },
-            { id: 8, cargo: 'Auxiliar', pessoa: { nome: 'Paulo', telefone: null, status_geral: 'INATIVO' } },
+            { id: 7, pessoa_id: 50, cargo: 'Professor', pessoa: { nome: 'Maria', telefone: null, status_geral: 'ATIVO' } },
+            { id: 8, pessoa_id: 51, cargo: 'Auxiliar', pessoa: { nome: 'Paulo', telefone: null, status_geral: 'INATIVO' } },
         ];
     };
     const res = resposta();
     await listarProfissionais({}, res);
     assert.equal(res.statusCode, 200);
     assert.deepEqual(res.body, [
-        { id: 7, nome: 'Maria', telefone: null, funcao: 'Professor', status_geral: 'ATIVO' },
-        { id: 8, nome: 'Paulo', telefone: null, funcao: 'Auxiliar', status_geral: 'INATIVO' },
+        { id: 7, pessoa_id: 50, nome: 'Maria', telefone: null, funcao: 'Professor', status_geral: 'ATIVO' },
+        { id: 8, pessoa_id: 51, nome: 'Paulo', telefone: null, funcao: 'Auxiliar', status_geral: 'INATIVO' },
     ]);
 });
 
@@ -124,7 +125,7 @@ test('rota oficial lista profissionais com permissão e a rota temporária foi r
     const original = prisma.funcionario.findMany;
     t.after(() => { prisma.funcionario.findMany = original; });
     prisma.funcionario.findMany = async () => [
-        { id: 7, cargo: 'Terapeuta', pessoa: { nome: 'Ana', telefone: null, status_geral: 'ATIVO' } },
+        { id: 7, pessoa_id: 50, cargo: 'Terapeuta', pessoa: { nome: 'Ana', telefone: null, status_geral: 'ATIVO' } },
     ];
     const app = express();
     app.use('/api', (req, res, next) => {
@@ -142,7 +143,7 @@ test('rota oficial lista profissionais com permissão e a rota temporária foi r
     const oficial = await fetch(`${baseUrl}/profissionais`);
     assert.equal(oficial.status, 200);
     assert.deepEqual(await oficial.json(), [
-        { id: 7, nome: 'Ana', telefone: null, funcao: 'Terapeuta', status_geral: 'ATIVO' },
+        { id: 7, pessoa_id: 50, nome: 'Ana', telefone: null, funcao: 'Terapeuta', status_geral: 'ATIVO' },
     ]);
     const semPermissao = await fetch(`${baseUrl}/profissionais`, { headers: { 'x-test-role': 'professor' } });
     assert.equal(semPermissao.status, 403);

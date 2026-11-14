@@ -21,8 +21,4 @@ const criarUsuarioDTO = z.discriminatedUnion('modo', [
   }),
 ]);
 
-const buscarPessoasElegiveisDTO = z.object({
-  q: z.string().trim().min(2).max(100),
-});
-
-module.exports = { criarUsuarioDTO, buscarPessoasElegiveisDTO };
+module.exports = { criarUsuarioDTO };

@@ -48,6 +48,7 @@ async function listarProfissionaisService() {
     const profissionais = await prisma.funcionario.findMany({
         select: {
             id: true,
+            pessoa_id: true,
             cargo: true,
             pessoa: { select: { nome: true, telefone: true, status_geral: true } },
         },
@@ -57,6 +58,7 @@ async function listarProfissionaisService() {
     return profissionais.map(profissional => {
         return {
             id: profissional.id,
+            pessoa_id: profissional.pessoa_id,
             nome: profissional.pessoa.nome,
             telefone: profissional.pessoa.telefone,
             funcao: profissional.cargo,
