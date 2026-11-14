@@ -1,6 +1,11 @@
 import { api } from './api';
 
 export const turmasService = {
+  async buscarPorId(id, signal) {
+    const { data } = await api.get(`/turmas/${id}`, { signal });
+    return data;
+  },
+
   async criar(dadosTurma) {
     const { data } = await api.post('/turmas', dadosTurma);
     return data;

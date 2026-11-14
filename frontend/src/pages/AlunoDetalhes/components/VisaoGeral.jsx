@@ -1,15 +1,7 @@
 import { DivInformacoes } from "../../../components/DivInformacoes";
 import { CalendarioSemanal } from "../../../components/CalendarioSemanal";
 import { formatarDataBR, formatarFrequencia, formatarTelefone, formatarTurno, formatarSimNao, formatarAutorizacaoAnalgesico } from "../../../utils/formatters";
-
-function CampoInformacao({ titulo, valor }) {
-    return (
-        <div className="space-y-xs py-sm">
-            <dt className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{titulo}</dt>
-            <dd className="whitespace-pre-wrap break-words text-sm text-text-main">{valor ?? 'Não informado'}</dd>
-        </div>
-    );
-}
+import { CampoInformacao } from "../../../components/CampoInformacao";
 
 export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, onSelecionarSemana, carregandoAgenda, erroAgenda }) {
     const responsaveis = dadosAluno?.responsaveis ?? [];

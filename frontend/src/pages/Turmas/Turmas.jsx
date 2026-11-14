@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,6 +14,7 @@ function normalizarTexto(valor = '') {
 }
 
 export function Turmas() {
+    const navigate = useNavigate();
     const [tipoTurma, setTipoTurma] = useState('REGULAR');
     const [resultado, setResultado] = useState({ tipo: 'REGULAR', tentativa: 0, status: 'carregando', turmas: [] });
     const [tentativa, setTentativa] = useState(0);
@@ -101,7 +103,7 @@ export function Turmas() {
             ) : (
                 <ul aria-label={tipoTurma === 'REGULAR' ? 'Turmas regulares' : 'Oficinas'} className="flex min-w-0 flex-col gap-sm">
                     {filtrados.map((turma) => <TurmaItem key={turma.id} turma={turma} profissionais={turma.profissionais} podeEditar={podeEditar}
-                        onSelecionar={(selecionada) => setAviso(`Os detalhes de ${selecionada.nome} ainda não estão disponíveis.`)} />)}
+                        onSelecionar={(selecionada) => navigate(`/turmas/${selecionada.id}`)} />)}
                 </ul>
             )}
             {modalAberto && podeEditar && <FormularioTurma tipoInicial={tipoTurma} onClose={() => setModalAberto(false)} onCriado={turmaCriada} />}

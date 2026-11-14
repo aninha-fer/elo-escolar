@@ -4,6 +4,10 @@ export function formatarDataBR(dataIso) {
     return `${dia}/${mes}/${ano}`;
 }
 
+export function obterIniciais(nome = '') {
+    return nome.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((parte) => parte[0]).join('').toLocaleUpperCase('pt-BR') || '?';
+}
+
 export function formatarDataHoraInstituicao(data = new Date()) {
     const partes = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
