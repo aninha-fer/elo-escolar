@@ -1,6 +1,16 @@
 import { api } from './api';
 
 export const matriculasService = {
+  async matricularRegular(idAluno, idTurma) {
+    const aluno_id = Number(idAluno);
+    const turma_id = Number(idTurma);
+    if (!Number.isInteger(aluno_id) || aluno_id <= 0 || !Number.isInteger(turma_id) || turma_id <= 0) {
+      throw new Error('Aluno ou turma inválidos.');
+    }
+    const { data } = await api.post('/matriculas/regular', { aluno_id, turma_id });
+    return data;
+  },
+
   /**
    * @param {Object} params - Filtros
    * @param {AbortSignal} signal - Token de cancelamento

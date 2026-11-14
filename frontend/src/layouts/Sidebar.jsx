@@ -85,7 +85,7 @@ function Sidebar() {
                             </clipPath>
                         </defs>
                     </svg>
-                    <a href="/">Turmas</a>
+                    <span>Turmas</span>
                 </NavLink>
                 {usuario?.role === 'admin' && <NavLink
                     to="/profissionais"

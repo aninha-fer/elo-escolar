@@ -116,4 +116,42 @@ async function criarTurmaService(dadosTurma) {
     }, { isolationLevel: 'ReadCommitted' });
 }
 
-module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService };
+async function obterTurmaService(turma_id) {
+  const turma = await prisma.turma.findUnique({
+    where: { id: turma_id },
+    select: {
+      id: true,
+      nome: true,
+      tipo: true,
+      capacidade_maxima: true,
+      turno: true,
+      ambiente: { select: { id: true, nome: true } },
+      descricao: true,
+      profissional: { select: { id: true, cargo: true, pessoa: { select: { nome: true } } } },
+      ano_letivo: true,
+      status: true,
+    //   created_at: true,
+      horarios: {
+        select: { id: true, dia_semana: true, hora_inicio: true, hora_fim: true },
+        orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]
+      },
+      matriculas: {
+        where: { status: 'ATIVO' },
+        orderBy: [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }],
+        select: {
+          aluno: {
+            select: {
+              id: true, dias_frequencia: true,
+              pessoa: { select: { nome: true } }
+            }
+          }
+        }
+      }
+    },
+  });
+  if (!turma) return null;
+  const { matriculas, ...dados } = turma;
+  return { ...dados, alunos: matriculas.map((matricula) => matricula.aluno) };
+}
+
+module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService };

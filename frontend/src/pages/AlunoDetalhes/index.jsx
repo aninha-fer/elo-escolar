@@ -7,10 +7,10 @@ import { Oficinas } from './components/Oficinas';
 import { formatarDataHoraInstituicao, formatarTurno } from '../../utils/formatters';
 import { Atendimentos } from './components/Atendimentos';
 import { useAuth } from '../../contexts/AuthContext';
+import { BotaoVoltar } from '../../components/BotaoVoltar';
 
 export function AlunoDetalhes() {
     const { id } = useParams();
-    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [aluno, setAluno] = useState(null);
     const [agenda, setAgenda] = useState(null);
@@ -144,13 +144,7 @@ export function AlunoDetalhes() {
     return (
         <div className="space-y-lg">
             <div className="flex items-center gap-md">
-                <button
-                    onClick={() => navigate('/alunos')}
-                    className="px-sm py-sm text-sm font-medium text-tertiary font-semibold bg-bg-surface border border-tertiary rounded-md hover:bg-gray-50 transition-colors"
-                >
-                    ← Voltar
-                </button>
-
+                <BotaoVoltar to='/alunos' />
                 <div>
                     <h1 className="text-xl font-bold text-text-main">
                         {aluno?.pessoa?.nome ?? aluno?.nome ?? 'Aluno'}

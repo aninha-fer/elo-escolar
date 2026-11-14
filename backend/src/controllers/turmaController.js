@@ -1,5 +1,5 @@
-const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO } = require('../dtos/turmaDTO');
-const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService } = require('../services/turmaService');
+const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO } = require('../dtos/turmaDTO');
+const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService } = require('../services/turmaService');
 
 async function listarTurmas(req, res) {
   try {
@@ -36,4 +36,17 @@ async function criarTurma(req, res) {
   }
 }
 
-module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma };
+async function obterTurma(req, res) {
+  try {
+    const { id } = getTurmaDTO.parse(req.params);
+    const turma = await obterTurmaService(id);
+    if (!turma) return res.status(404).json({ erro: 'Turma não encontrada.' });
+    return res.status(200).json(turma);
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    console.error('Erro ao obter turma.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao obter turma.' });
+  }
+}
+
+module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma };

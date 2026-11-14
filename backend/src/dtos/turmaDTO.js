@@ -45,4 +45,8 @@ const criarTurmaDTO = z.object({
   if (dados.dias_semana.length === 0) erro('dias_semana', 'Selecione ao menos um dia da semana da oficina.');
 });
 
-module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO };
+const getTurmaDTO = z.object({
+  id: z.coerce.number().int().positive('O ID da turma deve ser um número positivo.').max(2147483647)
+});
+
+module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO };
