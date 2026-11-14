@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { profissionaisService } from '../../services/profissionaisService';
 import { TabelaProfissionais } from './TabelaProfissionais';
 import { FormularioProfissional } from './FormularioProfissional';
+import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
 function normalizarTexto(valor) {
     return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
@@ -17,6 +18,11 @@ export function Profissionais() {
     const [busca, setBusca] = useState('');
     const [modalAberto, setModalAberto] = useState(false);
     const [aviso, setAviso] = useState('');
+    const [operacao, setOperacao] = useState(null);
+    const [alterandoStatus, setAlterandoStatus] = useState(false);
+    const [erroStatus, setErroStatus] = useState('');
+    const [conflitos, setConflitos] = useState([]);
+    const envioStatusEmAndamento = useRef(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -47,6 +53,43 @@ export function Profissionais() {
         setAviso('Profissional cadastrado com sucesso.');
     }
 
+    function abrirOperacao(tipo, profissional) {
+        setAviso('');
+        setErroStatus('');
+        setConflitos([]);
+        setOperacao({ tipo, profissional });
+    }
+
+    function profissionalAtualizado(profissional, mensagem) {
+        setProfissionais((atuais) => atuais.map((atual) => atual.id === profissional.id ? profissional : atual)
+            .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+        setOperacao(null);
+        setAviso(mensagem);
+    }
+
+    function fecharConfirmacao() {
+        if (!envioStatusEmAndamento.current) setOperacao(null);
+    }
+
+    async function confirmarStatus() {
+        if (envioStatusEmAndamento.current || operacao?.tipo !== 'status') return;
+        const ativando = operacao.profissional.status_geral === 'INATIVO';
+        envioStatusEmAndamento.current = true;
+        setAlterandoStatus(true);
+        setErroStatus('');
+        setConflitos([]);
+        try {
+            const atualizado = await profissionaisService.editar(operacao.profissional.id, { status_geral: ativando ? 'ATIVO' : 'INATIVO' });
+            profissionalAtualizado(atualizado, ativando ? 'Profissional ativado com sucesso.' : 'Profissional inativado com sucesso.');
+        } catch (error) {
+            setErroStatus(error.response?.data?.erro || 'Não foi possível alterar o status do profissional. Tente novamente.');
+            setConflitos(error.response?.data?.conflitos ?? []);
+        } finally {
+            envioStatusEmAndamento.current = false;
+            setAlterandoStatus(false);
+        }
+    }
+
     const termo = normalizarTexto(busca);
     const filtrados = profissionais.filter((profissional) => normalizarTexto(profissional.nome).includes(termo));
 
@@ -73,8 +116,23 @@ export function Profissionais() {
                     <p role="alert">{erro}</p>
                     <button type="button" className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold" onClick={tentarNovamente}>Tentar novamente</button>
                 </div>
-            ) : <TabelaProfissionais profissionais={filtrados} />}
+            ) : <TabelaProfissionais profissionais={filtrados} onEditar={(profissional) => abrirOperacao('editar', profissional)}
+                onAlterarStatus={(profissional) => abrirOperacao('status', profissional)} />}
             {modalAberto && <FormularioProfissional onClose={() => setModalAberto(false)} onCriado={profissionalCriado} />}
+            {operacao?.tipo === 'editar' && <FormularioProfissional key={operacao.profissional.id} profissional={operacao.profissional}
+                onClose={() => setOperacao(null)} onSalvo={(profissional) => profissionalAtualizado(profissional, 'Profissional atualizado com sucesso.')} />}
+            {operacao?.tipo === 'status' && <ModalConfirmacao isOpen onClose={fecharConfirmacao} showCancel
+                estado={operacao.profissional.status_geral === 'INATIVO' ? 'confirmacao' : 'atencao'}
+                title={operacao.profissional.status_geral === 'INATIVO' ? 'Ativar profissional?' : 'Inativar profissional?'}
+                description={<>
+                    Deseja {operacao.profissional.status_geral === 'INATIVO' ? 'ativar' : 'inativar'} o profissional <strong>{operacao.profissional.nome}</strong>?
+                    {' '}O status da conta de usuário vinculada também será atualizado, se houver.
+                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}
+                        {conflitos.map((conflito, indice) => <span key={indice} className="mt-xs block">{conflito.mensagem}</span>)}
+                    </span>}
+                </>}
+                confirmText={operacao.profissional.status_geral === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}
+                onConfirm={confirmarStatus} isConfirmLoading={alterandoStatus} />}
         </section>
     );
 }

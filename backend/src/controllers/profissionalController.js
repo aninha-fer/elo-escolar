@@ -1,5 +1,5 @@
-const { criarProfissionalDTO } = require('../dtos/profissionalDTO');
-const { criarProfissionalService, listarProfissionaisService } = require('../services/profissionalService');
+const { criarProfissionalDTO, editarProfissionalDTO, editarProfissionalParamsDTO } = require('../dtos/profissionalDTO');
+const { criarProfissionalService, listarProfissionaisService, editarProfissionalService } = require('../services/profissionalService');
 
 async function criarProfissional(req, res) {
   try {
@@ -29,7 +29,23 @@ async function listarProfissionais(req, res) {
   }
 }
 
+async function editarProfissional(req, res) {
+  try {
+    const { id } = editarProfissionalParamsDTO.parse(req.params);
+    const dados = editarProfissionalDTO.parse(req.body);
+    const profissional = await editarProfissionalService(id, dados);
+    return res.status(200).json(profissional);
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.isConflict) return res.status(409).json({ erro: error.message, conflitos: error.detalhes });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    console.error('Erro ao editar profissional.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao editar profissional.' });
+  }
+}
+
 module.exports = {
   criarProfissional,
-  listarProfissionais
+  listarProfissionais,
+  editarProfissional,
 };

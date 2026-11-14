@@ -1,4 +1,5 @@
 import { formatarStatus, formatarTelefone } from '../../utils/formatters';
+import { BotaoAcoes } from '../../components/BotaoAcoes';
 
 const coresFuncao = {
     Professor: 'bg-blue-50 text-blue-600',
@@ -15,7 +16,7 @@ function obterIniciais(nome) {
     return nome.trim().split(/\s+/).slice(0, 2).map((parte) => parte[0]).join('').toLocaleUpperCase('pt-BR');
 }
 
-export function TabelaProfissionais({ profissionais = [] }) {
+export function TabelaProfissionais({ profissionais = [], onEditar, onAlterarStatus }) {
     return (
         <div className="w-full overflow-x-auto rounded-md border border-slate-200 bg-bg-surface shadow-sm">
             <table className="w-max min-w-full table-auto border-collapse text-left text-sm">
@@ -35,7 +36,8 @@ export function TabelaProfissionais({ profissionais = [] }) {
                         <tr><td colSpan={6} className="px-lg py-10 text-center text-slate-500">Nenhum profissional encontrado.</td></tr>
                     ) : profissionais.map((profissional) => {
                         const nome = profissional.nome || 'Nome não informado';
-                        const inativo = profissional.status === 'INATIVO';
+                        const inativo = profissional.status_geral === 'INATIVO';
+                        const ativo = profissional.status_geral === 'ATIVO';
                         return (
                             <tr key={profissional.id} className={inativo ? 'bg-slate-50/50 text-slate-400' : 'text-text-main'}>
                                 <td className="px-lg py-md">
@@ -53,10 +55,11 @@ export function TabelaProfissionais({ profissionais = [] }) {
                                     <span className={`inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold before:mr-2 before:size-1.5 before:rounded-full ${coresStatus[profissional.status_geral] ?? 'bg-slate-100 text-slate-500'}`}>{formatarStatus(profissional.status_geral)}</span>
                                 </td>
                                 <td className="px-lg py-md text-right">
-                                    <button type="button" disabled aria-label={`Ações indisponíveis para ${nome}`} title="Ações ainda indisponíveis"
-                                        className="inline-flex size-9 cursor-not-allowed items-center justify-center rounded-sm border-2 border-slate-200 bg-bg-surface text-slate-400 opacity-60">
-                                        <svg width="16" height="16" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" /><circle cx="15" cy="9" r="1.5" /></svg>
-                                    </button>
+                                    <BotaoAcoes label={`Ações para ${nome}`} options={[
+                                        { id: 'editar', label: 'Editar', disabled: !ativo || !onEditar, onClick: () => onEditar(profissional) },
+                                        { id: 'status', label: inativo ? 'Ativar profissional' : 'Inativar profissional', textColor: inativo ? '#059669' : '#DC2626',
+                                            disabled: (!ativo && !inativo) || !onAlterarStatus, onClick: () => onAlterarStatus(profissional) },
+                                    ]} />
                                 </td>
                             </tr>
                         );

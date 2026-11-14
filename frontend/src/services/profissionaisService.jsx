@@ -20,4 +20,8 @@ export const profissionaisService = {
         const { data } = await api.post('/profissionais', dadosProfissional);
         return normalizarProfissional(data);
     },
+    async editar(id, dadosProfissional) {
+        const { data } = await api.patch(`/profissionais/${id}`, dadosProfissional);
+        return normalizarProfissional(data);
+    },
 };

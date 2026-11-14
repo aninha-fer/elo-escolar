@@ -126,11 +126,15 @@ async function editarUsuario(id, dados) {
     }
   }
 
+  const dadosPessoa = {
+    ...(dados.pessoa?.nome !== undefined ? { nome: dados.pessoa.nome } : {}),
+    ...(dados.status === 'ATIVO' ? { status_geral: 'ATIVO' } : {}),
+  };
   const data = {
     ...(dados.email !== undefined ? { email: dados.email } : {}),
     ...(dados.role !== undefined ? { role: dados.role } : {}),
     ...(dados.status !== undefined ? { status: dados.status } : {}),
-    ...(dados.pessoa?.nome !== undefined ? { pessoa: { update: { nome: dados.pessoa.nome } } } : {}),
+    ...(Object.keys(dadosPessoa).length ? { pessoa: { update: dadosPessoa } } : {}),
   };
   if (dados.senha !== undefined) {
     data.senha_hash = await argon2.hash(dados.senha, { type: argon2.argon2id });

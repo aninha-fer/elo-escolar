@@ -5,12 +5,19 @@ import { profissionaisService } from '../../services/profissionaisService';
 
 const funcoes = ['Professor', 'Terapeuta', 'Auxiliar'];
 
-export function FormularioProfissional({ onClose, onCriado }) {
-    const [formulario, setFormulario] = useState({ nome: '', telefone: '', cargo: '' });
+export function FormularioProfissional({ profissional, onClose, onCriado, onSalvo }) {
+    const editando = Boolean(profissional);
+    const [formulario, setFormulario] = useState(() => ({ nome: profissional?.nome ?? '', telefone: profissional?.telefone ?? '', cargo: profissional?.funcao ?? '' }));
     const [erros, setErros] = useState({});
     const [erroEnvio, setErroEnvio] = useState('');
     const [enviando, setEnviando] = useState(false);
     const envioEmAndamento = useRef(false);
+    const funcoesDisponiveis = [...new Set([...funcoes, ...(profissional?.funcao ? [profissional.funcao] : [])])];
+    const dadosAlterados = {
+        ...(editando && formulario.nome.trim() !== profissional.nome ? { nome: formulario.nome.trim() } : {}),
+        ...(editando && (formulario.telefone.replace(/\D/g, '') || null) !== profissional.telefone ? { telefone: formulario.telefone.replace(/\D/g, '') || null } : {}),
+        ...(editando && formulario.cargo !== profissional.funcao ? { cargo: formulario.cargo } : {}),
+    };
 
     function atualizarCampo(campo, valor) {
         setFormulario((atual) => ({ ...atual, [campo]: valor }));
@@ -32,7 +39,7 @@ export function FormularioProfissional({ onClose, onCriado }) {
         if (nome.length < 2) novosErros.nome = 'Informe o nome completo, com pelo menos 2 caracteres.';
         if (telefone && !/^\d{10,11}$/.test(telefone)) novosErros.telefone = 'Informe um telefone com DDD e 10 ou 11 dígitos.';
         if (formulario.telefone.trim() && !telefone) novosErros.telefone = 'Informe um telefone válido ou deixe o campo vazio.';
-        if (!funcoes.includes(formulario.cargo)) novosErros.cargo = 'Selecione uma função.';
+        if (!funcoesDisponiveis.includes(formulario.cargo)) novosErros.cargo = 'Selecione uma função.';
         setErros(novosErros);
         setErroEnvio('');
         const primeiroErro = Object.keys(novosErros)[0];
@@ -41,11 +48,17 @@ export function FormularioProfissional({ onClose, onCriado }) {
             return;
         }
 
+        if (editando && !Object.keys(dadosAlterados).length) return;
         envioEmAndamento.current = true;
         setEnviando(true);
         try {
-            const profissional = await profissionaisService.criar({ nome, cargo: formulario.cargo, ...(telefone ? { telefone } : {}) });
-            onCriado(profissional);
+            if (editando) {
+                const atualizado = await profissionaisService.editar(profissional.id, dadosAlterados);
+                onSalvo(atualizado);
+            } else {
+                const criado = await profissionaisService.criar({ nome, cargo: formulario.cargo, ...(telefone ? { telefone } : {}) });
+                onCriado(criado);
+            }
         } catch (error) {
             const errosCampos = {};
             for (const item of error.response?.data?.erros ?? []) {
@@ -53,7 +66,7 @@ export function FormularioProfissional({ onClose, onCriado }) {
                 if (['nome', 'telefone', 'cargo'].includes(campo)) errosCampos[campo] = item.message;
             }
             setErros(errosCampos);
-            setErroEnvio(error.response?.data?.erro || 'Não foi possível cadastrar o profissional. Verifique os dados e tente novamente.');
+            setErroEnvio(error.response?.data?.erro || `Não foi possível ${editando ? 'editar' : 'cadastrar'} o profissional. Verifique os dados e tente novamente.`);
         } finally {
             envioEmAndamento.current = false;
             setEnviando(false);
@@ -66,16 +79,16 @@ export function FormularioProfissional({ onClose, onCriado }) {
 
     return (
         <div className="profissional-modal">
-            <Modal isOpen onClose={fecharModal} title="Cadastrar Profissional" subtitle={<>Campos com <span className="text-danger">*</span> são obrigatórios</>}
+            <Modal isOpen onClose={fecharModal} title={editando ? 'Editar Profissional' : 'Cadastrar Profissional'} subtitle={<>Campos com <span className="text-danger">*</span> são obrigatórios</>}
                 confirmText={
                     <span className="inline-flex items-center gap-sm">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" />
                         </svg>
-                        Cadastrar Profissional
+                        {editando ? 'Salvar alterações' : 'Cadastrar Profissional'}
                     </span>
                 } cancelText="Cancelar" confirmFormId="form-cadastro-profissional" onConfirm={enviar}
-                isConfirmLoading={enviando} isConfirmDisabled={!formulario.nome.trim() || !formulario.cargo}>
+                isConfirmLoading={enviando} isConfirmDisabled={!formulario.nome.trim() || !formulario.cargo || (editando && !Object.keys(dadosAlterados).length)}>
                 <form id="form-cadastro-profissional" onSubmit={enviar} noValidate>
                     <fieldset disabled={enviando} className="min-w-0">
                         <Input id="profissional-nome" name="nome" label="Nome completo" placeholder="Ex: João Silva" autoComplete="name" required
@@ -87,7 +100,7 @@ export function FormularioProfissional({ onClose, onCriado }) {
                         <fieldset className="mb-md" {...acessibilidadeCampo('cargo')}>
                             <legend className="mb-sm font-mono text-xs font-semibold uppercase tracking-wider text-slate-600">Função <span className="text-danger">*</span></legend>
                             <div className="flex flex-wrap gap-sm">
-                                {funcoes.map((funcao) => (
+                                {funcoesDisponiveis.map((funcao) => (
                                     <label key={funcao} className="cursor-pointer">
                                         <input type="radio" name="cargo" value={funcao} checked={formulario.cargo === funcao} required
                                             onChange={(event) => atualizarCampo('cargo', event.target.value)} className="peer sr-only" />

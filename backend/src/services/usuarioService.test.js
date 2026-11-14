@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const argon2 = require('argon2');
 const prisma = require('../prismaClient');
 const { criarUsuario, editarUsuario } = require('../controllers/usuarioController');
+const { buscarIdentidadePorId } = require('./authService');
 
 const conta = { modo: 'existente', pessoa_id: 50, email: 'conta@example.com', role: 'professor', senha: 'senha-de-teste' };
 function resposta() {
@@ -98,10 +99,10 @@ test('busca por nome removida não permanece disponível na API de usuários', a
     assert.equal(response.status, 404);
 });
 
-function simularEdicao(t, { existe = true, emailDuplicado = false, falha } = {}) {
-    const salvo = { id: 7, pessoa_id: 50, email: conta.email, role: 'professor', status: 'ATIVO', pessoa: { nome: 'Maria' } };
+function simularEdicao(t, { existe = true, emailDuplicado = false, falha, status = 'ATIVO', statusPessoa = 'ATIVO' } = {}) {
+    const salvo = { id: 7, pessoa_id: 50, email: conta.email, role: 'professor', status, pessoa: { nome: 'Maria', status_geral: statusPessoa } };
     for (const [metodo, fn] of [
-        ['findUnique', async ({ where }) => { assert.deepEqual(where, { id: 7 }); return existe ? { id: 7 } : null; }],
+        ['findUnique', async ({ where }) => { assert.deepEqual(where, { id: 7 }); return existe ? salvo : null; }],
         ['findFirst', async ({ where }) => {
             assert.deepEqual(where.id, { not: 7 });
             assert.equal(where.email.mode, 'insensitive');
@@ -111,7 +112,9 @@ function simularEdicao(t, { existe = true, emailDuplicado = false, falha } = {})
             assert.deepEqual(where, { id: 7 });
             assert.equal('senha_hash' in select, false);
             if (falha) throw falha;
-            return { ...salvo, ...data, pessoa: data.pessoa ? { nome: data.pessoa.update.nome } : salvo.pessoa };
+            const pessoa = { ...salvo.pessoa, ...(data.pessoa?.update ?? {}) };
+            Object.assign(salvo, data, { pessoa });
+            return salvo;
         }],
     ]) {
         const original = prisma.usuario[metodo];
@@ -119,6 +122,7 @@ function simularEdicao(t, { existe = true, emailDuplicado = false, falha } = {})
         prisma.usuario[metodo] = t.mock.fn(fn);
     }
     t.mock.method(argon2, 'hash', async () => 'novo-hash');
+    return salvo;
 }
 
 for (const [body, esperado] of [
@@ -127,7 +131,7 @@ for (const [body, esperado] of [
     [{ senha: 'nova-senha-teste' }, { senha_hash: 'novo-hash' }],
     [{ pessoa: { nome: ' Maria Silva ' } }, { pessoa: { update: { nome: 'Maria Silva' } } }],
     [{ status: 'INATIVO' }, { status: 'INATIVO' }],
-    [{ status: 'ATIVO' }, { status: 'ATIVO' }],
+    [{ status: 'ATIVO' }, { status: 'ATIVO', pessoa: { update: { status_geral: 'ATIVO' } } }],
 ]) {
     test(`edição aceita somente ${Object.keys(body)[0]} e preserva campos omitidos`, async (t) => {
         simularEdicao(t);
@@ -186,3 +190,43 @@ for (const [falha, esperado] of [[{ code: 'P2025' }, 404], [{ code: 'P2002', met
         assert.equal(res.code, esperado);
     });
 }
+
+test('ativar conta com pessoa inativa também ativa a pessoa e libera a identidade autenticada', async (t) => {
+    const salvo = simularEdicao(t, { status: 'INATIVO', statusPessoa: 'INATIVO' });
+    assert.equal(await buscarIdentidadePorId(7), null);
+    const res = resposta();
+    await editarUsuario({ params: { id: '7' }, body: { status: 'ATIVO' } }, res);
+    assert.equal(res.code, 200);
+    assert.equal(salvo.status, 'ATIVO');
+    assert.equal(salvo.pessoa.status_geral, 'ATIVO');
+    assert.deepEqual(prisma.usuario.update.mock.calls[0].arguments[0].data, {
+        status: 'ATIVO', pessoa: { update: { status_geral: 'ATIVO' } },
+    });
+    assert.deepEqual(await buscarIdentidadePorId(7), { id: 7, nome: 'Maria', email: conta.email, role: 'professor' });
+});
+
+test('ativação junto com nome mantém os dois campos na atualização da pessoa', async (t) => {
+    const salvo = simularEdicao(t, { status: 'INATIVO', statusPessoa: 'INATIVO' });
+    const res = resposta();
+    await editarUsuario({ params: { id: '7' }, body: { status: 'ATIVO', pessoa: { nome: 'Maria Silva' } } }, res);
+    assert.equal(res.code, 200);
+    assert.deepEqual(salvo.pessoa, { nome: 'Maria Silva', status_geral: 'ATIVO' });
+});
+
+test('editar dados sem solicitar ativação não ativa a pessoa', async (t) => {
+    const salvo = simularEdicao(t, { statusPessoa: 'INATIVO' });
+    const res = resposta();
+    await editarUsuario({ params: { id: '7' }, body: { pessoa: { nome: 'Maria Silva' } } }, res);
+    assert.equal(res.code, 200);
+    assert.equal(salvo.pessoa.status_geral, 'INATIVO');
+    assert.deepEqual(prisma.usuario.update.mock.calls[0].arguments[0].data, { pessoa: { update: { nome: 'Maria Silva' } } });
+});
+
+test('falha na atualização não deixa conta ou pessoa parcialmente ativada', async (t) => {
+    const salvo = simularEdicao(t, { status: 'INATIVO', statusPessoa: 'INATIVO', falha: { code: 'P2025' } });
+    const res = resposta();
+    await editarUsuario({ params: { id: '7' }, body: { status: 'ATIVO' } }, res);
+    assert.equal(res.code, 404);
+    assert.equal(salvo.status, 'INATIVO');
+    assert.equal(salvo.pessoa.status_geral, 'INATIVO');
+});
