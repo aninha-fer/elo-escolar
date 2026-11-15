@@ -21,7 +21,7 @@ const criarTurmaDTO = z.object({
   tipo: z.enum(['REGULAR', 'OFICINA']),
   nome: z.string().trim().min(1, 'Informe o nome da turma.'),
   turno: z.enum(['MANHA', 'TARDE']),
-  ambiente_id: inteiroOpcional(z.number().int().positive()),
+  ambiente_id: z.number().int().positive(),
   capacidade_maxima: inteiroOpcional(z.number().int().nonnegative()),
   ano_letivo: inteiroOpcional(z.number().int().positive()),
   descricao: z.string().trim().nullish(),
@@ -49,4 +49,24 @@ const getTurmaDTO = z.object({
   id: z.coerce.number().int().positive('O ID da turma deve ser um número positivo.').max(2147483647)
 });
 
-module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO };
+const editarTurmaDTO = z.object({
+  nome: z.string().trim().min(1, 'Informe o nome da turma.'),
+  turno: z.enum(['MANHA', 'TARDE']),
+  ano_letivo: z.number().int().positive(),
+  ambiente_id: z.number().int().positive(),
+  capacidade_maxima: z.number().int().nonnegative().nullable(),
+  descricao: z.string().trim().nullable(),
+  profissional_id: z.number().int().positive(),
+  hora_inicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  hora_fim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  dias_semana: z.array(z.number().int().min(1).max(5)).nonempty(),
+  status: z.enum(['ATIVO', 'INATIVO']),
+}).partial().strict().superRefine((dados, contexto) => {
+  const campos = Object.keys(dados).filter((campo) => dados[campo] !== undefined);
+  if (!campos.length) contexto.addIssue({ code: 'custom', message: 'Informe ao menos um campo para atualizar.' });
+  if (campos.some((campo) => campo !== 'status') && dados.ambiente_id === undefined) {
+    contexto.addIssue({ code: 'custom', path: ['ambiente_id'], message: 'Selecione a sala da turma.' });
+  }
+});
+
+module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO };

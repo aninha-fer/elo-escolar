@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma } = require('../controllers/turmaController');
+const { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma } = require('../controllers/turmaController');
 const { exigirPermissao } = require('../middlewares/exigirPermissao');
 
 const turmaLeituraRoutes = Router();
@@ -11,5 +11,6 @@ turmaLeituraRoutes.get('/turmas/regulares', lerTurmas, listarTurmasRegularesPorT
 turmaLeituraRoutes.get('/turmas/:id', lerTurmas, obterTurma);
 
 turmaAdminRoutes.post('/turmas', criarTurma);
+turmaAdminRoutes.patch('/turmas/:id', exigirPermissao('administracao:acessar'), editarTurma);
 
 module.exports = { turmaLeituraRoutes, turmaAdminRoutes };

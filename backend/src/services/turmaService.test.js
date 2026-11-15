@@ -4,8 +4,8 @@ const prisma = require('../prismaClient');
 const { criarTurmaService, obterTurmaService } = require('./turmaService');
 const { criarTurma, obterTurma } = require('../controllers/turmaController');
 
-const regular = { tipo: 'REGULAR', nome: ' Turma A ', turno: 'MANHA', profissional_id: 1, ano_letivo: 2026 };
-const oficina = { tipo: 'OFICINA', nome: 'Artes', turno: 'MANHA', profissional_id: 1,
+const regular = { tipo: 'REGULAR', nome: ' Turma A ', turno: 'MANHA', profissional_id: 1, ambiente_id: 2, ano_letivo: 2026 };
+const oficina = { tipo: 'OFICINA', nome: 'Artes', turno: 'MANHA', profissional_id: 1, ambiente_id: 2,
     hora_inicio: '08:15', hora_fim: '09:15', dias_semana: [2, 4] };
 
 function simularTransacao(t, { cargo = 'Professor', profissionalExiste = true, salaExiste = true, falhaHorarios } = {}) {
@@ -41,7 +41,7 @@ for (const turno of ['MANHA', 'TARDE']) {
         const turma = await criarTurmaService({ ...regular, turno, hora_inicio: '00:00', dias_semana: [7], capacidade_maxima: 0 });
         assert.equal(turma.nome, 'Turma A');
         assert.equal(turma.profissional_id, 1);
-        assert.equal(turma.ambiente_id, null);
+        assert.equal(turma.ambiente_id, 2);
         assert.equal(turma.capacidade_maxima, 0);
         assert.equal(turma.descricao, null);
         assert.deepEqual(turma.horarios.map((h) => [h.dia_semana, h.hora_inicio.toISOString(), h.hora_fim.toISOString()]),
@@ -78,7 +78,7 @@ test('entradas inválidas são recusadas antes da transação', async (t) => {
         { ...regular, ano_letivo: undefined }, { ...regular, nome: ' ' }, { ...regular, tipo: 'INVALIDO' },
         { ...regular, turno: 'NOITE' }, { ...regular, profissional_id: [1, 2] },
         { ...regular, capacidade_maxima: -1 }, { ...regular, capacidade_maxima: 1.5 },
-        { ...regular, ano_letivo: 2026.5 }, { ...regular, ambiente_id: 0 },
+        { ...regular, ano_letivo: 2026.5 }, { ...regular, ambiente_id: 0 }, { ...regular, ambiente_id: undefined }, { ...regular, ambiente_id: null },
         { ...oficina, dias_semana: [] }, { ...oficina, dias_semana: [0] }, { ...oficina, dias_semana: [8] },
         { ...oficina, dias_semana: [1.5] }, { ...oficina, hora_inicio: undefined },
         { ...oficina, hora_fim: '11:00' }, { ...oficina, turno: 'TARDE' }
@@ -143,7 +143,7 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
             assert.deepEqual(select.ambiente, { select: { id: true, nome: true } });
             return { ...dados, matriculas: [{ aluno }] };
         });
-        assert.deepEqual(await obterTurmaService(10), { ...dados, alunos: [aluno] });
+        assert.deepEqual(await obterTurmaService(10), { ...dados, possui_matriculas: true, alunos: [aluno] });
     });
 }
 
@@ -186,7 +186,7 @@ test('controller responde 200 convertendo o ID da URL para número', async (t) =
     const res = resposta();
     await obterTurma({ params: { id: '12' } }, res);
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, { id: 12, horarios: [], alunos: [] });
+    assert.deepEqual(res.body, { id: 12, horarios: [], possui_matriculas: false, alunos: [] });
 });
 
 test('erro do banco retorna 500 sem expor detalhes internos', async (t) => {
@@ -221,7 +221,7 @@ test('GET /api/turmas/:id respeita permissão de leitura e não captura /turmas/
     for (const [role, codigo] of [[null, 401], ['outro', 403], ['professor', 200], ['admin', 200]]) {
         const response = await fetch(`${base}/1`, { headers: role ? { 'x-test-role': role } : {} });
         assert.equal(response.status, codigo);
-        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], alunos: [] });
+        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], possui_matriculas: false, alunos: [] });
     }
     assert.equal(consultar.mock.callCount(), 2);
     const regulares = await fetch(`${base}/regulares`, { headers: { 'x-test-role': 'professor' } });

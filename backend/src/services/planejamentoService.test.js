@@ -148,6 +148,35 @@ function simularBanco(t, inicial = {}) {
   return estado;
 }
 
+for (const tipo of ['REGULAR', 'OFICINA']) {
+  test(`${tipo}: matrícula provisória aguarda o bloqueio da turma e revalida seu status`, async (t) => {
+    const banco = simularBanco(t, { turma: [turma(10, tipo)] });
+    let liberar, sinalizar;
+    const bloqueada = new Promise((resolve) => { sinalizar = resolve; });
+    const continuar = new Promise((resolve) => { liberar = resolve; });
+    const inativacao = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${10} FOR UPDATE`;
+      sinalizar();
+      await continuar;
+      await tx.turma.update({ where: { id: 10 }, data: { status: 'INATIVO' } });
+    });
+    await bloqueada;
+    const matricula = tipo === 'REGULAR'
+      ? matricularTurmaRegularService({ aluno_id: 1, turma_id: 10 })
+      : matricularOficinasService({ aluno_id: 1, oficinas_ids: [10] });
+    const resultado = matricula.then(() => null, (erro) => erro);
+    try {
+      await new Promise(setImmediate);
+      assert.equal(banco.matricula_turma.length, 0);
+    } finally {
+      liberar();
+    }
+    await inativacao;
+    assert.ok(await resultado);
+    assert.equal(banco.matricula_turma.length, 0);
+  });
+}
+
 test('cadastro de rascunho aceita regular lotada e mantém pessoa inativa e vínculo provisório', async (t) => {
   const banco = simularBanco(t, { turma: [turma(20, 'REGULAR', 0)] });
   const criado = await criarAlunoService({ nome: 'Rascunho', status: 'RASCUNHO', turno: 'MANHA', dias_frequencia: [1, 2], turma_id: 20 });

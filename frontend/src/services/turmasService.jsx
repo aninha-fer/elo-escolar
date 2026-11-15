@@ -1,6 +1,10 @@
 import { api } from './api';
 
 export const turmasService = {
+  async editar(id, dadosTurma) {
+    const { data } = await api.patch(`/turmas/${id}`, dadosTurma);
+    return data;
+  },
   async buscarPorId(id, signal) {
     const { data } = await api.get(`/turmas/${id}`, { signal });
     return data;

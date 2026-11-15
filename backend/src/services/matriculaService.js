@@ -21,7 +21,7 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }) {
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
     const aluno = await tx.aluno.findUnique({ where: { id: aluno_id } });
     const status = obterStatusVinculo(aluno);
-    if (status === 'ATIVO') await bloquearTurmas(tx, [turma_id]);
+    await bloquearTurmas(tx, [turma_id]);
     const turma = await tx.turma.findUnique({ where: { id: turma_id }, include: { horarios: true } });
     if (!turma || turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
         const erro = new Error('A turma regular informada não existe ou está inativa.');
@@ -136,7 +136,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
     });
 
     const statusVinculo = obterStatusVinculo(aluno);
-    if (statusVinculo === 'ATIVO') await bloquearTurmas(tx, oficinas_ids);
+    await bloquearTurmas(tx, oficinas_ids);
 
     const dataInicio = obterDataInicioMatricula();
     const oficinas = await tx.turma.findMany({
