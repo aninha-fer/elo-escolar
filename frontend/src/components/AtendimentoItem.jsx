@@ -1,6 +1,8 @@
-import { formatarDataBR, formatarFrequencia, formatarHora } from '../utils/formatters';
+import { formatarDataBR, formatarFrequencia, formatarHora, formatarDataHoraInstituicao } from '../utils/formatters';
+import { BotaoAcoes } from './BotaoAcoes';
+import EditIcon from './icons/EditIcon';
 
-export function AtendimentoItem({ atendimento, onCancelar, cancelando = false }) {
+export function AtendimentoItem({ atendimento, onEditar, onCancelar, cancelando = false }) {
     const semanal = atendimento.tipo_recorrencia === 'SEMANAL';
     const mensal = atendimento.tipo_recorrencia === 'MENSAL';
     const frequencia = atendimento.frequencia ?? 1;
@@ -9,6 +11,8 @@ export function AtendimentoItem({ atendimento, onCancelar, cancelando = false })
         : mensal ? frequencia === 1 ? 'Mensal' : `A cada ${frequencia} meses` : 'Pontual';
     const dias = semanal ? formatarFrequencia([...(atendimento.dias_semana ?? [])].sort((a, b) => a - b)) : '';
     const horaInicio = atendimento.hora_inicio?.split('T').pop();
+    const eventualIniciado = atendimento.tipo_recorrencia === 'EVENTUAL' &&
+        `${atendimento.data_inicio?.slice(0, 10)}T${atendimento.hora_inicio?.slice(11, 19)}.000` <= formatarDataHoraInstituicao(new Date());
     const periodo = semanal || mensal
         ? `${formatarDataBR(atendimento.data_inicio)}${atendimento.data_termino
             ? ` até ${formatarDataBR(atendimento.data_termino)}` : ' · Sem data de término'}`
@@ -30,19 +34,17 @@ export function AtendimentoItem({ atendimento, onCancelar, cancelando = false })
                         🕐 {formatarHora(horaInicio)} · {atendimento.duracao_minutos} min {dias ? ` · ${dias}` : ''}
                     </p>
                     <p className="text-text-muted text-[14px]">
-                        📅 {periodo}
+                        📅 {semanal || mensal ? 'Início planejado: ' : ''}{periodo}
                     </p>
                 </div>
                 {mensal && <p className="text-xs text-text-muted">Confira na agenda as datas de cada sessão mensal.</p>}
             </div>
-            {onCancelar && <button
-                type="button"
-                className="shrink-0 rounded-sm border-1 border-danger bg-danger/20 px-md py-xs text-sm font-semibold text-danger transition-colors hover:bg-danger/30 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={cancelando || !onCancelar}
-                onClick={() => onCancelar?.(atendimento)}
-            >
-                Cancelar atendimento
-            </button>}
+            {(onEditar || onCancelar) && <BotaoAcoes testId={`atendimento-${atendimento.id}-acoes`} label={`Ações para ${atendimento.modalidade}`} disabled={cancelando} options={[
+                { id: 'editar', label: 'Editar', disabled: !onEditar || eventualIniciado,
+                    icon: <EditIcon />, onClick: () => onEditar?.(atendimento) },
+                { id: 'cancelar', label: 'Cancelar', disabled: !onCancelar, textColor: '#DC2626',
+                    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 6 12 12M6 18 18 6" /></svg>, onClick: () => onCancelar?.(atendimento) },
+            ]} />}
         </li>
     );
 }

@@ -131,17 +131,17 @@ export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, 
             </header>
 
             <div className="flex flex-wrap items-center gap-sm border-b border-gray-300 px-md py-sm">
-                <button type="button" aria-label="Semana anterior" disabled={carregando || !agenda}
+                <button data-testid="aluno-agenda-semana-anterior" type="button" aria-label="Semana anterior" disabled={carregando || !agenda}
                     onClick={() => onSelecionarSemana(adicionarDias(agenda.semana_inicio, -7))}
                     className="rounded-sm border border-gray-300 px-sm py-xs text-sm disabled:opacity-50">←</button>
-                <button type="button" onClick={() => onSelecionarSemana('')} disabled={carregando}
+                <button data-testid="aluno-agenda-semana-atual" type="button" onClick={() => onSelecionarSemana('')} disabled={carregando}
                     className="rounded-sm border border-gray-300 px-sm py-xs text-sm disabled:opacity-50">Semana atual</button>
-                <button type="button" aria-label="Próxima semana" disabled={carregando || !agenda}
+                <button data-testid="aluno-agenda-semana-seguinte" type="button" aria-label="Próxima semana" disabled={carregando || !agenda}
                     onClick={() => onSelecionarSemana(adicionarDias(agenda.semana_inicio, 7))}
                     className="rounded-sm border border-gray-300 px-sm py-xs text-sm disabled:opacity-50">→</button>
                 <label className="flex items-center gap-sm text-sm text-text-muted">
                     Ir para a semana de
-                    <input type="date" aria-label="Data de referência da semana" disabled={carregando}
+                    <input data-testid="aluno-agenda-data-referencia" type="date" aria-label="Data de referência da semana" disabled={carregando}
                         value={dataReferencia || agenda?.semana_inicio || ''}
                         onChange={(event) => onSelecionarSemana(event.target.value)}
                         className="rounded-sm border border-gray-300 bg-bg-surface px-sm py-xs text-text-main" />

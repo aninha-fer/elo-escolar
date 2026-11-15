@@ -2,8 +2,9 @@ import { DivInformacoes } from "../../../components/DivInformacoes";
 import { CalendarioSemanal } from "../../../components/CalendarioSemanal";
 import { formatarDataBR, formatarFrequencia, formatarTelefone, formatarTurno, formatarSimNao, formatarAutorizacaoAnalgesico } from "../../../utils/formatters";
 import { CampoInformacao } from "../../../components/CampoInformacao";
+import EditIcon from "../../../components/icons/EditIcon";
 
-export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, onSelecionarSemana, carregandoAgenda, erroAgenda }) {
+export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, onSelecionarSemana, carregandoAgenda, erroAgenda, permissao, onEditar, carregandoEdicao = false }) {
     const responsaveis = dadosAluno?.responsaveis ?? [];
     const medicos = dadosAluno?.dados_medicos;
     const atividadeFisica = medicos?.autorizado_atividade_fisica;
@@ -11,14 +12,22 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, o
     return (
         <div className="flex flex-col items-start gap-lg xl:flex-row">
             <div className="w-full shrink-0 space-y-lg xl:w-1/4">
-                <DivInformacoes destaque={dadosAluno?.participa_procan && (
-                    <span className="rounded-sm border border-amber-300 bg-amber-50 px-1 text-[10px] font-semibold text-amber-800">Procan</span>
-                )}>
+                <DivInformacoes destaque={
+                    <div className="inline-flex shrink-0 items-center gap-sm">
+                        {dadosAluno?.participa_procan && (
+                            <span className="rounded-sm border border-amber-300 bg-amber-50 px-1 text-[10px] font-semibold text-amber-800">Procan</span>)}
+                            {permissao && <button data-testid="aluno-editar" type="button" onClick={onEditar} disabled={carregandoEdicao}
+                                aria-label="Editar aluno" title="Editar aluno" aria-busy={carregandoEdicao}
+                                className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary disabled:cursor-wait disabled:opacity-50 [&>svg]:size-5 [&_path]:stroke-current">
+                                <EditIcon />
+                            </button>}
+                    </div>
+                }>
                     <dl>
                         <CampoInformacao titulo="Período" valor={formatarTurno(dadosAluno?.turno)} />
                         <CampoInformacao titulo="Frequência" valor={formatarFrequencia(dadosAluno?.dias_frequencia)} />
                         <CampoInformacao titulo="Almoço" valor={formatarSimNao(dadosAluno?.participa_almoco)} />
-                        <CampoInformacao titulo="Turma" valor={turmaRegular?.nome ?? 'Não informado'} />
+                        <CampoInformacao titulo="Turma" valor={turmaRegular ? `${turmaRegular.nome}${turmaRegular.status === 'INATIVO' ? ' — Inativa' : ''}` : 'Não informado'} />
                         <CampoInformacao titulo="Nascimento" valor={formatarDataBR(dadosAluno?.pessoa?.data_nascimento)} />
                         <CampoInformacao titulo="Telefone" valor={formatarTelefone(dadosAluno?.pessoa?.telefone)} />
                     </dl>
@@ -48,7 +57,6 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, o
                         <CampoInformacao titulo="Uso de medicamento" valor={medicos?.usa_medicamento === true
                             ? medicos.medicamentos_descricao : formatarSimNao(medicos?.usa_medicamento)} />
                         <CampoInformacao titulo="Em caso de dor" valor={formatarAutorizacaoAnalgesico(medicos?.autorizacao_analgesico)} />
-                        <CampoInformacao titulo="Procan" valor={formatarSimNao(dadosAluno?.participa_procan)} />
                     </dl>
                 </DivInformacoes>
             </div>

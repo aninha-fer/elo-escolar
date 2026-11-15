@@ -8,10 +8,11 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
 
     const turnoDaOficina = oficina.turno ?? turno;
     const horario = `${formatarTurno(turnoDaOficina)}: ${formatarHora(oficina.hora_inicio)} - ${formatarHora(oficina.hora_fim)}`;
+    const avisoInativa = oficina.status_turma === 'INATIVO' && <span className="ml-sm rounded-full bg-slate-100 px-sm py-xs text-xs font-normal text-slate-500">Inativa</span>;
 
     if (modo === 'selecao') {
         return (
-            <li
+            <li data-testid={`oficina-${oficina.turma_id ?? oficina.id}-selecionar`}
                 onClick={() => onToggle?.(oficina)}
                 className={`border-t px-lg py-md first:border-t-0 cursor-pointer select-none transition-colors ${
                     selecionada
@@ -36,6 +37,7 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
                     <div className="min-w-0 flex-1">
                         <span className="block text-base font-bold text-text-main">
                             {oficina.turma_nome ?? oficina.nome}
+                            {avisoInativa}
                         </span>
                         <span className="block truncate text-[14px] text-text-muted">
                             {horario} {' · '}{dias}
@@ -54,16 +56,18 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
     }
 
     return (
-        <li className="flex items-center justify-between gap-lg border-t border-gray-300 px-lg py-md first:border-t-0">
+        <li data-testid={`oficina-inscricao-${oficina.matricula_id ?? oficina.id}`} className="flex items-center justify-between gap-lg border-t border-gray-300 px-lg py-md first:border-t-0">
             <div>
-                <h3 className="text-base font-bold text-text-main">{oficina.turma_nome ?? oficina.nome}</h3>
+                <h3 className="text-base font-bold text-text-main">{oficina.turma_nome ?? oficina.nome}
+                    {avisoInativa}
+                </h3>
                 {oficina.status_vinculo === 'PROVISORIO' && <span className="text-xs text-text-muted">Provisório</span>}
                 <p className="truncate text-text-muted text-[14px]">
                     {horario}
                     {' · '}{dias}
                 </p>
             </div>
-            {permissao && <button
+            {permissao && <button data-testid={`oficina-inscricao-${oficina.matricula_id ?? oficina.id}-cancelar`}
                 type="button"
                 className="shrink-0 rounded-sm border-1 border-danger bg-danger/20 px-md py-xs text-sm font-semibold text-danger transition-colors hover:bg-danger/30 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={cancelando || !onCancelar}

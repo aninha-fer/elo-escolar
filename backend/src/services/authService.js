@@ -5,6 +5,7 @@ const camposPublicos = {
     id: true,
     email: true,
     role: true,
+    status: true,
     pessoa: {
         select: {
             nome: true,
@@ -37,7 +38,7 @@ async function verificarCredenciais({ email, senha }) {
     const hash = usuario?.senha_hash ?? (await hashFicticio);
     const senhaCorreta = await argon2.verify(hash, senha);
 
-    if (!senhaCorreta || usuario?.pessoa.status_geral !== 'ATIVO') {
+    if (!senhaCorreta || usuario?.status !== 'ATIVO' || usuario?.pessoa.status_geral !== 'ATIVO') {
         return null;
     }
 
@@ -50,7 +51,7 @@ async function buscarIdentidadePorId(id) {
         select: camposPublicos,
     });
 
-    if (usuario?.pessoa.status_geral !== 'ATIVO') {
+    if (usuario?.status !== 'ATIVO' || usuario?.pessoa.status_geral !== 'ATIVO') {
         return null;
     }
 

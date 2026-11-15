@@ -204,7 +204,7 @@ test('cria atendimento e sessões após bloquear o aluno e consultar disponibili
   assert.deepEqual(eventos, ['bloqueio', 'aluno']);
   assert.equal(tx.atendimento_clinico.create.mock.callCount(), 1);
   assert.deepEqual(tx.atendimento_sessao.createMany.mock.calls[0].arguments[0].data, [{
-    atendimento_clinico_id: 99, data_sessao: data('2026-10-26'),
+    atendimento_clinico_id: 99, profissional_id: 2, data_sessao: data('2026-10-26'),
     hora_inicio: hora('09:00'), duracao_minutos: 60, status: 'ATIVO'
   }]);
 });
@@ -341,7 +341,7 @@ test('consulta somente sessões e atendimentos ativos do aluno e oficinas ativas
   await agendarAtendimentoService(dadosBase);
   const filtroSessoes = tx.atendimento_sessao.findMany.mock.calls[0].arguments[0].where;
   assert.equal(filtroSessoes.status, 'ATIVO');
-  assert.deepEqual(filtroSessoes.atendimento_clinico, { aluno_id: 1, status: 'ATIVO' });
+  assert.deepEqual(filtroSessoes.atendimento_clinico, { aluno_id: 1, status: 'ATIVO', data_cancelamento: null });
   assert.deepEqual(filtroSessoes.data_sessao, { lte: data('2026-10-26') });
   const filtroOficinas = tx.matricula_turma.findMany.mock.calls[0].arguments[0].where;
   assert.equal(filtroOficinas.aluno_id, 1);

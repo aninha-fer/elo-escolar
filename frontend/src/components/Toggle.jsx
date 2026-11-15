@@ -8,6 +8,7 @@ export function Toggle({
     onChange,
     name = 'participa_almoco',
     id,
+    testId,
 }) {
     const generatedId = useId();
     const inputId = id ?? generatedId;
@@ -21,6 +22,7 @@ export function Toggle({
             </span>
             <div className="flex items-center gap-sm">
                 <input
+                    data-testid={testId}
                     id={inputId}
                     name={name}
                     type="checkbox"

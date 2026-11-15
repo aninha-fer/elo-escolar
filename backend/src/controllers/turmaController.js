@@ -1,5 +1,5 @@
-const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO } = require('../dtos/turmaDTO');
-const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService } = require('../services/turmaService');
+const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO } = require('../dtos/turmaDTO');
+const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService } = require('../services/turmaService');
 
 async function listarTurmas(req, res) {
   try {
@@ -49,4 +49,17 @@ async function obterTurma(req, res) {
   }
 }
 
-module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma };
+async function editarTurma(req, res) {
+  try {
+    const { id } = getTurmaDTO.parse(req.params);
+    const dados = editarTurmaDTO.parse(req.body);
+    return res.status(200).json(await editarTurmaService(id, dados));
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    console.error('Erro ao editar turma.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao editar turma.' });
+  }
+}
+
+module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma };

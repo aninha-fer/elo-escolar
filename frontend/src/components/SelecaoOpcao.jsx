@@ -9,6 +9,7 @@ export function SelecaoOpcao({
     labelClassName = '',
     disabled = false,
     name,
+    testId,
 }) {
     const opcoes = Array.isArray(options) ? options.slice(0, 2) : [];
 
@@ -28,6 +29,7 @@ export function SelecaoOpcao({
 
                     return (
                         <button
+                            data-testid={testId ? `${testId}-${String(opcao.value).toLowerCase()}` : undefined}
                             key={opcao.value ?? opcao.label ?? opcao.title}
                             type="button"
                             name={name}

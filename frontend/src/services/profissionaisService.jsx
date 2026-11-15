@@ -3,6 +3,7 @@ import { api } from './api';
 function normalizarProfissional(profissional) {
     return {
         id: profissional.id,
+        pessoa_id: profissional.pessoa_id,
         nome: profissional.nome,
         telefone: profissional.telefone,
         funcao: profissional.funcao ?? profissional.cargo,
@@ -17,6 +18,10 @@ export const profissionaisService = {
     },
     async criar(dadosProfissional) {
         const { data } = await api.post('/profissionais', dadosProfissional);
+        return normalizarProfissional(data);
+    },
+    async editar(id, dadosProfissional) {
+        const { data } = await api.patch(`/profissionais/${id}`, dadosProfissional);
         return normalizarProfissional(data);
     },
 };

@@ -29,7 +29,7 @@ function ExigirSessao() {
   return (
     <main>
       <p role="alert">Não foi possível verificar sua sessão.</p>
-      <button type="button" onClick={recarregarSessao}>
+      <button data-testid="sessao-tentar-novamente" type="button" onClick={recarregarSessao}>
         Tentar novamente
       </button>
     </main>

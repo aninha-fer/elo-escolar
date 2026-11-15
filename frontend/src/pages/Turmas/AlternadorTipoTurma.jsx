@@ -9,7 +9,7 @@ export function AlternadorTipoTurma({ value, onChange }) {
             {opcoes.map((opcao) => {
                 const selecionado = value === opcao.value;
                 return (
-                    <button
+                    <button data-testid={`turmas-tipo-${opcao.value.toLowerCase()}`}
                         key={opcao.value}
                         type="button"
                         aria-pressed={selecionado}

@@ -40,7 +40,7 @@ function Sidebar() {
                 </div>
             </div>
             <div className="flex flex-col gap-xs px-md py-md">
-                <NavLink
+                <NavLink data-testid="menu-inicio"
                     to="/"
                     end
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
@@ -51,7 +51,7 @@ function Sidebar() {
                     </svg>
                     <span>Início</span>
                 </NavLink>
-                <NavLink
+                <NavLink data-testid="menu-alunos"
                     to="/alunos"
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
@@ -68,7 +68,7 @@ function Sidebar() {
                     </svg>
                     <span>Alunos</span>
                 </NavLink>
-                <NavLink
+                <NavLink data-testid="menu-turmas"
                     to="/turmas"
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
@@ -87,7 +87,7 @@ function Sidebar() {
                     </svg>
                     <span>Turmas</span>
                 </NavLink>
-                {usuario?.role === 'admin' && <NavLink
+                {usuario?.role === 'admin' && <NavLink data-testid="menu-profissionais"
                     to="/profissionais"
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
@@ -106,7 +106,7 @@ function Sidebar() {
                     </svg>
                     <span>Profissionais</span>
                 </NavLink>}
-                {usuario?.role === 'admin' && <NavLink
+                {usuario?.role === 'admin' && <NavLink data-testid="menu-usuarios"
                     to="/usuarios"
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
@@ -130,7 +130,7 @@ function Sidebar() {
                     <p className='truncate font-bold text-bg-main/80 text-sm' title={usuario?.nome}>{usuario?.nome}</p>
                     <p className='truncate font-bold text-bg-main/35 text-xs tracking-widest' title={perfil}>{perfil}</p>
                 </div>
-                <button
+                <button data-testid="menu-sair"
                     type="button"
                     aria-label={saindo ? 'Saindo do sistema…' : 'Sair do sistema'}
                     title={saindo ? 'Saindo do sistema…' : 'Sair do sistema'}

@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 export function Modal({
   isOpen,
   onClose,
@@ -12,28 +14,37 @@ export function Modal({
   onSecondaryAction,
   isConfirmLoading,
   isConfirmDisabled,
-  showFooter = true
+  showFooter = true,
+  showHeader = true,
+  ariaLabelledBy,
+  ariaDescribedBy,
+  testId,
 }) {
+  const titleId = useId();
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden">
       <div 
+        data-testid={testId ? `${testId}-fundo` : undefined}
         className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs" 
         onClick={onClose} 
       />
 
-      <div className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-clip">
+      <div data-testid={testId} role="dialog" aria-modal="true" aria-labelledby={ariaLabelledBy ?? (showHeader ? titleId : undefined)} aria-describedby={ariaDescribedBy}
+        className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-clip">
         
-        <div className="flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-bg-main">
-          <div>
-            <h2 className="text-lg font-bold text-text-main">{title}</h2>
+        <div className={showHeader ? 'flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-bg-main' : 'absolute right-5 top-5 z-10'}>
+          {showHeader && <div>
+            <h2 id={titleId} className="text-lg font-bold text-text-main">{title}</h2>
             {subtitle && <p className="text-xs text-text-muted mt-1">{subtitle}</p>}
-          </div>
+          </div>}
           <button 
+            data-testid={testId ? `${testId}-fechar` : undefined}
             type="button" 
             onClick={onClose}
-            className="p-1 bg-bg-main text-text-main rounded-sm hover:bg-bg-surface"
+            aria-label="Fechar modal"
+            className={`p-1 text-text-main rounded-sm ${showHeader ? 'bg-bg-main hover:bg-bg-surface' : 'bg-bg-surface hover:bg-bg-main'}`}
           >
             ✕
           </button>
@@ -46,6 +57,7 @@ export function Modal({
         {showFooter && (
           <div className="flex items-center justify-end gap-3 p-4 bg-bg-main border-t border-slate-100 shrink-0">
             <button
+              data-testid={testId ? `${testId}-cancelar` : undefined}
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-semibold text-text-main bg-bg-surface border border-slate-300 rounded-md hover:bg-bg-main"
@@ -55,6 +67,7 @@ export function Modal({
 
             {onSecondaryAction && (
               <button
+                data-testid={testId ? `${testId}-acao-secundaria` : undefined}
                 type="button"
                 onClick={onSecondaryAction}
                 disabled={isConfirmLoading}
@@ -66,6 +79,7 @@ export function Modal({
             
             {onConfirm && (
               <button
+                data-testid={testId ? `${testId}-confirmar` : undefined}
                 type={confirmFormId ? 'submit' : 'button'}
                 form={confirmFormId}
                 onClick={confirmFormId ? undefined : onConfirm}

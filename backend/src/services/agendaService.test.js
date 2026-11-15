@@ -11,7 +11,7 @@ const hora = (valor) => new Date(`1970-01-01T${valor}:00.000Z`);
 
 function sessao(alteracoes = {}) {
   return {
-    id: 10, atendimento_clinico_id: 20, status: 'ATIVO',
+    id: 10, atendimento_clinico_id: 20, status: 'ATIVO', data_cancelamento: null,
     data_sessao: data('2026-11-02'), hora_inicio: hora('09:00'), duracao_minutos: 45,
     atendimento_clinico: {
       aluno_id: 1, status: 'ATIVO', modalidade: 'Fisioterapia',

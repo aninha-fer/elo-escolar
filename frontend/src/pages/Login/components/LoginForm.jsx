@@ -9,7 +9,6 @@ export function LoginForm() {
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [mostrarSenha, setMostrarSenha] = useState(false);
-    const [lembrar, setLembrar] = useState(true);
     const [erros, setErros] = useState({});
     const [aviso, setAviso] = useState('');
     const navigate = useNavigate();
@@ -65,7 +64,7 @@ export function LoginForm() {
 
     return (
         <form className="login-form" onSubmit={enviar} noValidate>
-            <Input
+            <Input data-testid="login-email"
                 id="login-email" name="email" type="email" label="E-mail"
                 placeholder="nome@apae.com" autoComplete="username" autoCapitalize="none" spellCheck={false}
                 required value={email} onChange={(event) => alterarCampo('email', event.target.value)}
@@ -73,7 +72,7 @@ export function LoginForm() {
                 aria-invalid={Boolean(erros.email)} aria-describedby={erros.email ? 'login-email-error' : undefined}
             />
             {erros.email && <p className="login-error" id="login-email-error">{erros.email}</p>}
-            <Input
+            <Input data-testid="login-senha"
                 id="login-senha" name="senha" type={mostrarSenha ? 'text' : 'password'} label="Senha"
                 placeholder="Digite sua senha" autoComplete="current-password" minLength={8}
                 required value={senha} onChange={(event) => alterarCampo('senha', event.target.value)}
@@ -81,7 +80,7 @@ export function LoginForm() {
                 inputClassName="pr-12"
                 aria-invalid={Boolean(erros.senha)} aria-describedby={erros.senha ? 'login-senha-error' : undefined}
                 trailingAdornment={
-                    <button type="button" className="login-password-toggle absolute right-0 top-0 flex h-full w-12 items-center justify-center"
+                    <button data-testid="login-mostrar-senha" type="button" className="login-password-toggle absolute right-0 top-0 flex h-full w-12 items-center justify-center"
                         aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={mostrarSenha}
                         aria-controls="login-senha" onClick={() => setMostrarSenha((atual) => !atual)}>
                         <LoginIcon name={mostrarSenha ? 'eye-off' : 'eye'} />
@@ -90,9 +89,9 @@ export function LoginForm() {
             />
             {erros.senha && <p className="login-error" id="login-senha-error">{erros.senha}</p>}
             <div className="login-options flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <button type="button" className="login-recovery" onClick={() => setAviso('A recuperação de senha ainda não está disponível. Entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
+                <button data-testid="login-recuperar-senha" type="button" className="login-recovery" onClick={() => setAviso('A recuperação de senha ainda não está disponível. Entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
             </div>
-            <Button type="submit" className="login-submit" disabled={enviando}>
+            <Button data-testid="login-entrar" type="submit" className="login-submit" disabled={enviando}>
                 {enviando ? 'Entrando...' : 'Entrar no sistema'}
             </Button>
             <p className="login-notice" role="status" aria-live="polite">{aviso}</p>

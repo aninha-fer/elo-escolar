@@ -9,8 +9,8 @@ export const usuariosService = {
         const { data } = await api.post('/usuarios', dadosUsuario);
         return data;
     },
-    async buscarFuncionariosElegiveis(q, signal) {
-        const { data } = await api.get('/pessoas-elegiveis', { params: { q }, signal });
+    async editar(id, dadosUsuario) {
+        const { data } = await api.patch(`/usuarios/${id}`, dadosUsuario);
         return data;
     },
 };

@@ -1,6 +1,10 @@
 import { api } from './api';
 
 export const alunoService = {
+  async editar(id, dadosAluno) {
+    const { data } = await api.patch(`/alunos/${id}`, dadosAluno);
+    return data;
+  },
   /**
    * @param {Object} params
    * @param {AbortSignal} signal

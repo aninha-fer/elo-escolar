@@ -1,5 +1,7 @@
 import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/formatters';
 import { agruparHorarios } from '../../utils/formatters';
+import { BotaoAcoes } from '../../components/BotaoAcoes';
+import EditIcon from '../../components/icons/EditIcon';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600',
@@ -15,11 +17,7 @@ function formatarDias(dias) {
         : formatarFrequencia(dias).replaceAll(', ', '/');
 }
 
-function obterIniciais(nome) {
-    return nome.trim().split(/\s+/).slice(0, 2).map((parte) => parte[0]).join('').toLocaleUpperCase('pt-BR');
-}
-
-export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar = false }) {
+export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar = false, onEditar, onAlterarStatus }) {
     const grupos = agruparHorarios(turma.horarios);
     const nome = turma.nome || 'Turma sem nome';
     const horarios = grupos.map((grupo) => `${formatarDias(grupo.dias)} ${grupo.inicio}–${grupo.fim}`).join(' · ');
@@ -57,12 +55,13 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                         ))}
                     </ul>
                 ) : <p className="mt-sm text-xs text-slate-500">Profissional não informado</p>}
-                <button type="button" className="absolute inset-0 size-full cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2"
+                <button data-testid={`turma-${turma.id}-abrir`} type="button" className="absolute inset-0 size-full cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2"
                     aria-label={`Selecionar ${turma.tipo === 'OFICINA' ? 'oficina' : 'turma'} ${nome}`} onClick={() => onSelecionar?.(turma)} />
-                {podeEditar && <button type="button" disabled aria-label={`Ações indisponíveis para ${nome}`} title="Ações ainda indisponíveis"
-                    className="absolute right-md top-md z-10 inline-flex size-8 cursor-not-allowed items-center justify-center rounded-sm border-2 border-slate-200 text-slate-400">
-                    <svg width="16" height="16" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" /><circle cx="15" cy="9" r="1.5" /></svg>
-                </button>}
+                {podeEditar && <div className="absolute right-md top-md z-10"><BotaoAcoes testId={`turma-${turma.id}-acoes`} label={`Ações para ${nome}`} options={[
+                    { id: 'editar', label: 'Editar', disabled: !onEditar, onClick: () => onEditar(turma), icon: <EditIcon/> },
+                    { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus,
+                        textColor: turma.status === 'INATIVO' ? '#059669' : '#DC2626', onClick: () => onAlterarStatus(turma) },
+                ]} /></div>}
             </article>
         </li>
     );

@@ -4,6 +4,8 @@ import { Modal } from "../../../components/Modal";
 import { OficinaItem } from "../../../components/OficinaItem";
 import { matriculasService } from "../../../services/matriculasService";
 import { ConflitosOficinas } from "../../../components/ConflitosOficinas";
+import { ModalConfirmacao } from "../../../components/ModalConfirmacao";
+import { Input } from "../../../components/Input";
 
 const DIAS_SEMANA = {
     1: 'Segunda',
@@ -14,6 +16,10 @@ const DIAS_SEMANA = {
     6: 'Sábado',
     7: 'Domingo',
 };
+
+function normalizarTexto(valor = '') {
+    return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+}
 
 function agruparOficinas(oficinas) {
     return Object.values(
@@ -44,6 +50,7 @@ function normalizarTurmas(turmas) {
         return horarios.map((horario) => ({
             matricula_id: turma.matricula_id,
             status_vinculo: turma.status_vinculo,
+            status_turma: turma.status,
             turma_id: turma.id,
             turma_nome: turma.nome,
             turno: turma.turno,
@@ -61,16 +68,21 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
     const oficinasAgrupadas = agruparOficinas(normalizarTurmas(oficinas.map((matricula) => ({
         ...matricula.turma, matricula_id: matricula.id, status_vinculo: matricula.status,
     }))));
-    const oficinasParaSelecao = agruparOficinas(normalizarTurmas(oficinasDisponiveis));
+    const oficinasParaSelecao = agruparOficinas(normalizarTurmas(
+        oficinasDisponiveis.filter((oficina) => ['MANHA', 'TARDE'].includes(turno) && oficina.turno === turno)
+    ));
     const quantidadeAtivas = oficinasAgrupadas.filter((oficina) => oficina.status_vinculo === 'ATIVO').length;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selecionadas, setSelecionadas] = useState([]);
+    const [termoBusca, setTermoBusca] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [conflitos, setConflitos] = useState([]);
     const [modalView, setModalView] = useState('selecao');
     const [inscricaoParaCancelar, setInscricaoParaCancelar] = useState(null);
     const [cancelando, setCancelando] = useState(false);
     const [erroCancelamento, setErroCancelamento] = useState('');
+    const busca = normalizarTexto(termoBusca);
+    const oficinasFiltradas = oficinasParaSelecao.filter((oficina) => normalizarTexto(oficina.turma_nome).includes(busca));
 
     function abrirCancelamento(oficina) {
         setErroCancelamento('');
@@ -135,7 +147,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
             setConflitos(Array.isArray(conflitosRecebidos)
                 ? conflitosRecebidos
                 : [err.response?.data?.erro || 'Não foi possível concluir a inscrição.']);
-            setModalView('conflitos'); 
+            setModalView('conflitos');
             console.log(err);
         } finally {
             setIsSubmitting(false);
@@ -143,6 +155,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
     }
 
     function abrirModal() {
+        setTermoBusca('');
         setConflitos([]);
         setModalView('selecao');
         setIsModalOpen(true);
@@ -170,43 +183,57 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                 <h2 className="text-base font-bold text-text-main">
                     Inscrições Ativas ({quantidadeAtivas})
                 </h2>
-                {permissao && <Button onClick={abrirModal}>
+                {permissao && <Button data-testid="aluno-oficinas-inscrever" onClick={abrirModal}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M2.91406 6.99361H11.0733" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Inscrever em Oficina
                 </Button>}
-                <Modal isOpen={isModalOpen}
+                <Modal testId="oficinas-selecao" isOpen={isModalOpen}
                     onClose={fecharModal}
                     title="Selecionar Oficinas para Inscrição"
                     subtitle="Selecione uma ou mais oficinas. Os conflitos serão verificados antes de confirmar."
-                    confirmText={modalView === 'conflitos' ? 'Revisar seleção' : 'Verificar e Confirmar'}
+                    confirmText={modalView === 'conflitos' ? 'Revisar seleção' : `Verificar e Confirmar (${selecionadas.length})`}
                     cancelText="Cancelar"
                     onConfirm={confirmarModal}
                     isConfirmLoading={isSubmitting}
                     isConfirmDisabled={modalView === 'selecao' && selecionadas.length === 0}>
                     {modalView === 'conflitos' ? (
                         <ConflitosOficinas conflitos={conflitos} />
-                    ) : oficinasParaSelecao.length > 0 ? (
-                        <ul>
-                            {oficinasParaSelecao.map((oficina) => (
-                                <OficinaItem
-                                    key={oficina.turma_id}
-                                    oficina={oficina}
-                                    turno={turno}
-                                    modo="selecao"
-                                    planejando={statusAluno === 'RASCUNHO'}
-                                    selecionada={selecionadas.includes(oficina.turma_id)}
-                                    onToggle={alternarOficina}
-                                />
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="py-lg text-center text-sm text-text-muted">
-                            Nenhuma oficina disponível para inscrição.
-                        </p>
-                    )}
+                    ) : <>
+                        <div className="mb-md flex flex-col gap-sm sm:flex-row sm:items-start">
+                            <div className="min-w-0 flex-1">
+                                <Input data-testid="oficinas-selecao-busca" type="search" aria-label="Buscar oficina por nome" placeholder="Buscar por nome..."
+                                    wrapperClassName="mb-0!" value={termoBusca} disabled={isSubmitting}
+                                    onChange={(event) => setTermoBusca(event.target.value)}
+                                    icon={<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>} />
+                            </div>
+                            <Button data-testid="oficinas-selecao-limpar" type="button" onClick={() => setSelecionadas([])} disabled={isSubmitting || selecionadas.length === 0}
+                                className="border border-slate-200 bg-bg-surface! text-text-main! hover:bg-bg-main! disabled:cursor-not-allowed disabled:opacity-50">
+                                Limpar seleção
+                            </Button>
+                        </div>
+                        {oficinasFiltradas.length > 0 ? (
+                            <ul>
+                                {oficinasFiltradas.map((oficina) => (
+                                    <OficinaItem
+                                        key={oficina.turma_id}
+                                        oficina={oficina}
+                                        turno={turno}
+                                        modo="selecao"
+                                        planejando={statusAluno === 'RASCUNHO'}
+                                        selecionada={selecionadas.includes(oficina.turma_id)}
+                                        onToggle={alternarOficina}
+                                    />
+                                ))}
+                            </ul>
+                        ) : (
+                            <p role="status" className="py-lg text-center text-sm text-text-muted">
+                                {oficinasParaSelecao.length ? 'Nenhuma oficina encontrada para a busca.' : 'Nenhuma oficina disponível para inscrição.'}
+                            </p>
+                        )}
+                    </>}
                 </Modal>
             </header>
 
@@ -228,23 +255,23 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                     Nenhuma oficina ativa encontrada para este aluno.
                 </p>
             )}
-            <Modal isOpen={Boolean(inscricaoParaCancelar)}
+            <ModalConfirmacao testId="oficina-cancelar-inscricao" isOpen={Boolean(inscricaoParaCancelar)}
                 onClose={fecharCancelamento}
-                title="Cancelar inscrição em oficina"
+                title="Cancelar inscrição em oficina?"
                 confirmText="Confirmar cancelamento"
                 cancelText="Manter inscrição"
                 onConfirm={confirmarCancelamento}
-                isConfirmLoading={cancelando}>
-                <p className="text-sm text-text-main">
-                    Deseja cancelar a inscrição em <strong>{inscricaoParaCancelar?.turma_nome}</strong>?
-                </p>
-                <p className="mt-sm text-sm text-text-muted">
-                    {inscricaoParaCancelar?.status_vinculo === 'PROVISORIO'
-                        ? 'Este vínculo provisório será removido por completo do planejamento. Ele não representa uma inscrição efetiva.'
-                        : 'O cancelamento vale a partir de hoje. As atividades até ontem continuarão disponíveis no calendário.'}
-                </p>
-                {erroCancelamento && <p role="alert" className="mt-md text-sm text-red-700">{erroCancelamento}</p>}
-            </Modal>
-        </section>
+                isConfirmLoading={cancelando}
+                description={
+                    <>
+                        Deseja cancelar a inscrição em <strong>{inscricaoParaCancelar?.turma_nome}</strong>?{' '}
+                        {inscricaoParaCancelar?.status_vinculo === 'PROVISORIO'
+                            ? 'Esta matrícula provisória será encerrada e essa ação não pode ser desfeita.'
+                            : 'Essa oficina deixará de ser exibida no calendário. A ação não altera o calendário de dias anteriores.'}
+                        {erroCancelamento && <p role="alert" className="mt-md text-sm text-red-700">{erroCancelamento}</p>}
+                    </>
+                }
+            />
+        </section >
     );
 }

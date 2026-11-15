@@ -40,8 +40,8 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
         aluno_id, turma: { status: 'ATIVO' },
         OR: [
           { status: 'ATIVO' },
-          ...(aluno.status === 'RASCUNHO' ? [{ status: 'PROVISORIO' }] : []),
-          { status: 'INATIVO', data_fim: { not: null }, turma: { tipo: 'OFICINA' } }
+          ...(aluno.status === 'RASCUNHO' ? [{ status: 'PROVISORIO', data_fim: null }] : []),
+          { status: 'INATIVO', data_fim: { not: null } }
         ],
         AND: [
           { OR: [{ data_inicio: null }, { data_inicio: { lt: fimSemana } }] },
@@ -55,11 +55,16 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
     prisma.atendimento_sessao.findMany({
       where: {
         status: aluno.status === 'RASCUNHO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO',
-        atendimento_clinico: { aluno_id, status: aluno.status === 'RASCUNHO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO' },
+        data_cancelamento: null,
+        atendimento_clinico: { aluno_id, OR: [
+          { status: 'ATIVO' },
+          ...(aluno.status === 'RASCUNHO' ? [{ status: 'PROVISORIO', data_cancelamento: null }] : []),
+          { status: 'INATIVO', data_cancelamento: { not: null } }
+        ] },
         // Sessões anteriores podem atravessar o início da semana; o intervalo é filtrado abaixo.
         data_sessao: { lt: fimSemana }
       },
-      include: { atendimento_clinico: { include: { profissional: { include: { pessoa: true } } } } }
+      include: { profissional: { select: { pessoa: { select: { nome: true } } } }, atendimento_clinico: { include: { profissional: { include: { pessoa: true } } } } }
     })
   ]);
 
@@ -118,7 +123,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
       sessao_id: sessao.id, atendimento_id: sessao.atendimento_clinico_id,
       titulo: atendimento.modalidade, modalidade: atendimento.modalidade, tipo: 'ATENDIMENTO',
       status: sessao.status,
-      ambiente: null, profissional: atendimento.profissional?.pessoa?.nome || 'Não definido'
+      ambiente: null, profissional: sessao.profissional?.pessoa?.nome || atendimento.profissional?.pessoa?.nome || 'Não definido'
     }, inicio, fim);
   }
 

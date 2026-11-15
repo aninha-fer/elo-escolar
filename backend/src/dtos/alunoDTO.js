@@ -59,18 +59,25 @@ const criarAlunoBaseDTO = z.object({
   status: z.enum(['RASCUNHO', 'ATIVO', 'INATIVO']).default('RASCUNHO'),
   turma_id: z.number().int().positive().optional()
 });
-const criarAlunoDTO = criarAlunoBaseDTO.refine(
-  (dados) => {
-    if (dados.status === 'ATIVO' && !dados.turma_id) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: "A seleção de uma turma regular é obrigatória para salvar um aluno como ATIVO.",
-    path: ["turma_id"]
-  }
-);
+const criarAlunoDTO = criarAlunoBaseDTO;
+
+const editarAlunoDTO = criarAlunoBaseDTO.omit({ status: true, responsaveis: true }).extend({
+  nome: z.string().trim().min(2, 'Informe o nome completo.'),
+  participa_procan: z.boolean(),
+  telefone: z.string().regex(/^\d{10,11}$/, 'Informe um telefone com DDD.').nullable(),
+  data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((valor) => {
+    const data = new Date(valor + 'T00:00:00.000Z');
+    return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
+  }, 'Data de nascimento inválida.').nullable(),
+  observacoes: z.string().trim().nullable(),
+  responsaveis: z.array(responsavelDTO.extend({ id: z.number().int().positive().optional() })),
+  status: z.enum(['RASCUNHO', 'ATIVO']),
+  turma_id: z.number().int().positive().nullable(),
+  confirmar_cancelamentos: z.object({
+    matriculas: z.array(z.number().int().positive()), atendimentos: z.array(z.number().int().positive())
+  }).strict(),
+}).partial().strict().refine((dados) => Object.keys(dados).some((campo) => campo !== 'confirmar_cancelamentos' && dados[campo] !== undefined),
+  { message: 'Informe ao menos um campo para atualizar.' });
 
 const getAlunoDTO = z.object({
   id: z.coerce.number().int().positive("O ID do aluno deve ser um número positivo.")
@@ -88,4 +95,4 @@ const getAgendaQueryDTO = z.object({
     }, 'Data inválida.').optional()
 });
 
-module.exports = { criarAlunoDTO, getAgendaAlunoDTO, getAgendaQueryDTO, getAlunoDTO };
+module.exports = { criarAlunoDTO, editarAlunoDTO, getAgendaAlunoDTO, getAgendaQueryDTO, getAlunoDTO };

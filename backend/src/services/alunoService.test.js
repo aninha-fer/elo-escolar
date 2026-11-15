@@ -11,7 +11,7 @@ function atendimento(alteracoes = {}) {
     id: 1, aluno_id: 1, status: 'ATIVO', modalidade: 'Psicologia',
     tipo_recorrencia: 'EVENTUAL', data_inicio: data('2026-10-26'),
     hora_inicio: new Date('1970-01-01T08:00:00.000Z'), duracao_minutos: 30,
-    data_termino: null, profissional: { pessoa: { nome: 'Ana' } },
+    data_cancelamento: null, data_termino: null, profissional: { pessoa: { nome: 'Ana' } },
     ...alteracoes
   };
 }

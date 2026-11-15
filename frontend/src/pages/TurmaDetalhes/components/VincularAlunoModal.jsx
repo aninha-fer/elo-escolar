@@ -63,17 +63,17 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
     }
 
     return (
-        <Modal isOpen title="Vincular Aluno" subtitle={`Selecione um aluno para ${turma.nome}.`}
+        <Modal testId="turma-vincular-aluno" isOpen title="Vincular Aluno" subtitle={`Selecione um aluno para ${turma.nome}.`}
             onClose={fecharModal} confirmText="Vincular Aluno" confirmFormId="form-vincular-aluno" onConfirm={enviar}
             isConfirmDisabled={carregando || !alunoSelecionado} isConfirmLoading={enviando}>
             <form id="form-vincular-aluno" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando}>
                     <p className="mb-md text-sm text-slate-500">São exibidos alunos ativos ou em rascunho que ainda não possuem turma regular. O turno, os dias de frequência e as vagas serão validados ao confirmar.</p>
-                    <Input id="vinculo-busca-aluno" label="Buscar aluno" placeholder="Buscar por nome..." value={busca}
+                    <Input data-testid="turma-vincular-aluno-busca" id="vinculo-busca-aluno" label="Buscar aluno" placeholder="Buscar por nome..." value={busca}
                         onChange={(event) => setBusca(event.target.value)} />
                     {carregando ? <p role="status" className="py-md text-sm text-slate-500">Carregando alunos...</p>
                         : resultado.status === 'erro' ? <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
-                            <p role="alert">{resultado.erro}</p><button type="button" className="mt-sm underline" onClick={() => setTentativa((atual) => atual + 1)}>Tentar novamente</button>
+                            <p role="alert">{resultado.erro}</p><button data-testid="turma-vincular-aluno-tentar-novamente" type="button" className="mt-sm underline" onClick={() => setTentativa((atual) => atual + 1)}>Tentar novamente</button>
                         </div> : <fieldset className="mb-md min-w-0">
                             <legend className="mb-sm text-xs font-semibold uppercase tracking-wider text-slate-600">Aluno <span className="text-danger">*</span></legend>
                             <div className="max-h-72 overflow-y-auto rounded-sm border border-slate-200 divide-y divide-slate-200">
@@ -83,7 +83,7 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
                                         <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold">{aluno.nome}</span>
                                             <span className="block text-xs text-slate-500">{formatarTurno(aluno.turno)} · {aluno.dias_frequencia?.length ? formatarFrequencia(aluno.dias_frequencia) : 'Dias não informados'}{aluno.status === 'RASCUNHO' ? ' · Rascunho' : ''}</span>
                                         </span>
-                                        <input type="radio" name="aluno_id" value={aluno.id} checked={selecionado === String(aluno.id)} required
+                                        <input data-testid={`turma-vincular-aluno-${aluno.id}`} type="radio" name="aluno_id" value={aluno.id} checked={selecionado === String(aluno.id)} required
                                             onChange={(event) => { setSelecionado(event.target.value); setErroEnvio(''); setConflitos([]); }} className="size-4 shrink-0 accent-blue-600" />
                                     </label>)}
                             </div>

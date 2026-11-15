@@ -19,6 +19,23 @@ const criarProfissionalBaseDTO = z.object({
     cargo: z.string({ required_error: "Cargo é obrigatório" }).trim().min(2, "Cargo muito curto")
 });
 
+const editarProfissionalDTO = criarProfissionalBaseDTO.pick({ nome: true, cargo: true }).extend({
+    telefone: z.preprocess(
+        (valor) => typeof valor === 'string' ? valor.trim() || null : valor,
+        z.string().regex(/^\d{10,11}$/, 'O telefone deve conter apenas 10 ou 11 dígitos, incluindo o DDD.').nullable()
+    ),
+    status_geral: z.enum(['ATIVO', 'INATIVO']),
+}).partial().strict().refine(
+    (dados) => Object.values(dados).some((valor) => valor !== undefined),
+    { message: 'Informe ao menos um campo para atualizar.' }
+);
+
+const editarProfissionalParamsDTO = z.object({
+    id: z.coerce.number().int().min(1).max(2147483647),
+});
+
 module.exports = {
-    criarProfissionalDTO: criarProfissionalBaseDTO
+    criarProfissionalDTO: criarProfissionalBaseDTO,
+    editarProfissionalDTO,
+    editarProfissionalParamsDTO,
 };

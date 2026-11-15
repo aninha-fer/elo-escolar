@@ -41,14 +41,14 @@ export function TurmaDetalhes() {
 
     if (!idValido) return (
         <div className="space-y-md">
-            <BotaoVoltar to='/turmas' />
+            <BotaoVoltar data-testid="turma-voltar" to='/turmas' />
             <p role="alert" className="text-red-700">Identificador de turma inválido.</p>
         </div>
     );
-    if (!resultado || resultado.id !== id || resultado.tentativa !== tentativa) return <div className="space-y-md"><BotaoVoltar to='/turmas' /><p role="status">Carregando dados da turma...</p></div>;
-    if (resultado.status === 'erro') return <div className="space-y-md"><BotaoVoltar to='/turmas' />
+    if (!resultado || resultado.id !== id || resultado.tentativa !== tentativa) return <div className="space-y-md"><BotaoVoltar data-testid="turma-voltar" to='/turmas' /><p role="status">Carregando dados da turma...</p></div>;
+    if (resultado.status === 'erro') return <div className="space-y-md"><BotaoVoltar data-testid="turma-voltar" to='/turmas' />
         <div className="rounded-sm bg-red-50 p-md text-sm text-red-700"><p role="alert">{resultado.codigo === 404 ? 'Turma não encontrada.' : resultado.erro}</p>
-            {resultado.codigo !== 404 && <button type="button" onClick={() => setTentativa((atual) => atual + 1)} className="mt-sm underline">Tentar novamente</button>}
+            {resultado.codigo !== 404 && <button data-testid="turma-tentar-novamente" type="button" onClick={() => setTentativa((atual) => atual + 1)} className="mt-sm underline">Tentar novamente</button>}
         </div></div>;
 
     const turma = resultado.dados;
@@ -77,7 +77,7 @@ export function TurmaDetalhes() {
     return (
         <section className="min-w-0 space-y-lg" aria-labelledby="turma-detalhes-titulo">
             <header className="flex flex-wrap items-center gap-md">
-                <BotaoVoltar to='/turmas' />
+                <BotaoVoltar data-testid="turma-voltar" to='/turmas' />
                 <div className="min-w-0 flex-1"><h1 id="turma-detalhes-titulo" className="break-words text-xl font-bold text-text-main">{turma.nome}</h1><p className="mt-xs text-sm text-slate-500">{tipo}</p></div>
                 <span className={`rounded-full px-md py-sm text-sm font-semibold ${estilosStatus[turma.status] ?? 'bg-slate-100 text-slate-500'}`}>{rotulosStatus[turma.status] ?? 'Não definido'}</span>
             </header>
