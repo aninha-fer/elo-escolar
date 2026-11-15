@@ -2,6 +2,7 @@ const permissoesProfessor = new Set([
   'sessao:gerenciar',
   'alunos:ler',
   'turmas:ler',
+  'ocorrencias:gerenciar',
 ]);
 
 function exigirPermissao(permissao) {

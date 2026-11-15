@@ -1,5 +1,5 @@
 import { useParams, useSearchParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { alunoService } from '../../services/alunoService';
 import { turmasService } from '../../services/turmasService';
 import { VisaoGeral } from './components/VisaoGeral';
@@ -8,6 +8,9 @@ import { formatarDataHoraInstituicao, formatarTurno } from '../../utils/formatte
 import { Atendimentos } from './components/Atendimentos';
 import { useAuth } from '../../contexts/AuthContext';
 import { BotaoVoltar } from '../../components/BotaoVoltar';
+import { FormularioAluno } from '../Alunos/FormularioAluno';
+import { Ocorrencias } from './components/Ocorrencias';
+import { ocorrenciasService } from '../../services/ocorrenciasService';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600 before:bg-emerald-600',
@@ -22,15 +25,42 @@ export function AlunoDetalhes() {
     const [agenda, setAgenda] = useState(null);
     const [oficinas, setOficinas] = useState([]);
     const [atendimentos, setAtendimentos] = useState([]);
+    const [ocorrencias, setOcorrencias] = useState([]);
+    const [carregandoOcorrencias, setCarregandoOcorrencias] = useState(true);
+    const [erroOcorrencias, setErroOcorrencias] = useState('');
+    const [versaoOcorrencias, setVersaoOcorrencias] = useState(0);
     const [carregandoAgenda, setCarregandoAgenda] = useState(true);
     const [erroAgenda, setErroAgenda] = useState(null);
     const [oficinasDisponiveis, setOficinasDisponiveis] = useState([]);
     const [refreshToken, setRefreshToken] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [alunoEdicao, setAlunoEdicao] = useState(null);
+    const [carregandoEdicao, setCarregandoEdicao] = useState(false);
+    const [erroEdicao, setErroEdicao] = useState('');
+    const edicaoController = useRef(null);
     const dataReferencia = searchParams.get('data') || '';
     const { usuario } = useAuth();
     const podeEditar = usuario?.role === 'admin';
+
+    useEffect(() => () => edicaoController.current?.abort(), [id]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        async function carregarOcorrencias() {
+            setCarregandoOcorrencias(true);
+            setErroOcorrencias('');
+            setOcorrencias([]);
+            try {
+                const dados = await ocorrenciasService.listar(id, controller.signal);
+                if (!controller.signal.aborted) setOcorrencias(dados);
+            } catch (error) {
+                if (!controller.signal.aborted) setErroOcorrencias(error.response?.data?.erro || 'Não foi possível carregar as ocorrências.');
+            } finally { if (!controller.signal.aborted) setCarregandoOcorrencias(false); }
+        }
+        carregarOcorrencias();
+        return () => controller.abort();
+    }, [id, versaoOcorrencias]);
 
     useEffect(() => {
         let diaConsultado = formatarDataHoraInstituicao().slice(0, 10);
@@ -125,6 +155,7 @@ export function AlunoDetalhes() {
         { id: 'visao-geral', label: 'Visão Geral', count: null },
         { id: 'oficinas', label: 'Oficinas', count: quantidadeOficinas },
         { id: 'atendimentos', label: 'Atendimentos', count: atendimentos.length },
+        { id: 'ocorrencias', label: 'Ocorrências', count: carregandoOcorrencias || erroOcorrencias ? null : ocorrencias.length },
         // { id: 'historico', label: 'Histórico', count: null },
     ];
 
@@ -147,6 +178,30 @@ export function AlunoDetalhes() {
         setRefreshToken((token) => token + 1);
     }
 
+    async function abrirEdicao() {
+        if (!podeEditar || edicaoController.current) return;
+        const controller = new AbortController();
+        edicaoController.current = controller;
+        setCarregandoEdicao(true);
+        setErroEdicao('');
+        try {
+            const dados = await alunoService.buscarPorId(id, controller.signal);
+            if (!controller.signal.aborted) setAlunoEdicao(dados);
+        } catch (err) {
+            if (!controller.signal.aborted) setErroEdicao(err.response?.data?.erro || 'Não foi possível carregar o aluno para edição. Tente novamente.');
+        } finally {
+            if (edicaoController.current === controller) {
+                edicaoController.current = null;
+                setCarregandoEdicao(false);
+            }
+        }
+    }
+
+    function alunoSalvo() {
+        setAlunoEdicao(null);
+        atualizarDados();
+    }
+
     return (
         <div className="space-y-lg">
             <div className="flex items-center gap-md">
@@ -167,6 +222,8 @@ export function AlunoDetalhes() {
                 </div>
             </div>
 
+            {carregandoEdicao && <p role="status" className="text-sm text-text-muted">Carregando dados para edição...</p>}
+            {erroEdicao && podeEditar && <p role="alert" className="rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEdicao}</p>}
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-8" aria-label="Abas de navegação">
                     {TABS.map((tab) => {
@@ -187,9 +244,18 @@ export function AlunoDetalhes() {
 
             <div className="mt-lg">
                 {abaAtiva === 'visao-geral' && (
-                    <VisaoGeral dadosAluno={aluno} agenda={agenda} turmaRegular={turmaRegular}
-                        dataReferencia={dataReferencia} onSelecionarSemana={selecionarSemana}
-                        carregandoAgenda={carregandoAgenda} erroAgenda={erroAgenda} />
+                    <VisaoGeral
+                        dadosAluno={aluno}
+                        agenda={agenda}
+                        turmaRegular={turmaRegular}
+                        dataReferencia={dataReferencia}
+                        onSelecionarSemana={selecionarSemana}
+                        carregandoAgenda={carregandoAgenda}
+                        erroAgenda={erroAgenda}
+                        permissao={podeEditar}
+                        onEditar={abrirEdicao}
+                        carregandoEdicao={carregandoEdicao}
+                    />
                 )}
                 {abaAtiva === 'oficinas' && (
                     <Oficinas
@@ -205,8 +271,14 @@ export function AlunoDetalhes() {
                 {abaAtiva === 'atendimentos' && (
                     <Atendimentos atendimentos={atendimentos} idAluno={id} statusAluno={aluno?.status} onSuccess={atualizarDados} permissao={podeEditar}/>
                 )}
+                {abaAtiva === 'ocorrencias' && <Ocorrencias key={id} ocorrencias={ocorrencias} idAluno={id}
+                    carregando={carregandoOcorrencias} erro={erroOcorrencias}
+                    onSuccess={() => setVersaoOcorrencias((versao) => versao + 1)}
+                    onTentarNovamente={() => setVersaoOcorrencias((versao) => versao + 1)} />}
                 {/* {abaAtiva === 'historico' && <AbaHistorico alunoId={id} />} */}
             </div>
+            {podeEditar && alunoEdicao && Number(alunoEdicao.id) === Number(id) && <FormularioAluno key={alunoEdicao.id}
+                aluno={alunoEdicao} onClose={() => setAlunoEdicao(null)} onSalvo={alunoSalvo} />}
         </div>
     );
 }

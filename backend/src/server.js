@@ -16,6 +16,7 @@ const atendimentosRoutes = require('./routes/atendimentosRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const profissionalRoutes = require('./routes/profissionalRoutes');
 const ambienteRoutes = require('./routes/ambienteRoutes');
+const ocorrenciaRoutes = require('./routes/ocorrenciaRoutes');
 
 const app = express();
 
@@ -65,6 +66,7 @@ api.use((req, res, next) => {
 api.use('/auth', authProtegidas);
 api.use(alunoLeituraRoutes);
 api.use(turmaLeituraRoutes);
+api.use(ocorrenciaRoutes);
 
 // Rotas com permissão de administração
 api.use(exigirPermissao('administracao:acessar'));
