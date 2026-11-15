@@ -240,8 +240,8 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                 </p>
                 <p className="mt-sm text-sm text-text-muted">
                     {inscricaoParaCancelar?.status_vinculo === 'PROVISORIO'
-                        ? 'Este vínculo provisório será removido por completo do planejamento. Ele não representa uma inscrição efetiva.'
-                        : 'O cancelamento vale a partir de hoje. As atividades até ontem continuarão disponíveis no calendário.'}
+                        ? 'Este vínculo provisório será encerrado e deixará de aparecer no planejamento. O registro será preservado.'
+                        : 'As próximas ocorrências serão canceladas. As ocorrências já iniciadas continuarão disponíveis no calendário.'}
                 </p>
                 {erroCancelamento && <p role="alert" className="mt-md text-sm text-red-700">{erroCancelamento}</p>}
             </Modal>

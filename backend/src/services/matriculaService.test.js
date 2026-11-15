@@ -43,7 +43,7 @@ function sessao(alteracoes = {}) {
     return {
         id: 20, atendimento_clinico_id: 30, status: 'ATIVO', data_sessao: data('2026-11-02'),
         hora_inicio: hora('09:30'), duracao_minutos: 60,
-        atendimento_clinico: { aluno_id: 1, status: 'ATIVO', modalidade: 'Fisioterapia' },
+        atendimento_clinico: { aluno_id: 1, status: 'ATIVO', data_cancelamento: null, modalidade: 'Fisioterapia' },
         ...alteracoes
     };
 }
@@ -51,7 +51,7 @@ function sessao(alteracoes = {}) {
 function simularBanco(t, {
     aluno = { id: 1, status: 'ATIVO', turno: 'MANHA', dias_frequencia: [1, 2, 3, 4, 5, 6, 7] },
     oficinas = [oficina()], sessoes = [], matriculas = [], vagas = [], falharNaMatricula,
-    agora = '2026-11-02T12:00:00.000Z'
+    agora = '2026-11-02T11:00:00.000Z'
 } = {}) {
     t.mock.timers.enable({ apis: ['Date'], now: new Date(agora) });
     const estado = { transacoes: [], matriculas: [], sessoes: [], atendimentos: [], eventos: [], atualizacoes: new Map() };
@@ -124,7 +124,7 @@ function simularBanco(t, {
             },
             atendimento_clinico: {
                 create: t.mock.fn(async ({ data: registro }) => {
-                    const novo = { id: 300 + pendentes.atendimentos.length, ...registro };
+                    const novo = { id: 300 + pendentes.atendimentos.length, data_cancelamento: null, ...registro };
                     pendentes.atendimentos.push(novo);
                     return novo;
                 }),
@@ -250,7 +250,7 @@ test('consulta apenas sessões e atendimentos ativos do aluno', async (t) => {
     await matricularOficinasService(pedido);
     assert.equal(banco.matriculas.length, 1);
     assert.deepEqual(banco.transacoes[0].atendimento_sessao.findMany.mock.calls[0].arguments[0].where,
-        { status: 'ATIVO', atendimento_clinico: { aluno_id: 1, status: 'ATIVO' } });
+        { status: 'ATIVO', atendimento_clinico: { aluno_id: 1, status: 'ATIVO', data_cancelamento: null } });
 });
 
 test('não grava nenhuma oficina quando somente uma do lote conflita', async (t) => {
@@ -479,7 +479,7 @@ test('fluxo completo mantém ontem na agenda, remove hoje e permite reinscriçã
     const turma = oficina({ capacidade_maxima: 1, horarios: [1, 2, 3].map((dia) => ({
         id: dia, dia_semana: dia, hora_inicio: hora('09:00'), hora_fim: hora('10:00')
     })) });
-    const banco = simularBanco(t, { oficinas: [turma], matriculas: [inscricao({ turma })], agora: '2026-11-03T12:00:00.000Z' });
+    const banco = simularBanco(t, { oficinas: [turma], matriculas: [inscricao({ turma })], agora: '2026-11-03T11:00:00.000Z' });
     function substituir(objeto, metodo, funcao) {
         const original = objeto[metodo];
         t.after(() => { objeto[metodo] = original; });

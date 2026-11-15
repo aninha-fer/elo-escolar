@@ -53,7 +53,7 @@ model pessoa {
   telefone        String?
   data_nascimento DateTime? @db.Date
   status_geral    status    @default(ATIVO)
-  created_at      DateTime  @default(now())
+  created_at      DateTime  @default(now()) @db.Timestamptz(3)
   updated_at      DateTime  @updatedAt
 
   aluno              aluno?
@@ -86,7 +86,7 @@ model aluno_responsavel {
   aluno_id   Int
   aluno      aluno    @relation(fields: [aluno_id], references: [id])
   parentesco String?  @db.VarChar(30)
-  created_at DateTime @default(now())
+  created_at DateTime @default(now()) @db.Timestamptz(3)
   updated_at DateTime @updatedAt
 
   @@unique([aluno_id, pessoa_id])
@@ -101,7 +101,7 @@ model aluno_dados_medicos {
   usa_medicamento             Boolean?
   medicamentos_descricao      String?                 @db.Text
   autorizacao_analgesico      autorizacao_analgesico?
-  created_at                  DateTime                @default(now())
+  created_at                  DateTime                @default(now()) @db.Timestamptz(3)
   updated_at                  DateTime                @updatedAt
 }
 
@@ -145,7 +145,7 @@ model turma {
   profissional      funcionario  @relation(fields: [profissional_id], references: [id])
   ano_letivo        Int?
   status            status_simples       @default(ATIVO)
-  created_at        DateTime     @default(now())
+  created_at        DateTime     @default(now()) @db.Timestamptz(3)
 
   horarios   turma_horario[]
   matriculas matricula_turma[]
@@ -174,7 +174,7 @@ model matricula_turma {
   data_inicio DateTime? @db.Date
   data_fim    DateTime? @db.Date
   status      status    @default(ATIVO)
-  created_at  DateTime  @default(now())
+  created_at  DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([aluno_id])
   @@index([turma_id])
@@ -194,8 +194,9 @@ model atendimento_clinico {
   frequencia       Int?
   dias_semana      Int[]
   data_termino     DateTime?        @db.Date
+  data_cancelamento DateTime?       @db.Date
   status           status           @default(ATIVO)
-  createdAt        DateTime         @default(now())
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
 
   sessoes atendimento_sessao[]
 

@@ -1,5 +1,6 @@
 import { formatarStatus, formatarTelefone } from '../../utils/formatters';
 import { BotaoAcoes } from '../../components/BotaoAcoes';
+import EditIcon from '../../components/icons/EditIcon';
 
 const coresFuncao = {
     Professor: 'bg-blue-50 text-blue-600',
@@ -56,7 +57,7 @@ export function TabelaProfissionais({ profissionais = [], onEditar, onAlterarSta
                                 </td>
                                 <td className="px-lg py-md text-right">
                                     <BotaoAcoes label={`Ações para ${nome}`} options={[
-                                        { id: 'editar', label: 'Editar', disabled: !ativo || !onEditar, onClick: () => onEditar(profissional) },
+                                        { id: 'editar', label: 'Editar', disabled: !ativo || !onEditar, onClick: () => onEditar(profissional), icon: <EditIcon/> },
                                         { id: 'status', label: inativo ? 'Ativar profissional' : 'Inativar profissional', textColor: inativo ? '#059669' : '#DC2626',
                                             disabled: (!ativo && !inativo) || !onAlterarStatus, onClick: () => onAlterarStatus(profissional) },
                                     ]} />

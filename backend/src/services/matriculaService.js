@@ -1,5 +1,7 @@
 const prisma = require('../prismaClient');
 
+const { fimMatricula, agoraInstituicao } = require('./encerramentoAtividade');
+
 const DIA_MS = 86400000;
 
 function obterStatusVinculo(aluno) {
@@ -34,7 +36,7 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }) {
         detalhes.push({ codigo: 'FREQUENCIA_INSUFICIENTE', mensagem: 'A turma regular não oferece todos os dias de frequência do aluno.' });
     }
     const existente = await tx.matricula_turma.findFirst({
-        where: { aluno_id, status: { in: ['ATIVO', 'PROVISORIO'] }, turma: { tipo: 'REGULAR' } }
+        where: { aluno_id, OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null }], turma: { tipo: 'REGULAR' } }
     });
     if (existente) detalhes.push({ codigo: 'MATRICULA_DUPLICADA', mensagem: 'O aluno já possui uma turma regular.' });
     if (status === 'ATIVO' && turma.capacidade_maxima != null) {
@@ -47,7 +49,7 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }) {
         erro.detalhes = detalhes;
         throw erro;
     }
-    return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: obterDataInicioMatricula() } });
+    return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: status === 'ATIVO' ? obterDataInicioMatricula() : null } });
 }
 
 async function matricularTurmaRegularService(dados) {
@@ -70,7 +72,7 @@ function obterInicio(data, hora) {
 async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, statusVinculo) {
     const status = statusVinculo === 'PROVISORIO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO';
     const sessoes = await tx.atendimento_sessao.findMany({
-        where: { status, atendimento_clinico: { aluno_id, status } },
+        where: { status, atendimento_clinico: { aluno_id, status, data_cancelamento: null } },
         select: {
             id: true, atendimento_clinico_id: true, data_sessao: true,
             hora_inicio: true, duracao_minutos: true,
@@ -207,7 +209,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
     const matriculasAtuais = await tx.matricula_turma.findMany({
         where: {
             aluno_id: aluno.id,
-            status: statusVinculo === 'PROVISORIO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO'
+            OR: [{ status: 'ATIVO' }, ...(statusVinculo === 'PROVISORIO' ? [{ status: 'PROVISORIO', data_fim: null }] : [])]
         },
         include: {
             turma: {
@@ -315,7 +317,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
             data: {
                 aluno_id: aluno.id,
                 turma_id: oficina.id,
-                data_inicio: dataInicio,
+                data_inicio: statusVinculo === 'ATIVO' ? dataInicio : null,
                 status: statusVinculo
             }
         }));
@@ -331,7 +333,7 @@ async function cancelarOficinaService({ aluno_id, matricula_id }) {
     return prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
         const select = {
-            id: true, aluno_id: true, turma_id: true, status: true, data_inicio: true, data_fim: true
+            id: true, aluno_id: true, turma_id: true, status: true, data_inicio: true, data_fim: true, turma: { select: { horarios: true } }
         };
         const matricula = await tx.matricula_turma.findFirst({
             where: { id: matricula_id, aluno_id, turma: { tipo: 'OFICINA' } },
@@ -351,15 +353,13 @@ async function cancelarOficinaService({ aluno_id, matricula_id }) {
             throw erro;
         }
 
-        const ontem = new Date(obterDataInicioMatricula().getTime() - DIA_MS);
-        // Um cancelamento não pode estender um período que já tinha término anterior.
-        const dataFim = matricula.data_fim && matricula.data_fim < ontem ? matricula.data_fim : ontem;
+        const dataFim = fimMatricula(matricula);
         const encerrada = await tx.matricula_turma.update({
             where: { id: matricula.id },
             data: { status: 'INATIVO', data_fim: dataFim },
             select
         });
-        return { mensagem: 'Inscrição cancelada a partir de hoje. O histórico anterior foi preservado.', matricula: encerrada };
+        return { mensagem: 'Inscrição cancelada. As ocorrências já iniciadas foram preservadas.', matricula: encerrada };
     }, { isolationLevel: 'ReadCommitted' });
 }
 
@@ -379,8 +379,9 @@ async function removerMatriculaProvisoriaService({ aluno_id, matricula_id }) {
             erro.statusCode = 409;
             throw erro;
         }
-        await tx.matricula_turma.delete({ where: { id: matricula_id } });
-        return { mensagem: 'Vínculo provisório removido do planejamento.' };
+        if (matricula.data_fim) return { mensagem: 'Vínculo provisório já encerrado.' };
+        await tx.matricula_turma.update({ where: { id: matricula_id }, data: { data_fim: new Date(agoraInstituicao().toISOString().slice(0, 10) + 'T00:00:00.000Z') } });
+        return { mensagem: 'Vínculo provisório encerrado. O registro foi preservado.' };
     }, { isolationLevel: 'ReadCommitted' });
 }
 

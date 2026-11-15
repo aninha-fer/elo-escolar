@@ -47,7 +47,8 @@ const diasDaSemana = {
 };
 
 export function formatarFrequencia(dias = []) {
-    return dias
+    return [...dias]
+        .sort((a, b) => a - b)
         .map((dia) => diasDaSemana[dia] ?? dia)
         .join(', ');
 }

@@ -164,10 +164,10 @@ async function editarTurmaService(id, entrada) {
         await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${id} FOR UPDATE`;
         const turma = await tx.turma.findUnique({ where: { id }, include: { horarios: true } });
         if (!turma) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
-        const matriculas = await tx.matricula_turma.groupBy({ by: ['status'], where: { turma_id: id }, _count: { _all: true } });
+        const matriculas = await tx.matricula_turma.groupBy({ by: ['status', 'data_fim'], where: { turma_id: id }, _count: { _all: true } });
         const possuiMatriculas = matriculas.some((grupo) => grupo._count._all > 0);
-        const ocupacao = matriculas.find((grupo) => grupo.status === 'ATIVO')?._count._all ?? 0;
-        const vigentes = matriculas.filter((grupo) => ['ATIVO', 'PROVISORIO'].includes(grupo.status)).reduce((total, grupo) => total + grupo._count._all, 0);
+        const ocupacao = matriculas.filter((grupo) => grupo.status === 'ATIVO').reduce((total, grupo) => total + grupo._count._all, 0);
+        const vigentes = matriculas.filter((grupo) => grupo.status === 'ATIVO' || (grupo.status === 'PROVISORIO' && grupo.data_fim == null)).reduce((total, grupo) => total + grupo._count._all, 0);
         const regular = turma.tipo === 'REGULAR';
         if (regular && ['hora_inicio', 'hora_fim', 'dias_semana'].some((campo) => dados[campo] !== undefined)) {
             throw Object.assign(new Error('O cronograma de turmas regulares é definido pelo turno.'), { statusCode: 400 });

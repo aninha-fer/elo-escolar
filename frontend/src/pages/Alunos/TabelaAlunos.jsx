@@ -1,5 +1,7 @@
+import { BotaoAcoes } from '../../components/BotaoAcoes';
 import { useNavigate } from 'react-router-dom';
 import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/formatters';
+import EditIcon from '../../components/icons/EditIcon';
 
 export function TabelaAlunos({ alunos = [], onAcao }) {
     const navigate = useNavigate();
@@ -108,22 +110,11 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <button
-                                        type="button"
-                                        aria-label={`Ações para ${nome}`}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            onAcao?.(aluno);
-                                        }}
-                                        onKeyDown={(event) => event.stopPropagation()}
-                                        className="inline-flex size-11 items-center justify-center rounded-lg border-2 border-slate-200 text-slate-500 transition-colors hover:bg-bg-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                                    >
-                                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-                                            <circle cx="3" cy="9" r="1.5" />
-                                            <circle cx="9" cy="9" r="1.5" />
-                                            <circle cx="15" cy="9" r="1.5" />
-                                        </svg>
-                                    </button>
+                                    {onAcao && <div className="inline-flex" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                                        <BotaoAcoes label={`Ações para ${nome}`} options={[
+                                            { id: 'editar', label: 'Editar', onClick: () => onAcao(aluno), icon: <EditIcon /> },
+                                        ]} />
+                                    </div>}
                                 </td>
                             </tr>
                         );

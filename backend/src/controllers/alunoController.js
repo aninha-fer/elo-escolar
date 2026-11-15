@@ -1,5 +1,5 @@
-const { criarAlunoDTO, getAlunoDTO } = require('../dtos/alunoDTO');
-const { criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService } = require('../services/alunoService');
+const { criarAlunoDTO, editarAlunoDTO, getAlunoDTO } = require('../dtos/alunoDTO');
+const { editarAlunoService, criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService } = require('../services/alunoService');
 
 
 async function criarAluno(req, res) {
@@ -66,4 +66,19 @@ async function obterAtendimentos(req, res) {
   }
 }
 
-module.exports = { criarAluno, listarAlunos, obterAluno, obterOficinas, obterAtendimentos };
+async function editarAluno(req, res) {
+  try {
+    const { id } = getAlunoDTO.parse(req.params);
+    await editarAlunoService(id, editarAlunoDTO.parse(req.body));
+    return res.status(200).json(await obterAlunoService(id));
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.confirmacao) return res.status(409).json({ erro: error.message, confirmacao: error.confirmacao, conflitos: error.detalhes });
+    if (error.isConflict) return res.status(409).json({ erro: error.message, conflitos: error.detalhes });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    console.error('Erro ao editar aluno.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao editar aluno.' });
+  }
+}
+
+module.exports = { editarAluno, criarAluno, listarAlunos, obterAluno, obterOficinas, obterAtendimentos };

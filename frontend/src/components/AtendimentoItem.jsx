@@ -30,7 +30,7 @@ export function AtendimentoItem({ atendimento, onCancelar, cancelando = false })
                         🕐 {formatarHora(horaInicio)} · {atendimento.duracao_minutos} min {dias ? ` · ${dias}` : ''}
                     </p>
                     <p className="text-text-muted text-[14px]">
-                        📅 {periodo}
+                        📅 {semanal || mensal ? 'Início planejado: ' : ''}{periodo}
                     </p>
                 </div>
                 {mensal && <p className="text-xs text-text-muted">Confira na agenda as datas de cada sessão mensal.</p>}

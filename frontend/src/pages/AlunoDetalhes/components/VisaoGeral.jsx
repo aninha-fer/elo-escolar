@@ -48,7 +48,6 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, o
                         <CampoInformacao titulo="Uso de medicamento" valor={medicos?.usa_medicamento === true
                             ? medicos.medicamentos_descricao : formatarSimNao(medicos?.usa_medicamento)} />
                         <CampoInformacao titulo="Em caso de dor" valor={formatarAutorizacaoAnalgesico(medicos?.autorizacao_analgesico)} />
-                        <CampoInformacao titulo="Procan" valor={formatarSimNao(dadosAluno?.participa_procan)} />
                     </dl>
                 </DivInformacoes>
             </div>

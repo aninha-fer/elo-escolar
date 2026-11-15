@@ -64,9 +64,6 @@ const editarTurmaDTO = z.object({
 }).partial().strict().superRefine((dados, contexto) => {
   const campos = Object.keys(dados).filter((campo) => dados[campo] !== undefined);
   if (!campos.length) contexto.addIssue({ code: 'custom', message: 'Informe ao menos um campo para atualizar.' });
-  if (campos.some((campo) => campo !== 'status') && dados.ambiente_id === undefined) {
-    contexto.addIssue({ code: 'custom', path: ['ambiente_id'], message: 'Selecione a sala da turma.' });
-  }
 });
 
 module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO };

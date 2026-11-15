@@ -420,7 +420,7 @@ export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSucces
                 onConfirm={confirmarCancelamento}
                 isConfirmLoading={isRemoving}>
                 <p className="text-sm text-text-main">
-                    Este atendimento provisório será removido por completo do planejamento, incluindo todas as sessões da recorrência.
+                    Este atendimento provisório será encerrado e deixará de aparecer no planejamento. Os registros serão preservados.
                 </p>
                 {erroRemocao && <p role="alert" className="mt-md text-sm text-red-700">{erroRemocao}</p>}
             </Modal>

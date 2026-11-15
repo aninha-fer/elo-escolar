@@ -1,6 +1,7 @@
 import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/formatters';
 import { agruparHorarios } from '../../utils/formatters';
 import { BotaoAcoes } from '../../components/BotaoAcoes';
+import EditIcon from '../../components/icons/EditIcon';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600',
@@ -57,7 +58,7 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                 <button type="button" className="absolute inset-0 size-full cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2"
                     aria-label={`Selecionar ${turma.tipo === 'OFICINA' ? 'oficina' : 'turma'} ${nome}`} onClick={() => onSelecionar?.(turma)} />
                 {podeEditar && <div className="absolute right-md top-md z-10"><BotaoAcoes label={`Ações para ${nome}`} options={[
-                    { id: 'editar', label: 'Editar', disabled: !onEditar, onClick: () => onEditar(turma) },
+                    { id: 'editar', label: 'Editar', disabled: !onEditar, onClick: () => onEditar(turma), icon: <EditIcon/> },
                     { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus,
                         textColor: turma.status === 'INATIVO' ? '#059669' : '#DC2626', onClick: () => onAlterarStatus(turma) },
                 ]} /></div>}

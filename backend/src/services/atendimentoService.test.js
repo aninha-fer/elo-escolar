@@ -341,7 +341,7 @@ test('consulta somente sessões e atendimentos ativos do aluno e oficinas ativas
   await agendarAtendimentoService(dadosBase);
   const filtroSessoes = tx.atendimento_sessao.findMany.mock.calls[0].arguments[0].where;
   assert.equal(filtroSessoes.status, 'ATIVO');
-  assert.deepEqual(filtroSessoes.atendimento_clinico, { aluno_id: 1, status: 'ATIVO' });
+  assert.deepEqual(filtroSessoes.atendimento_clinico, { aluno_id: 1, status: 'ATIVO', data_cancelamento: null });
   assert.deepEqual(filtroSessoes.data_sessao, { lte: data('2026-10-26') });
   const filtroOficinas = tx.matricula_turma.findMany.mock.calls[0].arguments[0].where;
   assert.equal(filtroOficinas.aluno_id, 1);

@@ -30,8 +30,8 @@ function simular(t, opcoes = {}) {
                 update: async ({ data }) => { chamadas.push('turma'); Object.assign(pendente.turma, data); },
             },
             matricula_turma: { groupBy: async ({ where, by }) => {
-                assert.deepEqual(where, { turma_id: 10 }); assert.deepEqual(by, ['status']);
-                return [...new Set(pendente.matriculas)].map((status) => ({ status, _count: { _all: pendente.matriculas.filter((item) => item === status).length } }));
+                assert.deepEqual(where, { turma_id: 10 }); assert.deepEqual(by, ['status', 'data_fim']);
+                return [...new Set(pendente.matriculas)].map((status) => ({ status, data_fim: opcoes.fimProvisorio ?? null, _count: { _all: pendente.matriculas.filter((item) => item === status).length } }));
             } },
             ambiente: { findUnique: async () => opcoes.salaInexistente ? null : { id: 2 } },
             funcionario: { findUnique: async () => opcoes.profissionalInexistente ? null : {
@@ -131,14 +131,31 @@ test('falha ao criar horários desfaz a alteração da turma e preserva os horá
     assert.equal(banco.estado.horarios[0].hora_inicio.toISOString().slice(11, 16), '07:30');
 });
 
-test('DTO exige sala em edição e rejeita alterações de tipo, dias inválidos e corpos vazios', async (t) => {
+test('DTO rejeita sala nula, alterações de tipo, dias inválidos e corpos vazios', async (t) => {
     simular(t);
-    for (const body of [{}, { nome: 'Sem sala' }, { ambiente_id: null }, { tipo: 'OFICINA', ambiente_id: 2 },
+    for (const body of [{}, { ambiente_id: null }, { tipo: 'OFICINA', ambiente_id: 2 },
         { dias_semana: [6], ambiente_id: 2 }, { capacidade_maxima: -1, ambiente_id: 2 }, { status: 'PROVISORIO' }]) {
         assert.equal((await editar(body)).code, 400);
     }
     assert.equal((await editar({ status: 'ATIVO' }, 'abc')).code, 400);
     assert.equal(prisma.$transaction.mock.callCount(), 0);
+});
+
+for (const tipo of ['REGULAR', 'OFICINA']) {
+    test(`${tipo}: PATCH somente com nome preserva a sala cadastrada`, async (t) => {
+        const banco = simular(t, { tipo });
+        const res = await editar({ nome: 'Novo nome' });
+        assert.equal(res.code, 200);
+        assert.equal(banco.estado.turma.nome, 'Novo nome');
+        assert.equal(banco.estado.turma.ambiente_id, 2);
+    });
+}
+
+test('alteração de cronograma sem enviar sala utiliza o ambiente já cadastrado', async (t) => {
+    const banco = simular(t);
+    assert.equal((await editar({ turno: 'TARDE' })).code, 200);
+    assert.equal(banco.estado.turma.ambiente_id, 2);
+    assert.ok(banco.estado.horarios.every((h) => h.hora_inicio.toISOString().slice(11, 16) === '12:30'));
 });
 
 test('horários fora das faixas e campos específicos do tipo errado são recusados', async (t) => {
@@ -168,6 +185,12 @@ test('detalhe sinaliza histórico mesmo sem alunos com matrícula ativa', async 
         return { id: 10, horarios: [], matriculas: [], _count: { matriculas: 1 } };
     };
     assert.deepEqual(await obterTurmaService(10), { id: 10, horarios: [], alunos: [], possui_matriculas: true });
+});
+
+test('provisório encerrado permite inativação, mas ainda constitui histórico da turma', async (t) => {
+    simular(t, { fimProvisorio: new Date('2026-11-01T00:00:00.000Z'), estado: { matriculas: ['PROVISORIO'] } });
+    assert.equal((await editar({ status: 'INATIVO' })).code, 200);
+    assert.equal((await editar({ ambiente_id: 2, turno: 'TARDE' })).code, 409);
 });
 
 test('rota PATCH permite somente administração', async (t) => {

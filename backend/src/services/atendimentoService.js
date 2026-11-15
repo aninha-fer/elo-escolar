@@ -1,6 +1,8 @@
 const prisma = require('../prismaClient');
 const { obterStatusVinculo } = require('./matriculaService');
 
+const { agoraInstituicao } = require('./encerramentoAtividade');
+
 const DIAS_DA_SEMANA = new Set([1, 2, 3, 4, 5, 6, 7]);
 
 function criarErroValidacao(mensagem) {
@@ -177,7 +179,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
   const sessoes = await tx.atendimento_sessao.findMany({
     where: {
       status,
-      atendimento_clinico: { aluno_id, status },
+      atendimento_clinico: { aluno_id, status, data_cancelamento: null },
       // Sem limite inferior: uma sessão iniciada antes pode avançar para o período solicitado.
       data_sessao: { lte: obterDia(ultimoFim - 1) }
     },
@@ -196,7 +198,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
     where: {
       aluno_id,
       OR: [{ status: 'ATIVO' }, { status: 'INATIVO', data_fim: { not: null } },
-        ...(statusVinculo === 'PROVISORIO' ? [{ status: 'PROVISORIO' }] : [])],
+        ...(statusVinculo === 'PROVISORIO' ? [{ status: 'PROVISORIO', data_fim: null }] : [])],
       turma: { tipo: 'OFICINA', status: 'ATIVO' },
       AND: [
         { OR: [{ data_inicio: null }, { data_inicio: { lte: obterDia(ultimoFim - 1) } }] },
@@ -369,6 +371,7 @@ async function removerAtendimentoProvisorioService({ aluno_id, atendimento_id })
       erro.statusCode = 409;
       throw erro;
     }
+    if (atendimento.data_cancelamento) return { mensagem: 'Atendimento provisório já encerrado.' };
     const sessoesEfetivas = await tx.atendimento_sessao.count({
       where: { atendimento_clinico_id: atendimento_id, status: { not: 'PROVISORIO' } }
     });
@@ -377,9 +380,8 @@ async function removerAtendimentoProvisorioService({ aluno_id, atendimento_id })
       erro.statusCode = 409;
       throw erro;
     }
-    await tx.atendimento_sessao.deleteMany({ where: { atendimento_clinico_id: atendimento_id, status: 'PROVISORIO' } });
-    await tx.atendimento_clinico.delete({ where: { id: atendimento_id } });
-    return { mensagem: 'Atendimento provisório e suas sessões removidos do planejamento.' };
+    await tx.atendimento_clinico.update({ where: { id: atendimento_id }, data: { data_cancelamento: new Date(agoraInstituicao().toISOString().slice(0, 10) + 'T00:00:00.000Z') } });
+    return { mensagem: 'Atendimento provisório encerrado. Os registros foram preservados.' };
   }, { isolationLevel: 'ReadCommitted' });
 }
 
