@@ -16,14 +16,14 @@ export function SeletorProfissional({ profissionais, value, onChange, tipo, carr
             </legend>
             <p className="mb-sm text-xs text-text-muted">Selecione um profissional responsável.</p>
             <div className="overflow-hidden rounded-sm border border-slate-200">
-                <Input id="turma-busca-profissional" aria-label="Buscar profissional" placeholder="Buscar profissional..."
+                <Input data-testid="turma-formulario-busca-profissional" id="turma-busca-profissional" aria-label="Buscar profissional" placeholder="Buscar profissional..."
                     wrapperClassName="mb-0!" inputClassName="rounded-none! border-0! bg-bg-main!"
                     value={busca} onChange={(event) => setBusca(event.target.value)}
                     icon={<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>} />
                 {carregando ? <p role="status" className="p-md text-sm text-text-muted">Carregando profissionais...</p>
                     : erroCarga ? <div className="p-md text-sm text-red-700">
                         <p role="alert">{erroCarga}</p>
-                        <button type="button" className="mt-sm underline" onClick={onTentarNovamente}>Tentar novamente</button>
+                        <button data-testid="turma-formulario-profissionais-tentar-novamente" type="button" className="mt-sm underline" onClick={onTentarNovamente}>Tentar novamente</button>
                     </div> : filtrados.length === 0 ? <p role="status" className="p-md text-sm text-text-muted">
                         {profissionais.length === 0 ? 'Nenhum profissional com função compatível cadastrado.' : 'Nenhum profissional encontrado para esta busca.'}
                     </p> : <div className="max-h-60 overflow-y-auto divide-y divide-slate-200">
@@ -36,7 +36,7 @@ export function SeletorProfissional({ profissionais, value, onChange, tipo, carr
                                     <span className="block break-words text-sm font-semibold text-text-main">{profissional.nome}</span>
                                     <span className="block text-xs text-text-muted">{profissional.funcao}</span>
                                 </span>
-                                <input type="radio" name="profissional_id" value={profissional.id} checked={String(value) === String(profissional.id)}
+                                <input data-testid={`turma-formulario-profissional-${profissional.id}`} type="radio" name="profissional_id" value={profissional.id} checked={String(value) === String(profissional.id)}
                                     onChange={(event) => onChange(event.target.value)} required aria-invalid={Boolean(error)}
                                     aria-describedby={error ? 'turma-profissional-erro' : undefined} className="size-4 shrink-0 accent-blue-600" />
                             </label>

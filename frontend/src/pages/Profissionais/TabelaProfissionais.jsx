@@ -56,7 +56,7 @@ export function TabelaProfissionais({ profissionais = [], onEditar, onAlterarSta
                                     <span className={`inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold before:mr-2 before:size-1.5 before:rounded-full ${coresStatus[profissional.status_geral] ?? 'bg-slate-100 text-slate-500'}`}>{formatarStatus(profissional.status_geral)}</span>
                                 </td>
                                 <td className="px-lg py-md text-right">
-                                    <BotaoAcoes label={`Ações para ${nome}`} options={[
+                                    <BotaoAcoes testId={`profissional-${profissional.id}-acoes`} label={`Ações para ${nome}`} options={[
                                         { id: 'editar', label: 'Editar', disabled: !ativo || !onEditar, onClick: () => onEditar(profissional), icon: <EditIcon/> },
                                         { id: 'status', label: inativo ? 'Ativar profissional' : 'Inativar profissional', textColor: inativo ? '#059669' : '#DC2626',
                                             disabled: (!ativo && !inativo) || !onAlterarStatus, onClick: () => onAlterarStatus(profissional) },

@@ -159,7 +159,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
     }
 
     return (
-        <Modal isOpen
+        <Modal testId="atendimento-formulario" isOpen
             onClose={fecharModal}
             title={editando ? 'Editar Atendimento Clínico' : 'Novo Atendimento Clínico'}
             subtitle={editando ? 'Altere os dados do atendimento. Sessões já iniciadas serão preservadas.' : 'Agende um novo atendimento clínico para este aluno.'}
@@ -178,7 +178,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                 <fieldset disabled={isSubmitting} className="min-w-0">
                     {bloqueado && <p className="mb-md rounded-sm bg-amber-50 p-sm text-sm text-amber-800">Há sessões já iniciadas. Modalidade, início e tipo de recorrência estão bloqueados. As demais alterações atingem somente sessões futuras.</p>}
                     <div className="flex flex-row justify-between gap-md">
-                        <Select
+                        <Select data-testid="atendimento-formulario-modalidade"
                             label="Modalidade"
                             name="modalidade" disabled={bloqueado}
                             value={formulario.modalidade}
@@ -192,7 +192,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             ]}
                         />
 
-                        <Select
+                        <Select data-testid="atendimento-formulario-profissional"
                             label="Profissional"
                             name="profissional_id"
                             value={formulario.profissional_id}
@@ -210,7 +210,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                     {erroProfissionais && (
                         <div className="mb-md text-sm text-red-700" role="alert">
                             <p>{erroProfissionais}</p>
-                            <button type="button" className="mt-xs underline" onClick={() => setTentativaProfissionais((valor) => valor + 1)}>
+                            <button data-testid="atendimento-formulario-profissionais-tentar-novamente" type="button" className="mt-xs underline" onClick={() => setTentativaProfissionais((valor) => valor + 1)}>
                                 Tentar novamente
                             </button>
                         </div>
@@ -219,7 +219,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                         <p role="status" className="mb-md text-sm text-text-muted">Nenhum profissional ativo cadastrado.</p>
                     )}
                     <div className="flex flex-row justify-between gap-md">
-                        <Input
+                        <Input data-testid="atendimento-formulario-data-inicio"
                             label="Data de Início"
                             placeholder="Selecione a data de início"
                             id="data-inicio"
@@ -231,7 +231,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             required
                         />
 
-                        <Input
+                        <Input data-testid="atendimento-formulario-hora-inicio"
                             label="Hora de Início"
                             placeholder="Selecione a hora de início"
                             id="hora-inicio"
@@ -244,7 +244,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             required
                         />
 
-                        <Select
+                        <Select data-testid="atendimento-formulario-duracao"
                             label="Duração (min)"
                             name="duracao_minutos"
                             value={formulario.duracao_minutos}
@@ -261,7 +261,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                         />
                     </div>
 
-                    <Toggle disabled={editando}
+                    <Toggle testId="atendimento-formulario-recorrente" disabled={editando}
                         label="Atendimento Recorrente"
                         name="recorrente"
                         checked={isRecorrente}
@@ -271,7 +271,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                         <div className="flex flex-col  bg-bg-main p-md rounded-md border border-gray-300">
                             <div className="flex flex-row justify-between gap-md">
                                 <div className="w-30">
-                                    <Input
+                                    <Input data-testid="atendimento-formulario-frequencia"
                                         label="A cada..."
                                         placeholder="Ex: 1, 2, 4..."
                                         id="frequencia"
@@ -284,7 +284,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                                         required
                                     />
                                 </div>
-                                <SelecaoOpcao
+                                <SelecaoOpcao testId="atendimento-formulario-tipo-recorrencia"
                                     label="Tipo de Recorrência"
                                     name="tipo_recorrencia" disabled={bloqueado}
                                     value={formulario.tipo_recorrencia}
@@ -302,7 +302,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                                 </p>
                             )}
                             <div className="flex flex-row justify-between gap-md items-center">
-                                {formulario.tipo_recorrencia === 'SEMANAL' && <SelecaoDiasSemana
+                                {formulario.tipo_recorrencia === 'SEMANAL' && <SelecaoDiasSemana testId="atendimento-formulario-dias-semana"
                                     label="Dias da Semana"
                                     name="dias_semana"
                                     value={formulario.dias_semana}
@@ -317,7 +317,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                                         { value: 'TODOS', label: 'Todos' },
                                     ]} />}
                                 <div className="w-65">
-                                    <Input
+                                    <Input data-testid="atendimento-formulario-data-termino"
                                         label="Data de Término"
                                         placeholder="Selecione a data de término"
                                         id="data-termino"

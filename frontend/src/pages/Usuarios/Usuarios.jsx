@@ -98,7 +98,7 @@ export function Usuarios() {
         <div className="flex min-w-0 flex-col gap-lg">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Usuários</h1>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
-                <Input placeholder="Pesquisar por nome ou e-mail..." aria-label="Pesquisar por nome ou e-mail"
+                <Input data-testid="usuarios-busca" placeholder="Pesquisar por nome ou e-mail..." aria-label="Pesquisar por nome ou e-mail"
                     value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)}
                     icon={
                         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -106,7 +106,7 @@ export function Usuarios() {
                             <path d="M11.9105 12.0981L9.44336 9.63091" stroke="currentColor" strokeWidth="1.13433" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     } />
-                <Button type="button" className="shrink-0 disabled:cursor-not-allowed disabled:opacity-50" disabled={carregando || Boolean(erro)}
+                <Button data-testid="usuarios-novo" type="button" className="shrink-0 disabled:cursor-not-allowed disabled:opacity-50" disabled={carregando || Boolean(erro)}
                     onClick={() => { setModalAberto(true); }}>
                     <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732M2.91406 6.99361H11.0733" stroke="currentColor" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
@@ -118,7 +118,7 @@ export function Usuarios() {
             {carregando ? <p role="status">Carregando usuários...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
-                    <button type="button" onClick={tentarNovamente} className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold">Tentar novamente</button>
+                    <button data-testid="usuarios-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold">Tentar novamente</button>
                 </div>
             ) : <TabelaUsuarios usuarios={filtrados}
                 onEditar={(usuario) => abrirOperacao('editar', usuario)}
@@ -129,7 +129,7 @@ export function Usuarios() {
                 onClose={() => setOperacao(null)} onSalvo={(usuario) => usuarioAtualizado(usuario, 'Usuário atualizado com sucesso.')} />}
             {operacao?.tipo === 'senha' && <ResetarSenhaUsuario key={operacao.usuario.id} usuario={operacao.usuario}
                 onClose={() => setOperacao(null)} onSalvo={(usuario) => usuarioAtualizado(usuario, 'Senha redefinida com sucesso.')} />}
-            {operacao?.tipo === 'status' && <ModalConfirmacao isOpen onClose={fecharConfirmacao}
+            {operacao?.tipo === 'status' && <ModalConfirmacao testId="usuario-alterar-status" isOpen onClose={fecharConfirmacao}
                 estado={operacao.usuario.status === 'INATIVO' ? 'confirmacao' : 'atencao'} showCancel
                 title={operacao.usuario.status === 'INATIVO' ? 'Ativar usuário?' : 'Inativar usuário?'}
                 description={<>

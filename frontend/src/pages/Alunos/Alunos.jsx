@@ -102,7 +102,7 @@ export function Alunos() {
     return (
         <div className="flex flex-col gap-lg">
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
-                <FiltroEstado
+                <FiltroEstado data-testid="alunos-filtro-todos"
                     count={contagemStatus.TODOS}
                     tipo="TODOS"
                     isSelecionado={statusSelecionado === 'TODOS'}
@@ -111,7 +111,7 @@ export function Alunos() {
                 >
                     Todos
                 </FiltroEstado>
-                <FiltroEstado
+                <FiltroEstado data-testid="alunos-filtro-ativo"
                     count={contagemStatus.ATIVO}
                     tipo="ATIVO"
                     isSelecionado={statusSelecionado === 'ATIVO'}
@@ -120,7 +120,7 @@ export function Alunos() {
                 >
                     Ativos
                 </FiltroEstado>
-                <FiltroEstado
+                <FiltroEstado data-testid="alunos-filtro-inativo"
                     count={contagemStatus.INATIVO}
                     tipo="INATIVO"
                     isSelecionado={statusSelecionado === 'INATIVO'}
@@ -129,7 +129,7 @@ export function Alunos() {
                 >
                     Inativos
                 </FiltroEstado>
-                <FiltroEstado
+                <FiltroEstado data-testid="alunos-filtro-rascunho"
                     count={contagemStatus.RASCUNHO}
                     tipo="RASCUNHO"
                     isSelecionado={statusSelecionado === 'RASCUNHO'}
@@ -140,7 +140,7 @@ export function Alunos() {
                 </FiltroEstado>
             </div>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
-                <Input
+                <Input data-testid="alunos-busca"
                     placeholder="Pesquisar por nome do aluno ou responsável..."
                     aria-label="Pesquisar por nome do aluno ou responsável"
                     value={termoBusca}
@@ -152,7 +152,7 @@ export function Alunos() {
                         </svg>
                     }
                 />
-                {podeEditar && <Button className="shrink-0" onClick={abrirModal}>
+                {podeEditar && <Button data-testid="alunos-novo" className="shrink-0" onClick={abrirModal}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M2.91406 6.99361H11.0733" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />

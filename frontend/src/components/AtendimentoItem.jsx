@@ -39,7 +39,7 @@ export function AtendimentoItem({ atendimento, onEditar, onCancelar, cancelando 
                 </div>
                 {mensal && <p className="text-xs text-text-muted">Confira na agenda as datas de cada sessão mensal.</p>}
             </div>
-            {(onEditar || onCancelar) && <BotaoAcoes label={`Ações para ${atendimento.modalidade}`} disabled={cancelando} options={[
+            {(onEditar || onCancelar) && <BotaoAcoes testId={`atendimento-${atendimento.id}-acoes`} label={`Ações para ${atendimento.modalidade}`} disabled={cancelando} options={[
                 { id: 'editar', label: 'Editar', disabled: !onEditar || eventualIniciado,
                     icon: <EditIcon />, onClick: () => onEditar?.(atendimento) },
                 { id: 'cancelar', label: 'Cancelar', disabled: !onCancelar, textColor: '#DC2626',

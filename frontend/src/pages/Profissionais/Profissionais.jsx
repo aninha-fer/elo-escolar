@@ -97,14 +97,14 @@ export function Profissionais() {
         <section className="profissionais-page flex min-w-0 flex-col gap-lg" aria-labelledby="profissionais-titulo">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Profissionais</h1>
             <div className="flex flex-col gap-sm sm:flex-row sm:items-start">
-                <Input id="busca-profissional" placeholder="Buscar por nome..." aria-label="Buscar profissional por nome"
+                <Input data-testid="profissionais-busca" id="busca-profissional" placeholder="Buscar por nome..." aria-label="Buscar profissional por nome"
                     wrapperClassName="mb-0! min-w-0" inputClassName="h-11" value={busca} onChange={(event) => setBusca(event.target.value)}
                     icon={
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                             <circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" />
                         </svg>
                     } />
-                <Button type="button" className="novo-profissional disabled:cursor-not-allowed disabled:opacity-50" disabled={carregando || Boolean(erro)}
+                <Button data-testid="profissionais-novo" type="button" className="novo-profissional disabled:cursor-not-allowed disabled:opacity-50" disabled={carregando || Boolean(erro)}
                     onClick={() => { setAviso(''); setModalAberto(true); }}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
                     Novo Profissional
@@ -114,14 +114,14 @@ export function Profissionais() {
             {carregando ? <p role="status">Carregando profissionais...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
-                    <button type="button" className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold" onClick={tentarNovamente}>Tentar novamente</button>
+                    <button data-testid="profissionais-tentar-novamente" type="button" className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold" onClick={tentarNovamente}>Tentar novamente</button>
                 </div>
             ) : <TabelaProfissionais profissionais={filtrados} onEditar={(profissional) => abrirOperacao('editar', profissional)}
                 onAlterarStatus={(profissional) => abrirOperacao('status', profissional)} />}
             {modalAberto && <FormularioProfissional onClose={() => setModalAberto(false)} onCriado={profissionalCriado} />}
             {operacao?.tipo === 'editar' && <FormularioProfissional key={operacao.profissional.id} profissional={operacao.profissional}
                 onClose={() => setOperacao(null)} onSalvo={(profissional) => profissionalAtualizado(profissional, 'Profissional atualizado com sucesso.')} />}
-            {operacao?.tipo === 'status' && <ModalConfirmacao isOpen onClose={fecharConfirmacao} showCancel
+            {operacao?.tipo === 'status' && <ModalConfirmacao testId="profissional-alterar-status" isOpen onClose={fecharConfirmacao} showCancel
                 estado={operacao.profissional.status_geral === 'INATIVO' ? 'confirmacao' : 'atencao'}
                 title={operacao.profissional.status_geral === 'INATIVO' ? 'Ativar profissional?' : 'Inativar profissional?'}
                 description={<>

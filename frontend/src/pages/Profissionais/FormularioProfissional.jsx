@@ -80,7 +80,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
 
     return (
         <div className="profissional-modal">
-            <Modal isOpen onClose={fecharModal} title={editando ? 'Editar Profissional' : 'Cadastrar Profissional'} subtitle={<>Campos com <span className="text-danger">*</span> são obrigatórios</>}
+            <Modal testId="profissional-formulario" isOpen onClose={fecharModal} title={editando ? 'Editar Profissional' : 'Cadastrar Profissional'} subtitle={<>Campos com <span className="text-danger">*</span> são obrigatórios</>}
                 confirmText={
                     <span className="inline-flex items-center gap-sm">
                         <SaveIcon />
@@ -90,10 +90,10 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
                 isConfirmLoading={enviando} isConfirmDisabled={!formulario.nome.trim() || !formulario.cargo || (editando && !Object.keys(dadosAlterados).length)}>
                 <form id="form-cadastro-profissional" onSubmit={enviar} noValidate>
                     <fieldset disabled={enviando} className="min-w-0">
-                        <Input id="profissional-nome" name="nome" label="Nome completo" placeholder="Ex: João Silva" autoComplete="name" required
+                        <Input data-testid="profissional-formulario-nome" id="profissional-nome" name="nome" label="Nome completo" placeholder="Ex: João Silva" autoComplete="name" required
                             labelClassName="font-mono" value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />
                         {erros.nome && <p id="profissional-nome-erro" className="mb-md text-sm text-red-700">{erros.nome}</p>}
-                        <Input id="profissional-telefone" name="telefone" label="Telefone" type="tel" placeholder="(11) 99999-9999" autoComplete="tel-national" maxLength={20}
+                        <Input data-testid="profissional-formulario-telefone" id="profissional-telefone" name="telefone" label="Telefone" type="tel" placeholder="(11) 99999-9999" autoComplete="tel-national" maxLength={20}
                             labelClassName="font-mono" value={formulario.telefone} onChange={(event) => atualizarCampo('telefone', event.target.value)} {...acessibilidadeCampo('telefone')} />
                         {erros.telefone && <p id="profissional-telefone-erro" className="mb-md text-sm text-red-700">{erros.telefone}</p>}
                         <fieldset className="mb-md" {...acessibilidadeCampo('cargo')}>
@@ -101,7 +101,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
                             <div className="flex flex-wrap gap-sm">
                                 {funcoesDisponiveis.map((funcao) => (
                                     <label key={funcao} className="cursor-pointer">
-                                        <input type="radio" name="cargo" value={funcao} checked={formulario.cargo === funcao} required
+                                        <input data-testid={`profissional-formulario-funcao-${funcao.toLowerCase()}`} type="radio" name="cargo" value={funcao} checked={formulario.cargo === funcao} required
                                             onChange={(event) => atualizarCampo('cargo', event.target.value)} className="peer sr-only" />
                                         <span className="inline-flex rounded-full border-2 border-slate-200 px-md py-sm text-base text-slate-500 transition-colors peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blue-600 peer-disabled:cursor-wait peer-disabled:opacity-50">{funcao}</span>
                                     </label>

@@ -59,7 +59,7 @@ export function TabelaUsuarios({ usuarios = [], onEditar, onResetarSenha, onAlte
                                     </span>
                                 </td>
                                 <td className="px-lg py-md text-right">
-                                    <BotaoAcoes
+                                    <BotaoAcoes testId={`usuario-${usuario.id}-acoes`}
                                         label={`Ações para ${usuario.nome}`}
                                         options={[
                                             {

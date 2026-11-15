@@ -16,7 +16,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, o
                     <div className="inline-flex shrink-0 items-center gap-sm">
                         {dadosAluno?.participa_procan && (
                             <span className="rounded-sm border border-amber-300 bg-amber-50 px-1 text-[10px] font-semibold text-amber-800">Procan</span>)}
-                            {permissao && <button type="button" onClick={onEditar} disabled={carregandoEdicao}
+                            {permissao && <button data-testid="aluno-editar" type="button" onClick={onEditar} disabled={carregandoEdicao}
                                 aria-label="Editar aluno" title="Editar aluno" aria-busy={carregandoEdicao}
                                 className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary disabled:cursor-wait disabled:opacity-50 [&>svg]:size-5 [&_path]:stroke-current">
                                 <EditIcon />

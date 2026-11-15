@@ -9,6 +9,7 @@ export function SelecaoDiasSemana({
     labelClassName = '',
     disabled = false,
     name,
+    testId,
     options = [],
     allowSelectAll = true,
     selectAllLabel = 'Todos',
@@ -78,6 +79,7 @@ export function SelecaoDiasSemana({
 
                     return (
                         <button
+                            data-testid={testId ? `${testId}-${String(opcao.value).toLowerCase()}` : undefined}
                             key={opcao.value ?? opcao.label}
                             type="button"
                             name={name}

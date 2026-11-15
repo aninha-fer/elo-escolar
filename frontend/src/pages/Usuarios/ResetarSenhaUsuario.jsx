@@ -49,12 +49,12 @@ export function ResetarSenhaUsuario({ usuario, onClose, onSalvo }) {
     }
 
     return (
-        <Modal isOpen onClose={fecharModal} title="Resetar senha" subtitle={`Defina uma nova senha para ${usuario.nome}.`}
+        <Modal testId="usuario-resetar-senha" isOpen onClose={fecharModal} title="Resetar senha" subtitle={`Defina uma nova senha para ${usuario.nome}.`}
             confirmText="Salvar nova senha" confirmFormId="form-resetar-senha" onConfirm={enviar} isConfirmLoading={enviando}>
             <form id="form-resetar-senha" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando} className="min-w-0">
                     {[['senha', 'Nova senha'], ['confirmacao', 'Confirmar nova senha']].map(([campo, label]) => <div key={campo}>
-                        <Input id={`resetar-${campo}`} name={campo} label={label} labelClassName="font-mono" type="password" required
+                        <Input data-testid={`usuario-resetar-${campo}`} id={`resetar-${campo}`} name={campo} label={label} labelClassName="font-mono" type="password" required
                             minLength={8} maxLength={100} autoComplete="new-password" placeholder={campo === 'senha' ? 'Mínimo de 8 caracteres' : 'Digite a nova senha novamente'}
                             value={formulario[campo]} onChange={(event) => atualizarCampo(campo, event.target.value)}
                             aria-invalid={Boolean(erros[campo])} aria-describedby={erros[campo] ? `resetar-${campo}-erro` : undefined} />

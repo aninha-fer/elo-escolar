@@ -72,18 +72,18 @@ export function EditarUsuario({ usuario, onClose, onSalvo }) {
     }
 
     return (
-        <Modal isOpen onClose={fecharModal} title="Editar usuário" subtitle="Defina os dados de acesso e o nível de permissão."
+        <Modal testId="usuario-editar" isOpen onClose={fecharModal} title="Editar usuário" subtitle="Defina os dados de acesso e o nível de permissão."
             confirmText="Salvar alterações" confirmFormId="form-editar-usuario" onConfirm={enviar}
             isConfirmLoading={enviando} isConfirmDisabled={!Object.keys(dados).length}>
             <form id="form-editar-usuario" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando} className="min-w-0">
-                    <Input id="editar-usuario-nome" name="nome" label="Nome completo" labelClassName="font-mono" required maxLength={200}
+                    <Input data-testid="usuario-editar-nome" id="editar-usuario-nome" name="nome" label="Nome completo" labelClassName="font-mono" required maxLength={200}
                         value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />
                     {erroCampo('nome')}
-                    <Input id="editar-usuario-email" name="email" label="E-mail" labelClassName="font-mono" type="email" required maxLength={254}
+                    <Input data-testid="usuario-editar-email" id="editar-usuario-email" name="email" label="E-mail" labelClassName="font-mono" type="email" required maxLength={254}
                         value={formulario.email} onChange={(event) => atualizarCampo('email', event.target.value)} {...acessibilidadeCampo('email')} />
                     {erroCampo('email')}
-                    <Select id="editar-usuario-role" name="role" label="Função" labelClassName="font-mono" required value={formulario.role}
+                    <Select data-testid="usuario-editar-funcao" id="editar-usuario-role" name="role" label="Função" labelClassName="font-mono" required value={formulario.role}
                         onChange={(event) => atualizarCampo('role', event.target.value)} error={erros.role}
                         options={[{ value: 'admin', label: 'Administrador' }, { value: 'professor', label: 'Professor' }]} />
                     {erroEnvio && <p role="alert" className="rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}

@@ -111,7 +111,7 @@ export function Turmas() {
             <h1 id="turmas-titulo" className="text-xl font-bold text-text-main">Turmas</h1>
             <div>
                 <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
-                    <Input placeholder="Pesquisar por nome..." aria-label="Pesquisar por nome"
+                    <Input data-testid="turmas-busca" placeholder="Pesquisar por nome..." aria-label="Pesquisar por nome"
                         value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)}
                         icon={
                             <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -119,7 +119,7 @@ export function Turmas() {
                                 <path d="M11.9105 12.0981L9.44336 9.63091" stroke="currentColor" strokeWidth="1.13433" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         } />
-                    {podeEditar && <Button type="button"
+                    {podeEditar && <Button data-testid="turmas-nova" type="button"
                         onClick={() => { setAviso(''); setModalAberto(true); }}>
                         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                             <path d="M6.99365 2.914V11.0732M2.91406 6.99361H11.0733" stroke="currentColor" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
@@ -133,7 +133,7 @@ export function Turmas() {
             {carregando ? <p role="status">Carregando {tipoTurma === 'REGULAR' ? 'turmas regulares' : 'oficinas'}...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
-                    <button type="button" onClick={tentarNovamente} className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold">Tentar novamente</button>
+                    <button data-testid="turmas-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold">Tentar novamente</button>
                 </div>
             ) : filtrados.length === 0 ? (
                 <p role="status" className="rounded-md border border-slate-200 bg-bg-surface px-lg py-10 text-center text-sm text-slate-500">
@@ -149,7 +149,7 @@ export function Turmas() {
             {modalAberto && podeEditar && <FormularioTurma tipoInicial={tipoTurma} onClose={() => setModalAberto(false)} onCriado={turmaCriada} />}
             {operacao?.tipo === 'editar' && podeEditar && <FormularioTurma key={operacao.turma.id} turma={operacao.turma}
                 onClose={() => setOperacao(null)} onSalvo={(turma) => turmaAtualizada(turma, 'Turma atualizada com sucesso.')} />}
-            {operacao?.tipo === 'status' && podeEditar && <ModalConfirmacao isOpen onClose={fecharConfirmacao} showCancel
+            {operacao?.tipo === 'status' && podeEditar && <ModalConfirmacao testId="turma-alterar-status" isOpen onClose={fecharConfirmacao} showCancel
                 estado={operacao.turma.status === 'INATIVO' ? 'confirmacao' : 'atencao'}
                 title={operacao.turma.status === 'INATIVO' ? 'Ativar turma?' : 'Inativar turma?'}
                 description={<>

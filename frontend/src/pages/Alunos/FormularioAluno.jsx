@@ -263,7 +263,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
 
 
     return (<>
-        <Modal isOpen={!confirmacao}
+        <Modal testId="aluno-formulario" isOpen={!confirmacao}
             onClose={fecharModal}
             title={editando ? 'Editar Aluno' : 'Cadastrar Novo Aluno'}
             subtitle="Campos com * são obrigatórios para o cadastro"
@@ -277,13 +277,13 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
             confirmFormId="form-cadastro-aluno"
             onConfirm={handleSubmit}
             isConfirmLoading={isSubmitting}>
-            {erroTurmas && <div role="alert" className="mb-md text-sm text-red-700">{erroTurmas} <button type="button" className="underline" onClick={() => setTentativa((v) => v + 1)}>Tentar novamente</button></div>}
+            {erroTurmas && <div role="alert" className="mb-md text-sm text-red-700">{erroTurmas} <button data-testid="aluno-formulario-turmas-tentar-novamente" type="button" className="underline" onClick={() => setTentativa((v) => v + 1)}>Tentar novamente</button></div>}
             <form id="form-cadastro-aluno" onSubmit={handleSubmit} noValidate>
                 <fieldset disabled={isSubmitting} className="min-w-0">
                     <div className="mb-md border-b border-gray-200 pb-sm">
                         <h3 className="text-sm font-semibold text-text-main">Dados pessoais</h3>
                     </div>
-                    {campoComErro('nome', (<Input
+                    {campoComErro('nome', (<Input data-testid="aluno-formulario-nome"
                         id="nome-aluno"
                         name="nome"
                         type="text"
@@ -294,7 +294,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                         required
                         {...acessibilidadeCampo('nome')} />))}
                     <div className="flex flex-row gap-md">
-                        {campoComErro('telefone', (<Input
+                        {campoComErro('telefone', (<Input data-testid="aluno-formulario-telefone"
                             id="telefone-aluno"
                             name="telefone"
                             type="tel"
@@ -303,7 +303,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             value={formulario.telefone}
                             onChange={(event) => atualizarCampo('telefone', event.target.value)}
                             {...acessibilidadeCampo('telefone')} />))}
-                        {campoComErro('data_nascimento', (<Input
+                        {campoComErro('data_nascimento', (<Input data-testid="aluno-formulario-data-nascimento"
                             id="data-nascimento-aluno"
                             name="data_nascimento"
                             type="date"
@@ -312,35 +312,35 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             onChange={(event) => atualizarCampo('data_nascimento', event.target.value)}
                             {...acessibilidadeCampo('data_nascimento')} />))}
                     </div>
-                    {campoComErro('participa_procan', (<Toggle label="Procan" name="participa_procan" checked={formulario.participa_procan}
+                    {campoComErro('participa_procan', (<Toggle testId="aluno-formulario-procan" label="Procan" name="participa_procan" checked={formulario.participa_procan}
                         onChange={(valor) => atualizarCampo('participa_procan', valor)} />))}
                     <div className="mb-md">
                         <label htmlFor="observacoes-aluno" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-600">Observações</label>
-                        {campoComErro('observacoes', (<textarea id="observacoes-aluno" name="observacoes" rows={3}
+                        {campoComErro('observacoes', (<textarea data-testid="aluno-formulario-observacoes" id="observacoes-aluno" name="observacoes" rows={3}
                             placeholder="Informações importantes sobre o aluno, sua rotina ou comportamento"
                             value={formulario.observacoes} onChange={(event) => atualizarCampo('observacoes', event.target.value)}
                             className="w-full resize-y rounded-sm border border-slate-200 bg-bg-surface p-sm text-text-main placeholder:text-placeholder focus:outline-none focus:ring-1 focus:ring-secondary" {...acessibilidadeCampo('observacoes')} />))}
                     </div>
                     <div className="mb-md flex items-center justify-between gap-sm border-b border-gray-200 pb-sm">
                         <h3 className="text-sm font-semibold text-text-main">Responsáveis <span className="font-normal text-text-muted">(opcional)</span></h3>
-                        <button type="button" onClick={adicionarResponsavel}
+                        <button data-testid="aluno-formulario-adicionar-responsavel" type="button" onClick={adicionarResponsavel}
                             className="rounded-sm border border-slate-200 px-sm py-xs text-xs font-semibold text-text-main hover:bg-bg-main">+ Adicionar responsável</button>
                     </div>
                     {formulario.responsaveis.map((responsavel, indice) => (
                         <div key={responsavel.chave} className="mb-md flex items-start gap-sm rounded-md border border-slate-200 bg-bg-main p-sm">
                             <span className="mt-7 flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-secondary">{indice + 1}</span>
                             <div className="grid min-w-0 flex-1 grid-cols-1 gap-sm sm:grid-cols-3">
-                                {campoComErro(`responsaveis.${responsavel.chave}.nome`, (<Input id={`responsavel-${responsavel.chave}-nome`} name={`responsaveis.${responsavel.chave}.nome`}
+                                {campoComErro(`responsaveis.${responsavel.chave}.nome`, (<Input data-testid={`aluno-formulario-responsavel-${responsavel.chave}-nome`} id={`responsavel-${responsavel.chave}-nome`} name={`responsaveis.${responsavel.chave}.nome`}
                                     label={`Nome do responsável`} placeholder="Ex: Roberto Andrade"
                                     value={responsavel.nome} onChange={(event) => atualizarResponsavel(responsavel.chave, 'nome', event.target.value)} {...acessibilidadeCampo(`responsaveis.${responsavel.chave}.nome`)} />))}
-                                {campoComErro(`responsaveis.${responsavel.chave}.parentesco`, (<Input id={`responsavel-${responsavel.chave}-parentesco`} name={`responsaveis.${responsavel.chave}.parentesco`}
+                                {campoComErro(`responsaveis.${responsavel.chave}.parentesco`, (<Input data-testid={`aluno-formulario-responsavel-${responsavel.chave}-parentesco`} id={`responsavel-${responsavel.chave}-parentesco`} name={`responsaveis.${responsavel.chave}.parentesco`}
                                     label="Parentesco" placeholder="Ex: Mãe" maxLength={30}
                                     value={responsavel.parentesco} onChange={(event) => atualizarResponsavel(responsavel.chave, 'parentesco', event.target.value)} {...acessibilidadeCampo(`responsaveis.${responsavel.chave}.parentesco`)} />))}
-                                {campoComErro(`responsaveis.${responsavel.chave}.telefone`, (<Input id={`responsavel-${responsavel.chave}-telefone`} name={`responsaveis.${responsavel.chave}.telefone`}
+                                {campoComErro(`responsaveis.${responsavel.chave}.telefone`, (<Input data-testid={`aluno-formulario-responsavel-${responsavel.chave}-telefone`} id={`responsavel-${responsavel.chave}-telefone`} name={`responsaveis.${responsavel.chave}.telefone`}
                                     label="Telefone" type="tel" placeholder="(11) 99999-9999"
                                     value={responsavel.telefone} onChange={(event) => atualizarResponsavel(responsavel.chave, 'telefone', event.target.value)} {...acessibilidadeCampo(`responsaveis.${responsavel.chave}.telefone`)} />))}
                             </div>
-                            <button type="button" aria-label={`Remover responsável ${indice + 1}`} onClick={() => removerResponsavel(responsavel.chave)}
+                            <button data-testid={`aluno-formulario-responsavel-${responsavel.chave}-remover`} type="button" aria-label={`Remover responsável ${indice + 1}`} onClick={() => removerResponsavel(responsavel.chave)}
                                 className="mt-7 rounded-sm border border-slate-200 px-2 py-1 text-xs text-text-muted hover:bg-bg-surface">×</button>
                         </div>
                     ))}
@@ -348,15 +348,15 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                         <h3 className="text-sm font-semibold text-text-main">Saúde e cuidados <span className="font-normal text-text-muted">(opcional)</span></h3>
                     </div>
                     <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
-                        {campoComErro('dados_medicos.restricao_alimentar', (<Input id="restricao-alimentar" name="restricao_alimentar" label="Restrição alimentar" placeholder="Ex: intolerância à lactose"
+                        {campoComErro('dados_medicos.restricao_alimentar', (<Input data-testid="aluno-formulario-restricao-alimentar" id="restricao-alimentar" name="restricao_alimentar" label="Restrição alimentar" placeholder="Ex: intolerância à lactose"
                             value={formulario.dados_medicos.restricao_alimentar} onChange={(event) => atualizarDadoMedico('restricao_alimentar', event.target.value)} {...acessibilidadeCampo('dados_medicos.restricao_alimentar')} />))}
-                        {campoComErro('dados_medicos.autorizado_atividade_fisica', (<Select id="atividade-fisica" name="autorizado_atividade_fisica" label="Autorização para atividade física" placeholder="— Não informado —"
+                        {campoComErro('dados_medicos.autorizado_atividade_fisica', (<Select data-testid="aluno-formulario-atividade-fisica" id="atividade-fisica" name="autorizado_atividade_fisica" label="Autorização para atividade física" placeholder="— Não informado —"
                             value={formulario.dados_medicos.autorizado_atividade_fisica} onChange={(event) => atualizarDadoMedico('autorizado_atividade_fisica', event.target.value)}
                             options={[{ value: 'true', label: 'Autorizado' }, { value: 'false', label: 'Não autorizado' }]} error={erros['dados_medicos.autorizado_atividade_fisica']} />), true)}
-                        {campoComErro('dados_medicos.usa_medicamento', (<Select id="usa-medicamento" name="usa_medicamento" label="Uso de medicamento" placeholder="— Não informado —"
+                        {campoComErro('dados_medicos.usa_medicamento', (<Select data-testid="aluno-formulario-usa-medicamento" id="usa-medicamento" name="usa_medicamento" label="Uso de medicamento" placeholder="— Não informado —"
                             value={formulario.dados_medicos.usa_medicamento} onChange={(event) => atualizarDadoMedico('usa_medicamento', event.target.value)}
                             options={[{ value: 'true', label: 'Sim' }, { value: 'false', label: 'Não' }]} error={erros['dados_medicos.usa_medicamento']} />), true)}
-                        {campoComErro('dados_medicos.autorizacao_analgesico', (<Select id="autorizacao-analgesico" name="autorizacao_analgesico" label="Em caso de dor" placeholder="— Não informado —"
+                        {campoComErro('dados_medicos.autorizacao_analgesico', (<Select data-testid="aluno-formulario-autorizacao-analgesico" id="autorizacao-analgesico" name="autorizacao_analgesico" label="Em caso de dor" placeholder="— Não informado —"
                             value={formulario.dados_medicos.autorizacao_analgesico} onChange={(event) => atualizarDadoMedico('autorizacao_analgesico', event.target.value)}
                             options={[
                                 { value: 'NENHUM', label: 'Nenhum' }, { value: 'PARACETAMOL', label: 'Paracetamol' },
@@ -364,13 +364,13 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             ]} error={erros['dados_medicos.autorizacao_analgesico']} />), true)}
                     </div>
                     {formulario.dados_medicos.usa_medicamento === 'true' && (
-                        campoComErro('dados_medicos.medicamentos_descricao', (<Input id="medicamentos-descricao" name="medicamentos_descricao" label="Qual medicamento?" placeholder="Nome e dosagem, se houver" required
+                        campoComErro('dados_medicos.medicamentos_descricao', (<Input data-testid="aluno-formulario-medicamentos-descricao" id="medicamentos-descricao" name="medicamentos_descricao" label="Qual medicamento?" placeholder="Nome e dosagem, se houver" required
                             value={formulario.dados_medicos.medicamentos_descricao} onChange={(event) => atualizarDadoMedico('medicamentos_descricao', event.target.value)} {...acessibilidadeCampo('dados_medicos.medicamentos_descricao')} />))
                     )}
                     <div className="border-gray-200 border-b w-full py-sm mb-md">
                         <h3 className="font-semibold text-[14px] text-text-main px-1">Frequência</h3>
                     </div>
-                    {campoComErro('turno', (<SelecaoOpcao
+                    {campoComErro('turno', (<SelecaoOpcao testId="aluno-formulario-turno"
                         label="Período"
                         name="turno"
                         required
@@ -381,7 +381,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             { value: 'TARDE', title: 'Tarde' },
                         ]}
                     />))}
-                    {campoComErro('dias_frequencia', (<SelecaoDiasSemana
+                    {campoComErro('dias_frequencia', (<SelecaoDiasSemana testId="aluno-formulario-frequencia"
                         name="dias_frequencia" label="Dias de frequência"
                         required
                         value={formulario.dias_frequencia}
@@ -396,13 +396,13 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                         ]}
                     />))}
                     <div className="flex flex-col gap-md sm:flex-row sm:items-start sm:justify-between">
-                        {campoComErro('participa_almoco', (<Toggle
+                        {campoComErro('participa_almoco', (<Toggle testId="aluno-formulario-almoco"
                             label="Participa do almoço?"
                             name="participa_almoco"
                             checked={formulario.participa_almoco}
                             onChange={(valor) => atualizarCampo('participa_almoco', valor)}
                         />))}
-                        {campoComErro('turma_id', (<Select
+                        {campoComErro('turma_id', (<Select data-testid="aluno-formulario-turma-regular"
                             label="Turma regular"
                             name="turma_id"
                             value={formulario.turma_id}
@@ -434,7 +434,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                 </fieldset>
             </form>
         </Modal>
-        <ModalConfirmacao isOpen={Boolean(confirmacao)} onClose={() => { if (!enviando.current) setConfirmacao(null); }}
+        <ModalConfirmacao testId="aluno-alterar-periodo" isOpen={Boolean(confirmacao)} onClose={() => { if (!enviando.current) setConfirmacao(null); }}
             title="Alterar período do aluno?" estado="atencao" showCancel confirmText="Alterar período e encerrar vínculos"
             description={<>As matrículas e os atendimentos abaixo serão encerrados para evitar conflitos de turno:
                 <span className="mt-xs block">{confirmacao?.conflitos?.map((c) => c.mensagem).join(', ')}</span>

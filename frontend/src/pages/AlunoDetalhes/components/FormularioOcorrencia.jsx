@@ -68,17 +68,17 @@ export function FormularioOcorrencia({ idAluno, ocorrencia, onClose, onSuccess }
         } finally { ocupado.current = false; setSalvando(false); }
     }
 
-    return <Modal isOpen onClose={() => { if (!ocupado.current) onClose(); }} title={ocorrencia ? 'Editar ocorrência' : 'Nova ocorrência'}
+    return <Modal testId="ocorrencia-formulario" isOpen onClose={() => { if (!ocupado.current) onClose(); }} title={ocorrencia ? 'Editar ocorrência' : 'Nova ocorrência'}
         subtitle="Campos com * são obrigatórios." confirmText={ocorrencia ? 'Salvar alterações' : 'Registrar ocorrência'}
         confirmFormId={id} onConfirm={salvar} isConfirmLoading={salvando}>
         <form id={id} ref={formularioRef} onSubmit={salvar} noValidate>
             <div className="grid grid-cols-1 gap-x-md sm:grid-cols-2">
-                <div className="sm:col-span-2"><Input {...atributos('resumo')} label="Resumo" maxLength={200} placeholder="Ex: Queda no corredor" />{mensagem('resumo')}</div>
-                <div><Input {...atributos('data')} label="Data" type="date" max={formatarDataHoraInstituicao().slice(0, 10)} />{mensagem('data')}</div>
-                <div><Input {...atributos('hora')} label="Hora" type="time" />{mensagem('hora')}</div>
+                <div className="sm:col-span-2"><Input data-testid="ocorrencia-formulario-resumo" {...atributos('resumo')} label="Resumo" maxLength={200} placeholder="Ex: Queda no corredor" />{mensagem('resumo')}</div>
+                <div><Input data-testid="ocorrencia-formulario-data" {...atributos('data')} label="Data" type="date" max={formatarDataHoraInstituicao().slice(0, 10)} />{mensagem('data')}</div>
+                <div><Input data-testid="ocorrencia-formulario-hora" {...atributos('hora')} label="Hora" type="time" />{mensagem('hora')}</div>
             </div>
             <label htmlFor={`${id}-descricao`} className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-600">Descrição <span className="text-red-500">*</span></label>
-            <textarea {...atributos('descricao')} rows={4} placeholder="Descreva o que aconteceu e quais providências foram tomadas."
+            <textarea data-testid="ocorrencia-formulario-descricao" {...atributos('descricao')} rows={4} placeholder="Descreva o que aconteceu e quais providências foram tomadas."
                 className="mb-sm w-full rounded-sm border border-slate-200 bg-bg-surface p-sm text-text-main placeholder:text-placeholder focus:outline-none focus:ring-1" />
             {mensagem('descricao')}
             {erro && <p role="alert" className="rounded-sm bg-red-50 p-sm text-sm text-red-700">{erro}</p>}

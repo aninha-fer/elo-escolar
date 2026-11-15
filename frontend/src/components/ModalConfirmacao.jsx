@@ -13,13 +13,14 @@ export function ModalConfirmacao({
     showCancel = estado === 'atencao',
     isConfirmLoading = false,
     isConfirmDisabled = false,
+    testId,
 }) {
     const titleId = useId();
     const descriptionId = useId();
     const confirmacao = estado === 'confirmacao';
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} showHeader={false} showFooter={false}
+        <Modal testId={testId} isOpen={isOpen} onClose={onClose} showHeader={false} showFooter={false}
             ariaLabelledBy={titleId} ariaDescribedBy={description ? descriptionId : undefined}>
             <div className="p-sm text-center justify-center">
                 <div aria-hidden="true" className={`mx-auto mb-md flex size-16 items-center justify-center rounded-full ${confirmacao ? 'bg-emerald-50 text-success' : 'bg-red-50 text-text-main'}`}>
@@ -37,11 +38,11 @@ export function ModalConfirmacao({
                 <h2 id={titleId} className="break-words text-xl font-bold text-text-main">{title}</h2>
                 {description && <p id={descriptionId} className="mt-lg whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-500 sm:text-base">{description}</p>}
                 <div className="mt-lg flex flex-col items-stretch justify-center gap-md sm:flex-row sm:items-center">
-                    {showCancel && <button type="button" onClick={onClose} disabled={isConfirmLoading}
+                    {showCancel && <button data-testid={testId ? `${testId}-cancelar` : undefined} type="button" onClick={onClose} disabled={isConfirmLoading}
                         className="rounded-md border border-slate-300 bg-bg-surface px-lg py-md text-sm font-semibold text-text-main hover:bg-bg-main disabled:cursor-not-allowed disabled:opacity-50">
                         {cancelText}
                     </button>}
-                    <button type="button" onClick={onConfirm ?? onClose} disabled={isConfirmDisabled || isConfirmLoading} aria-busy={isConfirmLoading}
+                    <button data-testid={testId ? `${testId}-confirmar` : undefined} type="button" onClick={onConfirm ?? onClose} disabled={isConfirmDisabled || isConfirmLoading} aria-busy={isConfirmLoading}
                         className={`inline-flex items-center justify-center gap-sm rounded-md px-lg py-md text-sm font-semibold text-bg-surface transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${confirmacao ? 'bg-success hover:bg-emerald-700' : 'bg-danger hover:bg-red-700'}`}>
                         {!confirmacao && <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 6 12 12M6 18 18 6" /></svg>}
                         {isConfirmLoading ? 'Carregando...' : confirmText}

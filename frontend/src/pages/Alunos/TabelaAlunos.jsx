@@ -64,7 +64,7 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                         const status = aluno.status ?? 'RASCUNHO';
 
                         return (
-                            <tr
+                            <tr data-testid={`aluno-${aluno.id}-abrir`}
                                 key={aluno.id ?? `${nome}-${index}`}
                                 tabIndex={aluno.id == null ? undefined : 0}
                                 aria-label={aluno.id == null ? undefined : `Abrir detalhes de ${nome}`}
@@ -112,7 +112,7 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     {onAcao && <div className="inline-flex" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                                        <BotaoAcoes label={`Ações para ${nome}`} options={[
+                                        <BotaoAcoes testId={`aluno-${aluno.id}-acoes`} label={`Ações para ${nome}`} options={[
                                             { id: 'editar', label: 'Editar', onClick: () => onAcao(aluno), icon: <EditIcon /> },
                                         ]} />
                                     </div>}

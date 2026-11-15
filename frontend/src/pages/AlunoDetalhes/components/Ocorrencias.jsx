@@ -34,13 +34,13 @@ export function Ocorrencias({ ocorrencias = [], idAluno, onSuccess, carregando, 
         <header className="flex flex-wrap items-center justify-between gap-md border-b border-gray-300 px-lg py-md">
             <div><h2 className="text-base font-bold text-text-main">Ocorrências do aluno</h2>
                 <p className="mt-xs text-sm text-text-muted">Registro de situações relevantes observadas no dia a dia.</p></div>
-            <Button onClick={() => setOperacao({ tipo: 'criar' })} disabled={excluindo}>
+            <Button data-testid="aluno-ocorrencias-nova" onClick={() => setOperacao({ tipo: 'criar' })} disabled={excluindo}>
                 <span aria-hidden="true">+</span> Nova ocorrência
             </Button>
         </header>
         {carregando ? <p role="status" className="p-lg text-sm text-text-muted">Carregando ocorrências...</p>
             : erro ? <div role="alert" className="m-md rounded-sm bg-red-50 p-sm text-sm text-red-700">{erro}
-                <button type="button" onClick={onTentarNovamente} className="ml-sm underline">Tentar novamente</button></div>
+                <button data-testid="ocorrencias-tentar-novamente" type="button" onClick={onTentarNovamente} className="ml-sm underline">Tentar novamente</button></div>
                 : ocorrencias.length ? <ul>{ocorrencias.map((ocorrencia) => {
                     const dataHora = formatarDataHoraInstituicao(new Date(ocorrencia.ocorrido_em));
                     return <li key={ocorrencia.id} className="flex items-start gap-md border-b border-gray-200 p-lg last:border-b-0">
@@ -53,7 +53,7 @@ export function Ocorrencias({ ocorrencias = [], idAluno, onSuccess, carregando, 
                             <p className="mt-xs whitespace-pre-wrap text-sm text-text-main">{ocorrencia.descricao}</p>
                             <p className="mt-sm text-xs text-text-muted">Relator: {ocorrencia.usuario_relator.pessoa.nome}</p>
                         </div>
-                        <BotaoAcoes label={`Ações de ${ocorrencia.resumo}`} disabled={excluindo} options={[
+                        <BotaoAcoes testId={`ocorrencia-${ocorrencia.id}-acoes`} label={`Ações de ${ocorrencia.resumo}`} disabled={excluindo} options={[
                             { id: 'editar', label: 'Editar', icon: <EditIcon />, onClick: () => setOperacao({ tipo: 'editar', ocorrencia }) },
                             { id: 'excluir', label: 'Excluir', icon: <TrashIcon />, textColor: 'var(--color-danger)', onClick: () => { setErroExclusao(''); setOperacao({ tipo: 'excluir', ocorrencia }); } },
                         ]} />
@@ -61,7 +61,7 @@ export function Ocorrencias({ ocorrencias = [], idAluno, onSuccess, carregando, 
                 })}</ul> : <p className="p-lg text-center text-sm text-text-muted">Nenhuma ocorrência registrada para este aluno.</p>}
         {['criar', 'editar'].includes(operacao?.tipo) && <FormularioOcorrencia key={operacao.ocorrencia?.id ?? 'nova'}
             idAluno={idAluno} ocorrencia={operacao.ocorrencia} onClose={fechar} onSuccess={salvo} />}
-        {operacao?.tipo === 'excluir' && <ModalConfirmacao isOpen estado="atencao" title="Excluir ocorrência?"
+        {operacao?.tipo === 'excluir' && <ModalConfirmacao testId="ocorrencia-excluir" isOpen estado="atencao" title="Excluir ocorrência?"
             confirmText="Confirmar exclusão" onClose={fechar} onConfirm={excluir} isConfirmLoading={excluindo}
             description={<>Deseja excluir <strong>{operacao.ocorrencia.resumo}</strong>? Essa ação não pode ser desfeita.
                 {erroExclusao && <span role="alert" className="mt-md block text-sm text-red-700">{erroExclusao}</span>}</>} />}

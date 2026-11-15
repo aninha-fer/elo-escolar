@@ -87,7 +87,7 @@ export function FormularioUsuario({ onClose, onCriado }) {
     }
 
     return (
-        <Modal isOpen onClose={fecharModal} title="Novo usuário" subtitle="Defina os dados de acesso e o nível de permissão."
+        <Modal testId="usuario-formulario" isOpen onClose={fecharModal} title="Novo usuário" subtitle="Defina os dados de acesso e o nível de permissão."
             confirmText={<span className="inline-flex items-center gap-sm">
                             <SaveIcon />
                             {enviando ? 'Salvando' : 'Salvar Usuário'}
@@ -97,33 +97,33 @@ export function FormularioUsuario({ onClose, onCriado }) {
                     <div className="grid grid-cols-1 items-start gap-md sm:grid-cols-2">
                         <div>
                             {formulario.modo === 'nova' ? <>
-                                <Input id="usuario-nome" name="nome" label="Nome completo" placeholder="Ex: Maria da Silva" maxLength={200} required
+                                <Input data-testid="usuario-formulario-nome" id="usuario-nome" name="nome" label="Nome completo" placeholder="Ex: Maria da Silva" maxLength={200} required
                                     value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />
                                 {erroCampo('nome')}
                             </> : <>
-                                <Input id="usuario-pessoa" name="pessoa_id" label="Código da pessoa" placeholder="Ex: 123" inputMode="numeric" maxLength={10} required
+                                <Input data-testid="usuario-formulario-pessoa" id="usuario-pessoa" name="pessoa_id" label="Código da pessoa" placeholder="Ex: 123" inputMode="numeric" maxLength={10} required
                                     value={formulario.pessoa_id} onChange={(event) => atualizarCampo('pessoa_id', event.target.value)} {...acessibilidadeCampo('pessoa_id')} />
                                 {erroCampo('pessoa_id')}
                             </>}
                         </div>
-                        <Toggle label="Criar usuário sem vínculo no sistema" name="sem_vinculo" checked={formulario.modo === 'nova'}
+                        <Toggle testId="usuario-formulario-sem-vinculo" label="Criar usuário sem vínculo no sistema" name="sem_vinculo" checked={formulario.modo === 'nova'}
                             disabled={enviando} onChange={(checked) => atualizarCampo('modo', checked ? 'nova' : 'existente')} />
                     </div>
-                    <Input id="usuario-email" name="email" label="E-mail" type="email" placeholder="Ex: nome@apae.com" maxLength={254}
+                    <Input data-testid="usuario-formulario-email" id="usuario-email" name="email" label="E-mail" type="email" placeholder="Ex: nome@apae.com" maxLength={254}
                         autoComplete="off" autoCapitalize="none" spellCheck={false} required value={formulario.email}
                         onChange={(event) => atualizarCampo('email', event.target.value)} {...acessibilidadeCampo('email')} />
                     {erroCampo('email')}
-                    <Select id="usuario-role" name="role" label="Função" placeholder="Selecione a função" required value={formulario.role}
+                    <Select data-testid="usuario-formulario-funcao" id="usuario-role" name="role" label="Função" placeholder="Selecione a função" required value={formulario.role}
                         onChange={(event) => atualizarCampo('role', event.target.value)} error={erros.role}
                         options={[{ value: 'professor', label: 'Professor' }, { value: 'admin', label: 'Administrador' }]} />
                     <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
                         <div>
-                            <Input id="usuario-senha" name="senha" label="Senha" type="password" placeholder="Mínimo de 8 caracteres" minLength={8} maxLength={100}
+                            <Input data-testid="usuario-formulario-senha" id="usuario-senha" name="senha" label="Senha" type="password" placeholder="Mínimo de 8 caracteres" minLength={8} maxLength={100}
                                 autoComplete="new-password" required value={formulario.senha} onChange={(event) => atualizarCampo('senha', event.target.value)} {...acessibilidadeCampo('senha')} />
                             {erroCampo('senha')}
                         </div>
                         <div>
-                            <Input id="usuario-confirmacao" name="confirmacao" label="Confirmar senha" type="password" placeholder="Digite a senha novamente" maxLength={100}
+                            <Input data-testid="usuario-formulario-confirmacao" id="usuario-confirmacao" name="confirmacao" label="Confirmar senha" type="password" placeholder="Digite a senha novamente" maxLength={100}
                                 autoComplete="new-password" required value={formulario.confirmacao} onChange={(event) => atualizarCampo('confirmacao', event.target.value)} {...acessibilidadeCampo('confirmacao')} />
                             {erroCampo('confirmacao')}
                         </div>

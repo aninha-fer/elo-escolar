@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, className = '' }) {
+export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, className = '', testId }) {
     const [aberto, setAberto] = useState(false);
     const botaoRef = useRef(null);
     const menuRef = useRef(null);
@@ -94,7 +94,7 @@ export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, 
 
     return (
         <>
-            <button ref={botaoRef} id={`${id}-botao`} type="button" title={label} aria-label={label}
+            <button data-testid={testId} ref={botaoRef} id={`${id}-botao`} type="button" title={label} aria-label={label}
                 aria-haspopup="menu" aria-expanded={visivel} aria-controls={visivel ? `${id}-menu` : undefined} disabled={indisponivel}
                 onClick={(event) => { event.stopPropagation(); focoInicial.current = 'primeiro'; setAberto((atual) => !atual); }}
                 onKeyDown={(event) => {
@@ -111,11 +111,11 @@ export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, 
                 </svg>
             </button>
             {visivel && createPortal(
-                <div ref={menuRef} id={`${id}-menu`} role="menu" tabIndex={-1} aria-labelledby={`${id}-botao`} onKeyDown={navegarMenu}
+                <div data-testid={testId ? `${testId}-menu` : undefined} ref={menuRef} id={`${id}-menu`} role="menu" tabIndex={-1} aria-labelledby={`${id}-botao`} onKeyDown={navegarMenu}
                     onClick={(event) => event.stopPropagation()}
                     className="fixed z-50 min-w-40 max-w-[calc(100vw-16px)] overflow-y-auto rounded-sm border border-slate-200 bg-bg-surface text-left shadow-lg divide-y divide-slate-200">
                     {options.map((option) => (
-                        <button key={option.id ?? option.label} type="button" role="menuitem" tabIndex={-1} disabled={option.disabled}
+                        <button data-testid={testId && option.id ? `${testId}-${option.id}` : undefined} key={option.id ?? option.label} type="button" role="menuitem" tabIndex={-1} disabled={option.disabled}
                             style={option.textColor ? { color: option.textColor } : undefined}
                             onClick={(event) => { event.stopPropagation(); fechar(true); option.onClick?.(event); }}
                             className="flex w-full items-center cursor-pointer gap-sm px-md py-sm text-left text-sm text-text-main transition-colors hover:bg-bg-main focus-visible:bg-bg-main focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">

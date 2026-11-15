@@ -55,9 +55,9 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                         ))}
                     </ul>
                 ) : <p className="mt-sm text-xs text-slate-500">Profissional não informado</p>}
-                <button type="button" className="absolute inset-0 size-full cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2"
+                <button data-testid={`turma-${turma.id}-abrir`} type="button" className="absolute inset-0 size-full cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2"
                     aria-label={`Selecionar ${turma.tipo === 'OFICINA' ? 'oficina' : 'turma'} ${nome}`} onClick={() => onSelecionar?.(turma)} />
-                {podeEditar && <div className="absolute right-md top-md z-10"><BotaoAcoes label={`Ações para ${nome}`} options={[
+                {podeEditar && <div className="absolute right-md top-md z-10"><BotaoAcoes testId={`turma-${turma.id}-acoes`} label={`Ações para ${nome}`} options={[
                     { id: 'editar', label: 'Editar', disabled: !onEditar, onClick: () => onEditar(turma), icon: <EditIcon/> },
                     { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus,
                         textColor: turma.status === 'INATIVO' ? '#059669' : '#DC2626', onClick: () => onAlterarStatus(turma) },

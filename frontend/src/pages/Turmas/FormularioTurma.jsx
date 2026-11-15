@@ -193,7 +193,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
     }
 
     return (
-        <Modal isOpen onClose={fecharModal} title={editando ? (regular ? 'Editar Turma' : 'Editar Oficina') : 'Nova Turma / Oficina'}
+        <Modal testId="turma-formulario" isOpen onClose={fecharModal} title={editando ? (regular ? 'Editar Turma' : 'Editar Oficina') : 'Nova Turma / Oficina'}
             subtitle={<>Campos marcados com <span className="text-danger">*</span> são obrigatórios</>}
             confirmText={<span className="inline-flex items-center gap-sm">
                 <SaveIcon />
@@ -202,28 +202,28 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
             confirmFormId="form-cadastro-turma" onConfirm={enviar} isConfirmLoading={enviando} isConfirmDisabled={incompleto}>
             <form id="form-cadastro-turma" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando} className="min-w-0">
-                    <SelecaoOpcao label="Tipo de turma" labelClassName="font-mono" name="tipo" required value={formulario.tipo} disabled={editando}
+                    <SelecaoOpcao testId="turma-formulario-tipo" label="Tipo de turma" labelClassName="font-mono" name="tipo" required value={formulario.tipo} disabled={editando}
                         className="[&>div]:flex-col sm:[&>div]:flex-row" optionClassName="min-w-0"
                         onChange={(valor) => atualizarCampo('tipo', valor)} options={[
                             { value: 'REGULAR', title: 'Turma Regular', subtitle: 'Aulas diárias com cronograma fixo' },
                             { value: 'OFICINA', title: 'Oficina', subtitle: 'Aulas semanais' },
                         ]} />
                     {editando && !infoEdicao && <p role="status" className="mb-md text-sm text-slate-500">Consultando matrículas e histórico...</p>}
-                    {editando && infoEdicao?.status === 'erro' && <div className="mb-md text-sm text-red-700"><p role="alert">Não foi possível consultar as restrições da turma.</p><button type="button" className="underline" onClick={tentarNovamente}>Tentar novamente</button></div>}
+                    {editando && infoEdicao?.status === 'erro' && <div className="mb-md text-sm text-red-700"><p role="alert">Não foi possível consultar as restrições da turma.</p><button data-testid="turma-formulario-restricoes-tentar-novamente" type="button" className="underline" onClick={tentarNovamente}>Tentar novamente</button></div>}
                     {infoEdicao?.bloqueada && <p className="mb-md rounded-sm bg-tertiary/20 p-sm text-sm text-amber-800 border border-amber-800">Esta turma possui matrículas ativas ou histórico de matrículas. Alguns dados não podem ser alterados.</p>}
-                    <Input id="turma-nome" label="Nome" labelClassName="font-mono" name="nome" required
+                    <Input data-testid="turma-formulario-nome" id="turma-nome" label="Nome" labelClassName="font-mono" name="nome" required
                         value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)}
                         placeholder={regular ? 'Ex: Turma Girassol' : 'Ex: Oficina de Artes'} {...acessibilidadeCampo('nome')} />
                     {erroCampo('nome')}
                     {regular ? <>
                         <div className="grid grid-cols-1 gap-md sm:grid-cols-3">
                             <div className="sm:col-span-2">
-                                <SelecaoOpcao label="Período" labelClassName="font-mono" name="turno" required value={formulario.turno} disabled={agendaBloqueada}
+                                <SelecaoOpcao testId="turma-formulario-turno" label="Período" labelClassName="font-mono" name="turno" required value={formulario.turno} disabled={agendaBloqueada}
                                     onChange={(valor) => atualizarCampo('turno', valor)} options={[{ value: 'MANHA', title: 'Manhã' }, { value: 'TARDE', title: 'Tarde' }]} />
                                 {erroCampo('turno')}
                             </div>
                             <div>
-                                <Input id="turma-ano" label="Ano letivo" labelClassName="font-mono" name="ano_letivo" type="number" min="1" step="1" required disabled={agendaBloqueada}
+                                <Input data-testid="turma-formulario-ano-letivo" id="turma-ano" label="Ano letivo" labelClassName="font-mono" name="ano_letivo" type="number" min="1" step="1" required disabled={agendaBloqueada}
                                     value={formulario.ano_letivo} onChange={(event) => atualizarCampo('ano_letivo', event.target.value)} {...acessibilidadeCampo('ano_letivo')} />
                                 {erroCampo('ano_letivo')}
                             </div>
@@ -236,31 +236,31 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
                             </dl> : <dl className="grid grid-cols-[1fr_auto] gap-sm text-sm"><dt>Segunda a sexta</dt><dd className="font-mono text-blue-600">12:30 – 16:30</dd></dl>}
                         </div>
                     </> : <>
-                        <Select id="turma-horario" label="Horário" labelClassName="font-mono" name="horario" required placeholder="Selecione um horário" disabled={agendaBloqueada}
+                        <Select data-testid="turma-formulario-horario" id="turma-horario" label="Horário" labelClassName="font-mono" name="horario" required placeholder="Selecione um horário" disabled={agendaBloqueada}
                             options={opcoesHorario} value={formulario.horario} onChange={(event) => atualizarCampo('horario', event.target.value)} error={erros.horario} />
-                        <SelecaoDiasSemana label="Dia(s) da semana" labelClassName="font-mono" name="dias_semana" required
+                        <SelecaoDiasSemana testId="turma-formulario-dias-semana" label="Dia(s) da semana" labelClassName="font-mono" name="dias_semana" required
                             value={formulario.dias_semana} options={diasSemana} allowSelectAll={false} containerClassName="grid! grid-cols-5 gap-xs!" disabled={agendaBloqueada}
                             onChange={(valor) => atualizarCampo('dias_semana', valor)} />
                         {erroCampo('dias_semana')}
                     </>}
                     <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
                         <div>
-                            <Select id="turma-sala" label="Sala / ambiente" labelClassName="font-mono" name="ambiente_id" placeholder="Selecione uma sala" required
+                            <Select data-testid="turma-formulario-sala" id="turma-sala" label="Sala / ambiente" labelClassName="font-mono" name="ambiente_id" placeholder="Selecione uma sala" required
                                 value={formulario.ambiente_id} onChange={(event) => atualizarCampo('ambiente_id', event.target.value)}
                                 disabled={salas.status !== 'sucesso'} options={salas.dados.map((sala) => ({ value: sala.id, label: sala.nome }))} error={erros.ambiente_id} />
                             {salas.status === 'carregando' && <p role="status" className="mb-md text-xs text-text-muted">Carregando salas...</p>}
                             {salas.status === 'erro' && <div className="mb-md text-sm text-red-700"><p role="alert">{salas.erro}</p>
-                                <button type="button" onClick={tentarNovamente} className="mt-xs underline">Tentar novamente</button></div>}
+                                <button data-testid="turma-formulario-salas-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-xs underline">Tentar novamente</button></div>}
                         </div>
                         <div>
-                            <Input id="turma-vagas" label="Vagas" labelClassName="font-mono" name="capacidade_maxima" type="number" min="0" step="1" placeholder="Ex: 12"
+                            <Input data-testid="turma-formulario-vagas" id="turma-vagas" label="Vagas" labelClassName="font-mono" name="capacidade_maxima" type="number" min="0" step="1" placeholder="Ex: 12"
                                 value={formulario.capacidade_maxima} onChange={(event) => atualizarCampo('capacidade_maxima', event.target.value)} {...acessibilidadeCampo('capacidade_maxima')} />
                             {erroCampo('capacidade_maxima')}
                         </div>
                     </div>
                     <div className="mb-lg">
                         <label htmlFor="turma-descricao" className="mb-sm block font-mono text-xs font-semibold uppercase tracking-wider text-slate-600">Descrição</label>
-                        <textarea id="turma-descricao" name="descricao" rows={3} placeholder="Breve descrição da turma ou oficina..."
+                        <textarea data-testid="turma-formulario-descricao" id="turma-descricao" name="descricao" rows={3} placeholder="Breve descrição da turma ou oficina..."
                             className="w-full resize-y rounded-sm border border-slate-200 bg-bg-surface px-md py-sm text-sm text-text-main placeholder:text-placeholder focus:outline-none focus:ring-1 focus:ring-secondary"
                             value={formulario.descricao} onChange={(event) => atualizarCampo('descricao', event.target.value)} {...acessibilidadeCampo('descricao')} />
                         {erroCampo('descricao')}

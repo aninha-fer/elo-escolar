@@ -39,7 +39,7 @@ export function AlunosVinculados({ alunos = [], capacidade, podeVincular, onVinc
                                                 {dias.map((dia) => <li key={dia} className="rounded-full bg-tertiary/20 px-sm py-xs text-xs font-semibold text-tertiary">{formatarFrequencia([dia])}</li>)}
                                             </ul> : <span className="text-slate-400">Não informado</span>}
                                         </td>
-                                        <td className="px-lg py-lg text-right"><Link to={`/alunos/${aluno.id}`} aria-label={`Ver aluno ${nome}`}
+                                        <td className="px-lg py-lg text-right"><Link data-testid={`turma-aluno-${aluno.id}-ver`} to={`/alunos/${aluno.id}`} aria-label={`Ver aluno ${nome}`}
                                             className="rounded-sm px-xs py-sm font-semibold text-text-muted hover:text-secondary focus-visible:outline-2 focus-visible:outline-blue-600">Ver</Link></td>
                                     </tr>
                                 );

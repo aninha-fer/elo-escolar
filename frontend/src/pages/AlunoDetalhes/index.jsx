@@ -205,7 +205,7 @@ export function AlunoDetalhes() {
     return (
         <div className="space-y-lg">
             <div className="flex items-center gap-md">
-                <BotaoVoltar to='/alunos' />
+                <BotaoVoltar data-testid="aluno-voltar" to='/alunos' />
                 <div>
                     <h1 className="text-xl font-bold text-text-main">
                         {aluno?.pessoa?.nome ?? aluno?.nome ?? 'Aluno'}
@@ -229,7 +229,7 @@ export function AlunoDetalhes() {
                     {TABS.map((tab) => {
                         const isSelected = abaAtiva === tab.id;
                         return (
-                            <button key={tab.id} onClick={() => handleTrocarAba(tab.id)} className={`flex items-center gap-xs py-sm px-1 border-b-2 font-semibold text-sm transition-colors ${isSelected ? 'border-secondary text-secondary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+                            <button data-testid={`aluno-aba-${tab.id}`} key={tab.id} onClick={() => handleTrocarAba(tab.id)} className={`flex items-center gap-xs py-sm px-1 border-b-2 font-semibold text-sm transition-colors ${isSelected ? 'border-secondary text-secondary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                                 <span>{tab.label}</span>
                                 {tab.count !== null && (
                                     <span className={`text-xs rounded-full ${isSelected ? 'text-secondary' : 'bg-gray-100 text-gray-600'}`}>

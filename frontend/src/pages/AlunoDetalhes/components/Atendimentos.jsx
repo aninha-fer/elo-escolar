@@ -53,7 +53,7 @@ export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSucces
         <section className="overflow-hidden rounded-md border border-gray-300 bg-bg-surface">
             <header className="flex items-center justify-between gap-md border-b border-gray-300 px-lg py-md">
                 <h2 className="text-base font-bold text-text-main">Atendimentos Clínicos ({atendimentos.length})</h2>
-                {permissao && <Button disabled={carregando || cancelando || statusAluno === 'INATIVO'} onClick={() => { setErro(''); setOperacao({ tipo: 'criar' }); }}>
+                {permissao && <Button data-testid="aluno-atendimentos-novo" disabled={carregando || cancelando || statusAluno === 'INATIVO'} onClick={() => { setErro(''); setOperacao({ tipo: 'criar' }); }}>
                     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                     Novo Atendimento
                 </Button>}
@@ -66,7 +66,7 @@ export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSucces
                 : <p className="px-lg py-xl text-center text-sm text-text-muted">Nenhum atendimento vigente encontrado para este aluno.</p>}
             {permissao && ['criar', 'editar'].includes(operacao?.tipo) && <FormularioAtendimento key={operacao.atendimento?.id ?? 'novo'}
                 atendimento={operacao.atendimento} idAluno={idAluno} onClose={fechar} onSuccess={salvo} />}
-            {permissao && operacao?.tipo === 'cancelar' && <ModalConfirmacao isOpen onClose={fechar} estado="atencao" showCancel
+            {permissao && operacao?.tipo === 'cancelar' && <ModalConfirmacao testId="atendimento-cancelar" isOpen onClose={fechar} estado="atencao" showCancel
                 title="Cancelar atendimento?" confirmText="Confirmar cancelamento" isConfirmLoading={cancelando} onConfirm={confirmarCancelamento}
                 description={<>Deseja cancelar <strong>{operacao.atendimento.modalidade}</strong>?{' '}
                     {operacao.atendimento.status === 'PROVISORIO'

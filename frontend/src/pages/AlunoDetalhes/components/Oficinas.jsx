@@ -183,14 +183,14 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                 <h2 className="text-base font-bold text-text-main">
                     Inscrições Ativas ({quantidadeAtivas})
                 </h2>
-                {permissao && <Button onClick={abrirModal}>
+                {permissao && <Button data-testid="aluno-oficinas-inscrever" onClick={abrirModal}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M2.91406 6.99361H11.0733" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Inscrever em Oficina
                 </Button>}
-                <Modal isOpen={isModalOpen}
+                <Modal testId="oficinas-selecao" isOpen={isModalOpen}
                     onClose={fecharModal}
                     title="Selecionar Oficinas para Inscrição"
                     subtitle="Selecione uma ou mais oficinas. Os conflitos serão verificados antes de confirmar."
@@ -204,12 +204,12 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                     ) : <>
                         <div className="mb-md flex flex-col gap-sm sm:flex-row sm:items-start">
                             <div className="min-w-0 flex-1">
-                                <Input type="search" aria-label="Buscar oficina por nome" placeholder="Buscar por nome..."
+                                <Input data-testid="oficinas-selecao-busca" type="search" aria-label="Buscar oficina por nome" placeholder="Buscar por nome..."
                                     wrapperClassName="mb-0!" value={termoBusca} disabled={isSubmitting}
                                     onChange={(event) => setTermoBusca(event.target.value)}
                                     icon={<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>} />
                             </div>
-                            <Button type="button" onClick={() => setSelecionadas([])} disabled={isSubmitting || selecionadas.length === 0}
+                            <Button data-testid="oficinas-selecao-limpar" type="button" onClick={() => setSelecionadas([])} disabled={isSubmitting || selecionadas.length === 0}
                                 className="border border-slate-200 bg-bg-surface! text-text-main! hover:bg-bg-main! disabled:cursor-not-allowed disabled:opacity-50">
                                 Limpar seleção
                             </Button>
@@ -255,7 +255,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                     Nenhuma oficina ativa encontrada para este aluno.
                 </p>
             )}
-            <ModalConfirmacao isOpen={Boolean(inscricaoParaCancelar)}
+            <ModalConfirmacao testId="oficina-cancelar-inscricao" isOpen={Boolean(inscricaoParaCancelar)}
                 onClose={fecharCancelamento}
                 title="Cancelar inscrição em oficina?"
                 confirmText="Confirmar cancelamento"
