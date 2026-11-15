@@ -1,11 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../prismaClient');
-const { editarAlunoService, criarAlunoService, obterAlunoService, obterOficinasService, obterAtendimentosService } = require('./alunoService');
+const { editarAlunoService, criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService } = require('./alunoService');
 const { matricularOficinasService, matricularTurmaRegularService, removerMatriculaProvisoriaService, cancelarOficinaService } = require('./matriculaService');
 const { agendarAtendimentoService, removerAtendimentoProvisorioService, editarAtendimentoService, cancelarAtendimentoService, obterAtendimentoService } = require('./atendimentoService');
 const { obterAgendaAlunoService } = require('./agendaService');
-const { listarTurmasService, listarTurmasRegularesPorTurnoService } = require('./turmaService');
+const { editarTurmaService, listarTurmasService, listarTurmasRegularesPorTurnoService } = require('./turmaService');
 const { removerMatriculaProvisoria } = require('../controllers/matriculaController');
 const { removerAtendimentoProvisorio } = require('../controllers/atendimentoController');
 
@@ -87,7 +87,17 @@ function simularBanco(t, inicial = {}) {
           return itens;
         },
         async count({ where }) { return buscar(where).length; },
-        async groupBy({ where }) {
+        async groupBy({ where, by }) {
+          if (by.includes('status')) {
+            const grupos = new Map();
+            for (const item of buscar(where)) {
+              const chave = `${item.status}:${item.data_fim?.toISOString() ?? ''}`;
+              const grupo = grupos.get(chave) ?? { status: item.status, data_fim: item.data_fim, _count: { _all: 0 } };
+              grupo._count._all++;
+              grupos.set(chave, grupo);
+            }
+            return [...grupos.values()];
+          }
           const contagem = new Map();
           for (const item of buscar(where)) contagem.set(item.turma_id, (contagem.get(item.turma_id) ?? 0) + 1);
           return [...contagem].map(([turma_id, total]) => ({ turma_id, _count: { turma_id: total } }));
@@ -839,3 +849,76 @@ test('edição rejeita sessões da própria recorrência que se sobrepõem', asy
     return erro.isConflict && erro.detalhes.some((c) => c.codigo === 'CHOQUE_SESSOES_RECORRENCIA');
   });
 });
+
+for (const tipo of ['REGULAR', 'OFICINA']) {
+  test(`${tipo}: inativação preserva planejamento, esconde agenda e mantém validações de inscrição e ativação`, async (t) => {
+    const banco = simularBanco(t, { pessoa: [pessoaEdicao], turma: [turma(10, tipo, 5)] });
+    if (tipo === 'REGULAR') await matricularTurmaRegularService({ aluno_id: 1, turma_id: 10 });
+    else await matricularOficinasService({ aluno_id: 1, oficinas_ids: [10] });
+    const matricula = structuredClone(banco.matricula_turma[0]);
+    await editarTurmaService(10, { status: 'INATIVO' });
+    assert.deepEqual(banco.matricula_turma[0], matricula);
+    assert.equal((await obterAgendaAlunoService(1)).eventos.length, 0);
+    await assert.rejects(() => editarAlunoService(1, { status: 'ATIVO' }), { isConflict: true });
+    assert.equal(banco.aluno[0].status, 'RASCUNHO');
+    if (tipo === 'REGULAR') {
+      await assert.rejects(() => matricularTurmaRegularService({ aluno_id: 2, turma_id: 10 }), { statusCode: 400 });
+      const detalhe = await obterAlunoService(1);
+      assert.equal(detalhe.turma_regular.id, 10);
+      assert.equal(detalhe.turma_regular.status, 'INATIVO');
+      await editarAlunoService(1, { nome: 'Nome editado', turma_id: detalhe.turma_regular.id });
+    } else {
+      await assert.rejects(() => matricularOficinasService({ aluno_id: 2, oficinas_ids: [10] }), { isConflict: true });
+      const oficinas = await obterOficinasService(1);
+      assert.equal(oficinas.length, 1);
+      assert.equal(oficinas[0].turma.status, 'INATIVO');
+      // A redução de frequência continua exigindo que o usuário resolva o vínculo.
+      await assert.rejects(() => editarAlunoService(1, { dias_frequencia: [2] }), { isConflict: true });
+    }
+    assert.deepEqual(banco.matricula_turma[0], matricula);
+    await editarTurmaService(10, { status: 'ATIVO' });
+    assert.ok((await obterAgendaAlunoService(1)).eventos.length);
+    assert.equal(banco.matricula_turma[0].status, 'PROVISORIO');
+  });
+}
+
+test('listagem e detalhe retornam o mesmo vínculo regular inativo e seu status', async (t) => {
+  const banco = simularBanco(t, { pessoa: [pessoaEdicao], turma: [turma(20, 'REGULAR', 5)] });
+  await matricularTurmaRegularService({ aluno_id: 1, turma_id: 20 });
+  await editarTurmaService(20, { status: 'INATIVO' });
+  const detalhe = await obterAlunoService(1);
+  const consulta = t.mock.fn(async ({ include }) => {
+    assert.equal(include.matriculas_turmas.select.turma.select.status, true);
+    return [{ ...banco.aluno[0], pessoa: pessoaEdicao, responsaveis: [], matriculas_turmas: [{ ...banco.matricula_turma[0], turma: detalhe.turma_regular }] }];
+  });
+  prisma.aluno.findMany = consulta;
+  const [listado] = await listarAlunosService();
+  assert.equal(listado.turma_regular.status, 'INATIVO');
+  assert.deepEqual(listado.turma_regular, detalhe.turma_regular);
+});
+
+for (const primeiro of ['inativar', 'ativar_aluno']) {
+  test(`concorrência com ${primeiro} primeiro mantém consistente o bloqueio por matrícula ativa`, async (t) => {
+    const banco = simularBanco(t, { pessoa: [pessoaEdicao], turma: [turma(20, 'REGULAR', 5)] });
+    await matricularTurmaRegularService({ aluno_id: 1, turma_id: 20 });
+    let liberar, sinalizar;
+    const pronto = new Promise((resolve) => { sinalizar = resolve; });
+    const continuar = new Promise((resolve) => { liberar = resolve; });
+    const barreira = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${20} FOR UPDATE`;
+      sinalizar(); await continuar;
+    });
+    await pronto;
+    const operacoes = primeiro === 'inativar'
+      ? [() => editarTurmaService(20, { status: 'INATIVO' }), () => editarAlunoService(1, { status: 'ATIVO' })]
+      : [() => editarAlunoService(1, { status: 'ATIVO' }), () => editarTurmaService(20, { status: 'INATIVO' })];
+    const primeira = operacoes[0]().then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
+    await new Promise(setImmediate);
+    const segunda = operacoes[1]().then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
+    liberar(); await barreira;
+    assert.equal((await primeira).status, 'fulfilled');
+    assert.equal((await segunda).status, 'rejected');
+    assert.equal(banco.turma[0].status, primeiro === 'inativar' ? 'INATIVO' : 'ATIVO');
+    assert.equal(banco.matricula_turma[0].status, primeiro === 'inativar' ? 'PROVISORIO' : 'ATIVO');
+  });
+}

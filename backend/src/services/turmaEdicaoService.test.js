@@ -98,11 +98,17 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
     }
 }
 
-for (const status of ['ATIVO', 'PROVISORIO']) {
-    test(`matrícula ${status} impede inativação sem aplicar nenhuma alteração`, async (t) => {
-        const banco = simular(t, { estado: { matriculas: [status] } });
+for (const tipo of ['REGULAR', 'OFICINA']) {
+    test(`${tipo}: matrícula ativa impede inativação mesmo junto de provisórios`, async (t) => {
+        const banco = simular(t, { tipo, estado: { matriculas: ['ATIVO', 'PROVISORIO'] } });
         assert.equal((await editar({ status: 'INATIVO', ambiente_id: 2, nome: 'Não deve gravar' })).code, 409);
         assert.equal(banco.estado.turma.status, 'ATIVO'); assert.equal(banco.estado.turma.nome, 'Turma A');
+    });
+    test(`${tipo}: somente provisórios permitem inativação sem encerrar as matrículas`, async (t) => {
+        const banco = simular(t, { tipo, estado: { matriculas: ['PROVISORIO', 'PROVISORIO'] } });
+        assert.equal((await editar({ status: 'INATIVO' })).code, 200);
+        assert.equal(banco.estado.turma.status, 'INATIVO');
+        assert.deepEqual(banco.estado.matriculas, ['PROVISORIO', 'PROVISORIO']);
     });
 }
 

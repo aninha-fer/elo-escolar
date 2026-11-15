@@ -167,7 +167,6 @@ async function editarTurmaService(id, entrada) {
         const matriculas = await tx.matricula_turma.groupBy({ by: ['status', 'data_fim'], where: { turma_id: id }, _count: { _all: true } });
         const possuiMatriculas = matriculas.some((grupo) => grupo._count._all > 0);
         const ocupacao = matriculas.filter((grupo) => grupo.status === 'ATIVO').reduce((total, grupo) => total + grupo._count._all, 0);
-        const vigentes = matriculas.filter((grupo) => grupo.status === 'ATIVO' || (grupo.status === 'PROVISORIO' && grupo.data_fim == null)).reduce((total, grupo) => total + grupo._count._all, 0);
         const regular = turma.tipo === 'REGULAR';
         if (regular && ['hora_inicio', 'hora_fim', 'dias_semana'].some((campo) => dados[campo] !== undefined)) {
             throw Object.assign(new Error('O cronograma de turmas regulares é definido pelo turno.'), { statusCode: 400 });
@@ -186,8 +185,8 @@ async function editarTurmaService(id, entrada) {
         if (possuiMatriculas && (mudouTurno || mudouAno || mudouHorario || mudouDias)) {
             throw Object.assign(new Error('Turmas com matrículas ou histórico não permitem alterar turno, ano letivo, dias ou horários.'), { statusCode: 409 });
         }
-        if (dados.status === 'INATIVO' && vigentes > 0) {
-            throw Object.assign(new Error('Não é possível inativar uma turma com matrículas ativas ou provisórias.'), { statusCode: 409 });
+        if (dados.status === 'INATIVO' && ocupacao > 0) {
+            throw Object.assign(new Error('Não é possível inativar uma turma com matrículas ativas.'), { statusCode: 409 });
         }
         if (dados.capacidade_maxima != null && dados.capacidade_maxima < ocupacao) {
             throw Object.assign(new Error(`A capacidade não pode ser menor que os ${ocupacao} alunos com matrícula ativa.`), { statusCode: 409 });

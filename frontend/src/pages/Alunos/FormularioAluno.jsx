@@ -29,6 +29,7 @@ const formularioInicial = {
 
 export function FormularioAluno({ aluno, onClose, onSalvo }) {
     const editando = Boolean(aluno);
+    const turmaAtual = aluno?.turma_regular;
     const [formulario, setFormulario] = useState(() => aluno ? {
         ...formularioInicial, ...aluno, nome: aluno.pessoa.nome, telefone: aluno.pessoa.telefone ?? '',
         data_nascimento: aluno.pessoa.data_nascimento?.slice(0, 10) ?? '',
@@ -408,12 +409,16 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             onChange={(event) => atualizarCampo('turma_id', event.target.value)}
                             placeholder="Sem turma regular"
                             disabled={!formulario.turno}
-                            options={turmas
+                            options={[
+                                ...(turmaAtual?.status === 'INATIVO' && turmaAtual.turno === formulario.turno
+                                    ? [{ value: turmaAtual.id, label: `${turmaAtual.nome} — Inativa`, disabled: true }] : []),
+                                ...turmas
                                 .filter((turma) => turma.turno === formulario.turno)
                                 .map((turma) => ({
                                     value: turma.id,
                                     label: `${turma.nome} - ${formatarTurno(turma.turno)}${turma.capacidade_maxima == null ? ' — Sem limite' : turma.vagas_disponiveis === 0 ? ' — Lotada: rascunho não reserva vaga' : ''}`,
-                                }))}
+                                })),
+                            ]}
                             error={erros['turma_id']} />), true, 'sm:ml-30')}
                     </div>
                     {(submitError || conflitos.length > 0) && (

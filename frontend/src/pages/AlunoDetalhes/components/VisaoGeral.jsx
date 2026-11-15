@@ -18,7 +18,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, o
                         <CampoInformacao titulo="Período" valor={formatarTurno(dadosAluno?.turno)} />
                         <CampoInformacao titulo="Frequência" valor={formatarFrequencia(dadosAluno?.dias_frequencia)} />
                         <CampoInformacao titulo="Almoço" valor={formatarSimNao(dadosAluno?.participa_almoco)} />
-                        <CampoInformacao titulo="Turma" valor={turmaRegular?.nome ?? 'Não informado'} />
+                        <CampoInformacao titulo="Turma" valor={turmaRegular ? `${turmaRegular.nome}${turmaRegular.status === 'INATIVO' ? ' — Inativa' : ''}` : 'Não informado'} />
                         <CampoInformacao titulo="Nascimento" valor={formatarDataBR(dadosAluno?.pessoa?.data_nascimento)} />
                         <CampoInformacao titulo="Telefone" valor={formatarTelefone(dadosAluno?.pessoa?.telefone)} />
                     </dl>

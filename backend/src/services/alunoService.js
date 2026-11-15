@@ -106,7 +106,7 @@ async function listarAlunosService() {
         select: {
           id: true, status: true,
           turma: {
-            select: { id: true, nome: true, turno: true }
+            select: { id: true, nome: true, turno: true, status: true }
           }
         }
       }
@@ -143,10 +143,10 @@ async function obterAlunoService(aluno_id) {
       responsaveis: { orderBy: { id: 'asc' }, select: selectResponsavel },
       dados_medicos: { select: selectDadosMedicos },
       matriculas_turmas: {
-        where: { OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR', status: 'ATIVO' } },
+        where: { OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR' } },
         orderBy: { created_at: 'desc' },
         take: 1,
-        select: { id: true, status: true, turma: { select: { id: true, nome: true, turno: true } } }
+        select: { id: true, status: true, turma: { select: { id: true, nome: true, turno: true, status: true } } }
       }
     },
   });

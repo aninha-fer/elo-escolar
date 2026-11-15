@@ -1,4 +1,4 @@
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { alunoService } from '../../services/alunoService';
 import { turmasService } from '../../services/turmasService';
@@ -8,6 +8,12 @@ import { formatarDataHoraInstituicao, formatarTurno } from '../../utils/formatte
 import { Atendimentos } from './components/Atendimentos';
 import { useAuth } from '../../contexts/AuthContext';
 import { BotaoVoltar } from '../../components/BotaoVoltar';
+
+const estilosStatus = {
+    ATIVO: 'bg-emerald-50 text-emerald-600 before:bg-emerald-600',
+    INATIVO: 'bg-slate-100 text-slate-500 before:bg-slate-400',
+    RASCUNHO: 'bg-amber-50 text-amber-600 before:bg-amber-500',
+};
 
 export function AlunoDetalhes() {
     const { id } = useParams();
@@ -150,13 +156,12 @@ export function AlunoDetalhes() {
                         {aluno?.pessoa?.nome ?? aluno?.nome ?? 'Aluno'}
                     </h1>
                     <div className="flex items-center gap-sm mt-sm">
-                        <span className="inline-flex items-center gap-sm px-md py-xs rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                            <span className="size-1.5 rounded-full bg-emerald-500"></span>
+                        <span className={`inline-flex items-center gap-sm px-md py-xs rounded-full text-xs font-semibold before:size-1.5 before:shrink-0 before:rounded-full ${estilosStatus[aluno?.status] ?? estilosStatus.RASCUNHO}`}>
                             {aluno?.status ?? 'Status'}
                         </span>
                         <p className="text-sm text-text-muted">
                             Período: {formatarTurno(aluno?.turno) ?? 'Turno'} <span className="mx-1">•</span>
-                            {turmaRegular?.nome ?? 'Sem turma regular'}
+                            {turmaRegular ? `${turmaRegular.nome}${turmaRegular.status === 'INATIVO' ? ' — Inativa' : ''}` : 'Sem turma regular'}
                         </p>
                     </div>
                 </div>

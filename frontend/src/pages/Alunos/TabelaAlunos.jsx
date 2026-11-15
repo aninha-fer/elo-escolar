@@ -27,11 +27,12 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
             (matricula) => matricula.status === 'ATIVO',
         );
 
-        return aluno.turma?.nome
+        const nome = aluno.turma?.nome
             ?? aluno.turma_regular?.nome
             ?? matriculaAtiva?.turma?.nome
             ?? aluno.turma_nome
             ?? '—';
+        return aluno.turma_regular?.status === 'INATIVO' ? `${nome} — Inativa` : nome;
     }
 
     return (
