@@ -204,7 +204,7 @@ test('cria atendimento e sessões após bloquear o aluno e consultar disponibili
   assert.deepEqual(eventos, ['bloqueio', 'aluno']);
   assert.equal(tx.atendimento_clinico.create.mock.callCount(), 1);
   assert.deepEqual(tx.atendimento_sessao.createMany.mock.calls[0].arguments[0].data, [{
-    atendimento_clinico_id: 99, data_sessao: data('2026-10-26'),
+    atendimento_clinico_id: 99, profissional_id: 2, data_sessao: data('2026-10-26'),
     hora_inicio: hora('09:00'), duracao_minutos: 60, status: 'ATIVO'
   }]);
 });

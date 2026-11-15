@@ -216,7 +216,7 @@ async function lerPlanejamento(tx, aluno_id) {
       { status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null }
     ] }, include: { turma: { include: { horarios: true } } } }),
     tx.atendimento_clinico.findMany({ where: { aluno_id, status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null },
-      include: { sessoes: { where: { status: { in: ['ATIVO', 'PROVISORIO'] } } } } })
+      include: { sessoes: { where: { status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null } } } })
   ]);
   return { matriculas, atendimentos };
 }
@@ -239,7 +239,7 @@ function intervalosOficina(matricula, inicio, fim) {
 }
 
 function sessoesFuturas(atendimento, agora) {
-  return atendimento.sessoes.filter((s) => inicioOcorrencia(s.data_sessao, s.hora_inicio) + s.duracao_minutos * 60000 > agora.getTime());
+  return atendimento.sessoes.filter((s) => !s.data_cancelamento && s.status !== 'INATIVO' && inicioOcorrencia(s.data_sessao, s.hora_inicio) + s.duracao_minutos * 60000 > agora.getTime());
 }
 
 function diasSessao(sessao) {
@@ -349,10 +349,10 @@ async function editarAlunoService(id, entrada) {
         data_cancelamento: fim,
         ...(a.status === 'ATIVO' ? { status: 'INATIVO', ...(a.tipo_recorrencia !== 'EVENTUAL' ? { data_termino: a.data_termino && a.data_termino < fim ? a.data_termino : fim } : {}) } : {})
       } });
-      if (a.status === 'ATIVO') {
-        const futuras = a.sessoes.filter((s) => inicioOcorrencia(s.data_sessao, s.hora_inicio) > agora.getTime()).map((s) => s.id);
-        await tx.atendimento_sessao.updateMany({ where: { id: { in: futuras } }, data: { status: 'INATIVO' } });
-      }
+      const futuras = a.sessoes.filter((s) => !s.data_cancelamento && s.status !== 'INATIVO' && inicioOcorrencia(s.data_sessao, s.hora_inicio) > agora.getTime()).map((s) => s.id);
+      const hoje = new Date(agora); hoje.setUTCHours(0, 0, 0, 0);
+      await tx.atendimento_sessao.updateMany({ where: { id: { in: futuras }, data_cancelamento: null },
+        data: { data_cancelamento: hoje, ...(a.status === 'ATIVO' ? { status: 'INATIVO' } : {}) } });
     }
     const camposPessoa = ['nome', 'telefone', 'data_nascimento'];
     const pessoa = Object.fromEntries(camposPessoa.filter((campo) => dados[campo] !== undefined).map((campo) => [campo,
@@ -390,7 +390,7 @@ async function editarAlunoService(id, entrada) {
       const planejamentoEfetivo = {
         matriculas: vigente.matriculas.map((m) => m.status === 'PROVISORIO' ? { ...m, data_inicio: dataInicio } : m),
         atendimentos: vigente.atendimentos.map((a) => a.status === 'PROVISORIO' ? {
-          ...a, sessoes: a.sessoes.filter((s) => s.status === 'ATIVO' || (s.status === 'PROVISORIO' && inicioOcorrencia(s.data_sessao, s.hora_inicio) >= agora.getTime()))
+          ...a, sessoes: a.sessoes.filter((s) => !s.data_cancelamento && (s.status === 'ATIVO' || (s.status === 'PROVISORIO' && inicioOcorrencia(s.data_sessao, s.hora_inicio) >= agora.getTime())))
         } : a)
       };
       await validarAtivacao(tx, novo, planejamentoEfetivo, agora);
@@ -400,7 +400,7 @@ async function editarAlunoService(id, entrada) {
       const ids = atendimentos.map((a) => a.id);
       const sessoes = atendimentos.flatMap((a) => a.sessoes.filter((s) => s.status === 'PROVISORIO').map((s) => s.id));
       await tx.atendimento_clinico.updateMany({ where: { id: { in: ids }, status: 'PROVISORIO', data_cancelamento: null }, data: { status: 'ATIVO' } });
-      await tx.atendimento_sessao.updateMany({ where: { id: { in: sessoes }, status: 'PROVISORIO' }, data: { status: 'ATIVO' } });
+      await tx.atendimento_sessao.updateMany({ where: { id: { in: sessoes }, status: 'PROVISORIO', data_cancelamento: null }, data: { status: 'ATIVO' } });
     }
     return { id };
   }, { isolationLevel: 'ReadCommitted' });

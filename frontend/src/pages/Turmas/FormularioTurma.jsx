@@ -9,6 +9,7 @@ import { profissionaisService } from '../../services/profissionaisService';
 import { turmasService } from '../../services/turmasService';
 import { SeletorProfissional } from './SeletorProfissional';
 import { agruparHorarios } from '../../utils/formatters';
+import { SaveIcon } from '../../components/icons/SaveIcon';
 
 const faixasOficina = [
     { value: '08:15', label: 'Manhã: 08:15 – 09:15', turno: 'MANHA', fim: '09:15' },
@@ -195,7 +196,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
         <Modal isOpen onClose={fecharModal} title={editando ? (regular ? 'Editar Turma' : 'Editar Oficina') : 'Nova Turma / Oficina'}
             subtitle={<>Campos marcados com <span className="text-danger">*</span> são obrigatórios</>}
             confirmText={<span className="inline-flex items-center gap-sm">
-                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" /></svg>
+                <SaveIcon />
                 {editando ? 'Salvar alterações' : regular ? 'Salvar Turma' : 'Salvar Oficina'}
             </span>}
             confirmFormId="form-cadastro-turma" onConfirm={enviar} isConfirmLoading={enviando} isConfirmDisabled={incompleto}>

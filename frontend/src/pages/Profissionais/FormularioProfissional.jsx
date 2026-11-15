@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { Input } from '../../components/Input';
 import { profissionaisService } from '../../services/profissionaisService';
+import { SaveIcon } from '../../components/icons/SaveIcon';
 
 const funcoes = ['Professor', 'Terapeuta', 'Auxiliar'];
 
@@ -82,9 +83,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
             <Modal isOpen onClose={fecharModal} title={editando ? 'Editar Profissional' : 'Cadastrar Profissional'} subtitle={<>Campos com <span className="text-danger">*</span> são obrigatórios</>}
                 confirmText={
                     <span className="inline-flex items-center gap-sm">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" />
-                        </svg>
+                        <SaveIcon />
                         {editando ? 'Salvar alterações' : 'Cadastrar Profissional'}
                     </span>
                 } cancelText="Cancelar" confirmFormId="form-cadastro-profissional" onConfirm={enviar}

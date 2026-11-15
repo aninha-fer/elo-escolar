@@ -72,7 +72,7 @@ function obterInicio(data, hora) {
 async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, statusVinculo) {
     const status = statusVinculo === 'PROVISORIO' ? { in: ['ATIVO', 'PROVISORIO'] } : 'ATIVO';
     const sessoes = await tx.atendimento_sessao.findMany({
-        where: { status, atendimento_clinico: { aluno_id, status, data_cancelamento: null } },
+        where: { status, data_cancelamento: null, atendimento_clinico: { aluno_id, status, data_cancelamento: null } },
         select: {
             id: true, atendimento_clinico_id: true, data_sessao: true,
             hora_inicio: true, duracao_minutos: true,

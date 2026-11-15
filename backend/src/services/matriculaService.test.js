@@ -41,7 +41,7 @@ function oficina(alteracoes = {}) {
 
 function sessao(alteracoes = {}) {
     return {
-        id: 20, atendimento_clinico_id: 30, status: 'ATIVO', data_sessao: data('2026-11-02'),
+        id: 20, atendimento_clinico_id: 30, status: 'ATIVO', data_cancelamento: null, data_sessao: data('2026-11-02'),
         hora_inicio: hora('09:30'), duracao_minutos: 60,
         atendimento_clinico: { aluno_id: 1, status: 'ATIVO', data_cancelamento: null, modalidade: 'Fisioterapia' },
         ...alteracoes
@@ -116,7 +116,7 @@ function simularBanco(t, {
                 findMany: t.mock.fn(async ({ where }) => [...sessoes, ...estado.sessoes].filter((item) => corresponde(item, where))),
                 createMany: t.mock.fn(async ({ data: registros }) => {
                     pendentes.sessoes.push(...registros.map((registro, indice) => ({
-                        id: 200 + indice, ...registro,
+                        id: 200 + indice, data_cancelamento: null, ...registro,
                         atendimento_clinico: pendentes.atendimentos.find((item) => item.id === registro.atendimento_clinico_id)
                     })));
                     return { count: registros.length };
@@ -250,7 +250,7 @@ test('consulta apenas sessões e atendimentos ativos do aluno', async (t) => {
     await matricularOficinasService(pedido);
     assert.equal(banco.matriculas.length, 1);
     assert.deepEqual(banco.transacoes[0].atendimento_sessao.findMany.mock.calls[0].arguments[0].where,
-        { status: 'ATIVO', atendimento_clinico: { aluno_id: 1, status: 'ATIVO', data_cancelamento: null } });
+        { status: 'ATIVO', data_cancelamento: null, atendimento_clinico: { aluno_id: 1, status: 'ATIVO', data_cancelamento: null } });
 });
 
 test('não grava nenhuma oficina quando somente uma do lote conflita', async (t) => {

@@ -9,6 +9,7 @@ import { SelecaoDiasSemana } from '../../components/SelecaoDiasSemana';
 import { alunoService } from '../../services/alunoService';
 import { turmasService } from '../../services/turmasService';
 import { formatarTurno } from '../../utils/formatters';
+import { SaveIcon } from '../../components/icons/SaveIcon';
 const formularioInicial = {
     nome: '',
     telefone: '',
@@ -266,7 +267,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
             title={editando ? 'Editar Aluno' : 'Cadastrar Novo Aluno'}
             subtitle="Campos com * são obrigatórios para o cadastro"
             confirmText={<span className="inline-flex items-center gap-sm">
-                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" /></svg>
+                <SaveIcon />
                 {editando ? aluno.status === 'RASCUNHO' ? 'Salvar e ativar' : 'Salvar alterações' : 'Salvar Aluno'}
             </span>}
             cancelText="Cancelar"

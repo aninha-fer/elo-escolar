@@ -113,6 +113,7 @@ model funcionario {
 
   turmas                turma[]
   atendimentos_clinicos atendimento_clinico[]
+  atendimento_sessoes   atendimento_sessao[]
 }
 
 model usuario {
@@ -208,12 +209,16 @@ model atendimento_sessao {
   id                     Int                 @id @default(autoincrement())
   atendimento_clinico_id Int
   atendimento_clinico    atendimento_clinico @relation(fields: [atendimento_clinico_id], references: [id])
+  profissional_id       Int
+  profissional          funcionario         @relation(fields: [profissional_id], references: [id])
   data_sessao            DateTime            @db.Date
   hora_inicio            DateTime            @db.Time
   duracao_minutos        Int
   status                 status              @default(ATIVO)
+  data_cancelamento      DateTime?           @db.Date
 
   @@index([atendimento_clinico_id])
+  @@index([profissional_id])
 }
 
 model Sessao {

@@ -5,6 +5,7 @@ import { Input } from '../../components/Input';
 import { Select } from '../../components/Select';
 import { Toggle } from '../../components/Toggle';
 import { usuariosService } from '../../services/usuariosService';
+import { SaveIcon } from '../../components/icons/SaveIcon';
 
 const formularioInicial = { modo: 'existente', nome: '', pessoa_id: '', email: '', role: '', senha: '', confirmacao: '' };
 const emailSchema = z.string().email().max(254);
@@ -87,7 +88,10 @@ export function FormularioUsuario({ onClose, onCriado }) {
 
     return (
         <Modal isOpen onClose={fecharModal} title="Novo usuário" subtitle="Defina os dados de acesso e o nível de permissão."
-            confirmText="Criar usuário" cancelText="Cancelar" confirmFormId="form-cadastro-usuario" onConfirm={enviar} isConfirmLoading={enviando}>
+            confirmText={<span className="inline-flex items-center gap-sm">
+                            <SaveIcon />
+                            {enviando ? 'Salvando' : 'Salvar Usuário'}
+                        </span>} cancelText="Cancelar" confirmFormId="form-cadastro-usuario" onConfirm={enviar} isConfirmLoading={enviando}>
             <form id="form-cadastro-usuario" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando} className="min-w-0">
                     <div className="grid grid-cols-1 items-start gap-md sm:grid-cols-2">

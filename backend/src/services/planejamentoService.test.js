@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const prisma = require('../prismaClient');
 const { editarAlunoService, criarAlunoService, obterAlunoService, obterOficinasService, obterAtendimentosService } = require('./alunoService');
 const { matricularOficinasService, matricularTurmaRegularService, removerMatriculaProvisoriaService, cancelarOficinaService } = require('./matriculaService');
-const { agendarAtendimentoService, removerAtendimentoProvisorioService } = require('./atendimentoService');
+const { agendarAtendimentoService, removerAtendimentoProvisorioService, editarAtendimentoService, cancelarAtendimentoService, obterAtendimentoService } = require('./atendimentoService');
 const { obterAgendaAlunoService } = require('./agendaService');
 const { listarTurmasService, listarTurmasRegularesPorTurnoService } = require('./turmaService');
 const { removerMatriculaProvisoria } = require('../controllers/matriculaController');
@@ -46,7 +46,7 @@ function simularBanco(t, inicial = {}) {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-02T12:00:00.000Z') });
   const estado = { aluno: [aluno(1), aluno(2, 'ATIVO'), aluno(3, 'ATIVO')], pessoa: [],
     turma: [turma(10), turma(20, 'REGULAR')], matricula_turma: [], atendimento_clinico: [], atendimento_sessao: [],
-    aluno_responsavel: [], aluno_dados_medicos: [], ...inicial };
+    aluno_responsavel: [], aluno_dados_medicos: [], funcionario: [{ id: 1, pessoa_id: 10, nome: 'Ana' }, { id: 2, pessoa_id: 11, nome: 'Bruno' }], ...inicial };
   let sequencia = 100;
   const filas = new Map();
 
@@ -54,14 +54,16 @@ function simularBanco(t, inicial = {}) {
     const ler = (nome) => [...estado[nome], ...pendentes[nome]].filter((item) => !removidos[nome].has(item.id))
       .map((item) => ({ ...item, ...atualizados[nome].get(item.id) }));
     function hidratar(nome, item) {
+      if (nome === 'funcionario') return { ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id) ?? { nome: item.nome, status_geral: 'ATIVO' } };
       if (nome === 'aluno') return { ...item, responsaveis: ler('aluno_responsavel').filter((r) => r.aluno_id === item.id) };
       if (nome === 'matricula_turma') return { ...item,
         aluno: ler('aluno').find((outro) => outro.id === item.aluno_id),
         turma: ler('turma').find((outro) => outro.id === item.turma_id) };
       if (nome === 'atendimento_clinico') return { ...item,
-        aluno: ler('aluno').find((outro) => outro.id === item.aluno_id), profissional: { pessoa: { nome: 'Ana' } },
+        aluno: ler('aluno').find((outro) => outro.id === item.aluno_id), profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { nome: 'Ana' }),
         sessoes: ler('atendimento_sessao').filter((outro) => outro.atendimento_clinico_id === item.id) };
       if (nome === 'atendimento_sessao') return { ...item,
+        profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { nome: 'Ana' }),
         atendimento_clinico: hidratar('atendimento_clinico', ler('atendimento_clinico').find((outro) => outro.id === item.atendimento_clinico_id)) };
       return { ...item };
     }
@@ -336,6 +338,7 @@ test('cancelamento provisório da recorrência preserva sessões e oculta soment
   await removerAtendimentoProvisorioService({ aluno_id: 1, atendimento_id: primeiro.id });
   assert.equal(banco.atendimento_clinico.length, 2);
   assert.ok(banco.atendimento_clinico.find((a) => a.id === primeiro.id).data_cancelamento);
+  assert.ok(banco.atendimento_sessao.filter((s) => s.atendimento_clinico_id === primeiro.id).every((s) => s.data_cancelamento && s.status === 'PROVISORIO'));
   assert.equal(banco.atendimento_sessao.length, 4);
   assert.deepEqual((await obterAtendimentosService(1)).map((a) => a.id), [outro.id]);
 });
@@ -429,6 +432,7 @@ test('troca de período exige confirmação atualizada e preserva provisórios e
   assert.ok(banco.matricula_turma[0].data_fim);
   assert.equal(banco.atendimento_clinico[0].status, 'PROVISORIO');
   assert.ok(banco.atendimento_clinico[0].data_cancelamento);
+  assert.ok(banco.atendimento_sessao.every((s) => s.data_cancelamento && s.status === 'PROVISORIO'));
   assert.equal((await obterAgendaAlunoService(1)).eventos.length, 0);
   await editarAlunoService(1, { status: 'ATIVO' });
   assert.equal(banco.matricula_turma[0].status, 'PROVISORIO');
@@ -495,7 +499,7 @@ test('troca de período ativo encerra vínculos, preserva sessões iniciadas e h
   assert.equal(banco.atendimento_clinico[0].status, 'INATIVO');
   assert.equal(banco.atendimento_clinico[0].data_termino.toISOString().slice(0,10), '2026-11-02');
   assert.equal(banco.atendimento_sessao[0].status, 'ATIVO');
-  assert.ok(banco.atendimento_sessao.slice(1).every((s) => s.status === 'INATIVO'));
+  assert.ok(banco.atendimento_sessao.slice(1).every((s) => s.status === 'INATIVO' && s.data_cancelamento));
   const agenda = await obterAgendaAlunoService(2);
   assert.ok(agenda.eventos.some((e) => e.tipo === 'ATENDIMENTO'));
   assert.ok(agenda.eventos.some((e) => e.tipo === 'REGULAR'));
@@ -647,4 +651,191 @@ test('conflitos de sessões elegíveis impedem promoção e datas efetivas sem a
   assert.equal(banco.matricula_turma[0].status, 'PROVISORIO');
   assert.equal(banco.atendimento_clinico[0].status, 'PROVISORIO');
   assert.ok(banco.atendimento_sessao.every((s) => s.status === 'PROVISORIO'));
+});
+
+async function prepararEdicaoAtendimento(t, status = 'ATIVO', configuracao = {}) {
+  const banco = simularBanco(t, { aluno: [aluno(1, status)], pessoa: [pessoaEdicao], turma: [turma(10, 'OFICINA', 5)] });
+  const atendimento = await agendarAtendimentoService({ ...pedidoClinico, tipo_recorrencia: 'SEMANAL', frequencia: 1,
+    dias_semana: [1, 3], data_termino: '2026-11-16', ...configuracao });
+  return { banco, atendimento, params: { aluno_id: 1, atendimento_id: atendimento.id } };
+}
+
+test('editar eventual antes do início atualiza sessão e profissional sem conflito consigo mesmo', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t, 'ATIVO', { tipo_recorrencia: 'EVENTUAL' });
+  const id = banco.atendimento_sessao[0].id;
+  await editarAtendimentoService(params, { hora_inicio: '10:30', duracao_minutos: 45, profissional_id: 2 });
+  assert.equal(banco.atendimento_sessao.length, 1);
+  assert.equal(banco.atendimento_sessao[0].id, id);
+  assert.equal(banco.atendimento_sessao[0].hora_inicio.toISOString().slice(11,16), '10:30');
+  assert.equal(banco.atendimento_sessao[0].profissional_id, 2);
+  assert.equal(banco.atendimento_clinico[0].profissional_id, 2);
+});
+
+for (const status of ['ATIVO', 'RASCUNHO']) {
+  test(`${status}: eventual iniciado não pode ser editado e aluno não pode ser trocado`, async (t) => {
+    const { banco, params } = await prepararEdicaoAtendimento(t, status, { tipo_recorrencia: 'EVENTUAL' });
+    await assert.rejects(() => editarAtendimentoService(params, { aluno_id: 2 }), { name: 'ZodError' });
+    t.mock.timers.setTime(new Date('2026-11-02T12:30:00.000Z').getTime());
+    await assert.rejects(() => editarAtendimentoService(params, { profissional_id: 2 }), { statusCode: 409 });
+    assert.equal(banco.atendimento_sessao[0].profissional_id, 1);
+    assert.equal((await obterAtendimentoService(params)).pode_editar, false);
+  });
+
+  test(`${status}: editar recorrência preserva sessão iniciada e cancela dias removidos com data`, async (t) => {
+    const { banco, params } = await prepararEdicaoAtendimento(t, status);
+    const primeira = structuredClone(banco.atendimento_sessao[0]);
+    t.mock.timers.setTime(new Date('2026-11-02T12:45:00.000Z').getTime());
+    await editarAtendimentoService(params, { profissional_id: 2, hora_inicio: '11:00', duracao_minutos: 45, dias_semana: [1, 2], data_termino: '2026-11-17' });
+    assert.deepEqual(banco.atendimento_sessao.find((s) => s.id === primeira.id), primeira);
+    const quartas = banco.atendimento_sessao.filter((s) => s.data_sessao.getUTCDay() === 3);
+    assert.ok(quartas.every((s) => s.data_cancelamento && s.status === (status === 'ATIVO' ? 'INATIVO' : 'PROVISORIO')));
+    const novas = banco.atendimento_sessao.filter((s) => !s.data_cancelamento && s.id !== primeira.id);
+    assert.ok(novas.every((s) => s.profissional_id === 2 && s.hora_inicio.toISOString().slice(11,16) === '11:00' && s.duracao_minutos === 45));
+    assert.equal(banco.atendimento_sessao.filter((s) => !s.data_cancelamento && s.data_sessao.getTime() === primeira.data_sessao.getTime()).length, 1);
+    const agenda = await obterAgendaAlunoService(1);
+    assert.equal(agenda.eventos.find((e) => e.sessao_id === primeira.id).profissional, 'Ana');
+    assert.ok(agenda.eventos.some((e) => e.profissional === 'Bruno'));
+    if (status === 'RASCUNHO') assert.ok(banco.atendimento_sessao.every((s) => s.status === 'PROVISORIO'));
+  });
+
+  test(`${status}: cancelamento preenche data em todas as sessões futuras, preserva passado e é idempotente`, async (t) => {
+    const { banco, params } = await prepararEdicaoAtendimento(t, status);
+    const primeira = structuredClone(banco.atendimento_sessao[0]);
+    t.mock.timers.setTime(new Date('2026-11-02T12:45:00.000Z').getTime());
+    await cancelarAtendimentoService(params);
+    assert.ok(banco.atendimento_clinico[0].data_cancelamento);
+    assert.equal(banco.atendimento_clinico[0].status, status === 'ATIVO' ? 'INATIVO' : 'PROVISORIO');
+    assert.deepEqual(banco.atendimento_sessao[0], primeira);
+    assert.ok(banco.atendimento_sessao.slice(1).every((s) => s.data_cancelamento && s.status === (status === 'ATIVO' ? 'INATIVO' : 'PROVISORIO')));
+    assert.equal((await obterAgendaAlunoService(1, '2026-11-09')).eventos.length, 0);
+    const depois = structuredClone(banco.atendimento_clinico[0]);
+    t.mock.timers.setTime(new Date('2026-11-03T16:00:00.000Z').getTime());
+    await cancelarAtendimentoService(params);
+    assert.deepEqual(banco.atendimento_clinico[0], depois);
+    await assert.rejects(() => editarAtendimentoService(params, { profissional_id: 2 }), { statusCode: 409 });
+  });
+}
+
+for (const [antes, depois] of [['SEMANAL', 'MENSAL'], ['MENSAL', 'SEMANAL']]) {
+  test(`converte ${antes} para ${depois} antes da primeira sessão e bloqueia após início`, async (t) => {
+    const { banco, params } = await prepararEdicaoAtendimento(t, 'RASCUNHO', { tipo_recorrencia: antes, dias_semana: [1], data_termino: '2026-12-02' });
+    await editarAtendimentoService(params, { tipo_recorrencia: depois, frequencia: 1, dias_semana: depois === 'SEMANAL' ? [1,3] : [] });
+    assert.equal(banco.atendimento_clinico[0].tipo_recorrencia, depois);
+    assert.ok(banco.atendimento_sessao.every((s) => s.status === 'PROVISORIO'));
+    t.mock.timers.setTime(new Date('2026-11-02T12:45:00.000Z').getTime());
+    await assert.rejects(() => editarAtendimentoService(params, { tipo_recorrencia: antes }), { statusCode: 409 });
+    await assert.rejects(() => editarAtendimentoService(params, { modalidade: 'Outra' }), { statusCode: 409 });
+    await assert.rejects(() => editarAtendimentoService(params, { data_inicio: '2026-11-03' }), { statusCode: 409 });
+  });
+}
+
+for (const tipo_recorrencia of ['SEMANAL', 'MENSAL']) {
+  test(`${tipo_recorrencia}: frequência pode mudar após início sem deslocar sessões passadas`, async (t) => {
+    const { banco, params } = await prepararEdicaoAtendimento(t, 'ATIVO', { tipo_recorrencia, dias_semana: [1], data_termino: '2027-02-02' });
+    const primeira = structuredClone(banco.atendimento_sessao[0]);
+    t.mock.timers.setTime(new Date('2026-11-02T12:45:00.000Z').getTime());
+    await editarAtendimentoService(params, { frequencia: 2 });
+    assert.deepEqual(banco.atendimento_sessao[0], primeira);
+    assert.equal(banco.atendimento_clinico[0].frequencia, 2);
+    assert.ok(banco.atendimento_sessao.some((s) => s.data_cancelamento));
+    assert.deepEqual(banco.atendimento_clinico[0].data_inicio, data('2026-11-02'));
+  });
+}
+
+test('eventual não vira recorrente nem recorrente vira eventual', async (t) => {
+  const { params } = await prepararEdicaoAtendimento(t);
+  await assert.rejects(() => editarAtendimentoService(params, { tipo_recorrencia: 'EVENTUAL' }), { statusCode: 400 });
+});
+
+test('conflito ao editar horário impede todas as alterações e preserva IDs e sessões', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t, 'ATIVO', { tipo_recorrencia: 'EVENTUAL', hora_inicio: '11:00' });
+  await matricularOficinasService({ aluno_id: 1, oficinas_ids: [10] });
+  const antes = structuredClone({ atendimento: banco.atendimento_clinico, sessoes: banco.atendimento_sessao });
+  await assert.rejects(() => editarAtendimentoService(params, { hora_inicio: '09:15', profissional_id: 2 }), { isConflict: true });
+  assert.deepEqual(banco.atendimento_clinico, antes.atendimento);
+  assert.deepEqual(banco.atendimento_sessao, antes.sessoes);
+});
+
+test('edição de duração valida conflitos com outra clínica e não sobrepõe sessões da própria recorrência', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t, 'ATIVO', { tipo_recorrencia: 'EVENTUAL' });
+  await agendarAtendimentoService({ ...pedidoClinico, hora_inicio: '11:00' });
+  await assert.rejects(() => editarAtendimentoService(params, { duracao_minutos: 120 }), { isConflict: true });
+  assert.equal(banco.atendimento_sessao[0].duracao_minutos, 30);
+});
+
+test('provisórios retirados por edição não conflitam nem são promovidos na ativação', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t, 'RASCUNHO');
+  await editarAtendimentoService(params, { dias_semana: [1] });
+  const canceladas = banco.atendimento_sessao.filter((s) => s.data_cancelamento).map((s) => s.id);
+  await editarAlunoService(1, { status: 'ATIVO' });
+  assert.ok(banco.atendimento_sessao.filter((s) => canceladas.includes(s.id)).every((s) => s.status === 'PROVISORIO' && s.data_cancelamento));
+  assert.ok(banco.atendimento_sessao.filter((s) => !canceladas.includes(s.id)).every((s) => s.status === 'ATIVO'));
+});
+
+test('conversão exige os parâmetros do novo tipo e profissional precisa estar ativo', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t);
+  await assert.rejects(() => editarAtendimentoService(params, { tipo_recorrencia: 'MENSAL' }), { statusCode: 400 });
+  await assert.rejects(() => editarAtendimentoService(params, { profissional_id: 999 }), { statusCode: 400 });
+  assert.equal(banco.atendimento_clinico[0].profissional_id, 1);
+});
+
+test('término pode encurtar ou estender o futuro sem excluir o passado', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t);
+  const primeira = structuredClone(banco.atendimento_sessao[0]);
+  t.mock.timers.setTime(new Date('2026-11-02T12:45:00.000Z').getTime());
+  await editarAtendimentoService(params, { data_termino: '2026-11-04' });
+  assert.ok(banco.atendimento_sessao.filter((s) => s.data_sessao > data('2026-11-04')).every((s) => s.status === 'INATIVO' && s.data_cancelamento));
+  await editarAtendimentoService(params, { data_termino: '2026-11-18' });
+  assert.deepEqual(banco.atendimento_sessao[0], primeira);
+  const futuras = banco.atendimento_sessao.filter((s) => !s.data_cancelamento);
+  assert.ok(futuras.some((s) => s.data_sessao.getTime() === data('2026-11-18').getTime()));
+  assert.equal(new Set(futuras.map((s) => s.data_sessao.toISOString())).size, futuras.length);
+});
+
+test('edição e cancelamento concorrentes não deixam sessões vigentes em atendimento cancelado', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t);
+  await Promise.allSettled([editarAtendimentoService(params, { frequencia: 2 }), cancelarAtendimentoService(params)]);
+  assert.equal(banco.atendimento_clinico[0].status, 'INATIVO');
+  assert.ok(banco.atendimento_sessao.every((s) => s.data_cancelamento && s.status === 'INATIVO'));
+});
+
+test('rotas de atendimento exigem administração, validam entrada e protegem propriedade do aluno', async (t) => {
+  const express = require('express');
+  const { createServer } = require('node:http');
+  const routes = require('../routes/atendimentosRoutes');
+  const { params } = await prepararEdicaoAtendimento(t);
+  const app = express(); app.use(express.json());
+  app.use('/api', (req, res, next) => { if (req.get('x-test-role')) req.usuario = { role: req.get('x-test-role') }; next(); }, routes);
+  const server = createServer(app);
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `/api/alunos/1/atendimentos/${params.atendimento_id}`;
+  for (const [method, caminho, role, body, esperado] of [['GET', base, null, undefined, 401], ['PATCH', base, 'professor', { hora_inicio: '10:30' }, 403],
+    ['PATCH', base, 'admin', { aluno_id: 2 }, 400], ['PATCH', base, 'admin', {}, 400], ['GET', base.replace('/alunos/1', '/alunos/2'), 'admin', undefined, 404],
+    ['GET', base, 'admin', undefined, 200], ['PATCH', base, 'admin', { hora_inicio: '10:30' }, 200], ['PATCH', base + '/cancelamento', 'admin', undefined, 200],
+    ['PATCH', base, 'admin', { hora_inicio: '11:00' }, 409]]) {
+    const resposta = await fetch(`http://127.0.0.1:${server.address().port}${caminho}`, { method,
+      headers: { 'content-type': 'application/json', ...(role ? { 'x-test-role': role } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    assert.equal(resposta.status, esperado);
+  }
+});
+
+test('falha ao criar sessão durante edição desfaz atualização de sessões e atendimento', async (t) => {
+  const { banco, params } = await prepararEdicaoAtendimento(t);
+  const antes = structuredClone({ atendimento: banco.atendimento_clinico, sessoes: banco.atendimento_sessao });
+  const transacao = prisma.$transaction;
+  prisma.$transaction = (operacao, options) => transacao(async (tx) => {
+    tx.atendimento_sessao.create = async () => { throw new Error('Falha simulada ao inserir sessão'); };
+    return operacao(tx);
+  }, options);
+  await assert.rejects(() => editarAtendimentoService(params, { dias_semana: [1, 2], hora_inicio: '11:00', profissional_id: 2 }), /Falha simulada/);
+  assert.deepEqual(banco.atendimento_clinico, antes.atendimento);
+  assert.deepEqual(banco.atendimento_sessao, antes.sessoes);
+});
+
+test('edição rejeita sessões da própria recorrência que se sobrepõem', async (t) => {
+  const { params } = await prepararEdicaoAtendimento(t);
+  await assert.rejects(() => editarAtendimentoService(params, { dias_semana: [1, 2], duracao_minutos: 1500 }), (erro) => {
+    return erro.isConflict && erro.detalhes.some((c) => c.codigo === 'CHOQUE_SESSOES_RECORRENCIA');
+  });
 });

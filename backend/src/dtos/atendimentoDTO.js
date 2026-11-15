@@ -68,4 +68,16 @@ const removerAtendimentoProvisorioDTO = z.object({
   atendimento_id: z.coerce.number().int().positive('ID do atendimento inválido.')
 });
 
-module.exports = { criarAtendimentoDTO, removerAtendimentoProvisorioDTO };
+const editarAtendimentoDTO = z.object({
+  profissional_id: z.number().int().positive(),
+  modalidade: z.string().trim().min(1, 'Informe a modalidade.'),
+  tipo_recorrencia: z.enum(['EVENTUAL', 'SEMANAL', 'MENSAL']),
+  data_inicio: dataDTO,
+  hora_inicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Informe um horário válido.'),
+  duracao_minutos: z.number().int().positive(),
+  frequencia: z.number().int().positive(),
+  dias_semana: z.array(z.number().int().min(1).max(7)),
+  data_termino: dataDTO,
+}).partial().strict().refine((dados) => Object.values(dados).some((v) => v !== undefined), { message: 'Informe ao menos um campo para atualizar.' });
+
+module.exports = { criarAtendimentoDTO, removerAtendimentoProvisorioDTO, editarAtendimentoDTO };
