@@ -1,7 +1,8 @@
 const prisma = require('../prismaClient');
 const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
-const { editarAlunoDTO } = require('../dtos/alunoDTO');
+const { editarAlunoDTO, alterarStatusAlunoDTO } = require('../dtos/alunoDTO');
 const { agoraInstituicao, inicioOcorrencia, dataEncerramento, fimMatricula, DIA_MS } = require('./encerramentoAtividade');
+const { bloquearProfissionalAtivo } = require('./profissionalService');
 
 const selectResponsavel = {
   id: true, pessoa_id: true, parentesco: true,
@@ -88,6 +89,7 @@ async function criarAlunoService(dadosAluno) {
 
 async function listarAlunosService() {
   const alunos = await prisma.aluno.findMany({
+    where: { deleted_at: null },
     include: {
       pessoa: true,
       responsaveis: {
@@ -98,7 +100,7 @@ async function listarAlunosService() {
         where: {
           OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }],
           turma: {
-            is: { tipo: 'REGULAR' }
+            is: { tipo: 'REGULAR', deleted_at: null }
           }
         },
         orderBy: { created_at: 'desc' },
@@ -143,14 +145,14 @@ async function obterAlunoService(aluno_id) {
       responsaveis: { orderBy: { id: 'asc' }, select: selectResponsavel },
       dados_medicos: { select: selectDadosMedicos },
       matriculas_turmas: {
-        where: { OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR' } },
+        where: { OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR', deleted_at: null } },
         orderBy: { created_at: 'desc' },
         take: 1,
         select: { id: true, status: true, turma: { select: { id: true, nome: true, turno: true, status: true } } }
       }
     },
   });
-  if (!aluno) return null;
+  if (!aluno || aluno.deleted_at) return null;
   const { matriculas_turmas, responsaveis, ...dados } = aluno;
   const regular = matriculas_turmas[0];
   return { ...dados, responsaveis: formatarResponsaveis(responsaveis), dados_medicos: aluno.dados_medicos ?? null,
@@ -159,12 +161,14 @@ async function obterAlunoService(aluno_id) {
 }
 
 async function obterOficinasService(aluno_id) {
+  const aluno = await prisma.aluno.findUnique({ where: { id: aluno_id }, select: { id: true, deleted_at: true } });
+  if (!aluno || aluno.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
   const oficinas = await prisma.matricula_turma.findMany({
     where: {
       aluno_id: aluno_id,
       OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }],
       turma: {
-        tipo: 'OFICINA'
+        tipo: 'OFICINA', deleted_at: null
       }
     },
     include: {
@@ -179,6 +183,8 @@ async function obterOficinasService(aluno_id) {
 }
 
 async function obterAtendimentosService(aluno_id) {
+  const aluno = await prisma.aluno.findUnique({ where: { id: aluno_id }, select: { id: true, deleted_at: true } });
+  if (!aluno || aluno.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
   const partes = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
   }).formatToParts(new Date());
@@ -260,7 +266,7 @@ async function validarAtivacao(tx, aluno, planejamento, agora) {
   if (regulares.length > 1) conflitos.push({ mensagem: 'O aluno possui mais de uma turma regular vigente.' });
   for (const m of turmas) {
     const turma = m.turma;
-    if (turma.status !== 'ATIVO' || turma.turno !== aluno.turno) conflitos.push({ turma_id: turma.id, mensagem: `${turma.nome}: turma inativa ou período incompatível.` });
+    if (turma.deleted_at || turma.status !== 'ATIVO' || turma.turno !== aluno.turno) conflitos.push({ turma_id: turma.id, mensagem: `${turma.nome}: turma inativa, excluída ou período incompatível.` });
     const dias = turma.horarios.map((h) => h.dia_semana);
     if (turma.tipo === 'REGULAR' ? aluno.dias_frequencia.some((d) => !dias.includes(d)) : dias.some((d) => !aluno.dias_frequencia.includes(d))) {
       conflitos.push({ turma_id: turma.id, mensagem: `${turma.nome}: dias incompatíveis com a frequência do aluno.` });
@@ -302,9 +308,12 @@ async function editarAlunoService(id, entrada) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${id} FOR UPDATE`;
     const atual = await tx.aluno.findUnique({ where: { id }, include: { responsaveis: true } });
-    if (!atual) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
+    if (!atual || atual.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
     if (dados.status !== undefined && atual.status !== 'RASCUNHO') {
       throw Object.assign(new Error('O status só pode ser editado para alunos em rascunho.'), { statusCode: 400 });
+    }
+    if (atual.status === 'INATIVO' && dados.turma_id) {
+      throw Object.assign(new Error('Não é possível vincular uma turma regular a um aluno inativo.'), { statusCode: 409 });
     }
     const novo = { ...atual, ...dados };
     const mudouTurno = novo.turno !== atual.turno;
@@ -315,6 +324,14 @@ async function editarAlunoService(id, entrada) {
     planejamento = await lerPlanejamento(tx, id);
     const agora = agoraInstituicao();
     const ativando = atual.status === 'RASCUNHO' && dados.status === 'ATIVO';
+    if (ativando) {
+      const profissionais = [...new Set([
+        ...planejamento.matriculas.map((m) => m.turma.profissional_id),
+        ...planejamento.atendimentos.flatMap((a) => a.sessoes.filter((s) => inicioOcorrencia(s.data_sessao, s.hora_inicio) >= agora.getTime())
+          .flatMap((s) => [a.profissional_id, s.profissional_id])),
+      ].filter(Number.isInteger))].sort((a, b) => a - b);
+      for (const profissionalId of profissionais) await bloquearProfissionalAtivo(tx, profissionalId);
+    }
     if (mudouTurno && (planejamento.matriculas.length || planejamento.atendimentos.length)) {
       const assinatura = { matriculas: planejamento.matriculas.map((m) => m.id).sort((a,b) => a-b), atendimentos: planejamento.atendimentos.map((a) => a.id).sort((a,b) => a-b) };
       const recebido = dados.confirmar_cancelamentos;
@@ -340,9 +357,18 @@ async function editarAlunoService(id, entrada) {
     const regular = planejamento.matriculas.find((m) => m.turma.tipo === 'REGULAR');
     const trocarRegular = dados.turma_id !== undefined && dados.turma_id !== (regular?.turma_id ?? null);
     const encerrar = mudouTurno ? planejamento.matriculas : trocarRegular && regular ? [regular] : [];
-    for (const m of encerrar) await tx.matricula_turma.update({ where: { id: m.id }, data: {
-      data_fim: fimMatricula(m, agora), ...(m.status === 'ATIVO' ? { status: 'INATIVO' } : {})
-    } });
+    let dataInicioRegular;
+    for (const m of encerrar) {
+      const dataFim = fimMatricula(m, agora);
+      if (m.id === regular?.id && atual.status === 'ATIVO' && m.status === 'ATIVO') {
+        const hoje = new Date(agora); hoje.setUTCHours(0, 0, 0, 0);
+        // A sucessora não ocupa o dia preservado nem antecipa uma matrícula ainda futura.
+        dataInicioRegular = new Date(Math.max(hoje.getTime(), dataFim.getTime() + DIA_MS, m.data_inicio?.getTime() ?? 0));
+      }
+      await tx.matricula_turma.update({ where: { id: m.id }, data: {
+        data_fim: dataFim, ...(m.status === 'ATIVO' ? { status: 'INATIVO' } : {})
+      } });
+    }
     if (mudouTurno) for (const a of planejamento.atendimentos) {
       const fim = dataEncerramento(a.sessoes.map((s) => ({ data: s.data_sessao, hora: s.hora_inicio })), agora);
       await tx.atendimento_clinico.update({ where: { id: a.id }, data: {
@@ -381,7 +407,7 @@ async function editarAlunoService(id, entrada) {
       if (dados.dados_medicos === null) await tx.aluno_dados_medicos.deleteMany({ where: { aluno_id: id } });
       else await tx.aluno_dados_medicos.upsert({ where: { aluno_id: id }, create: { aluno_id: id, ...dados.dados_medicos }, update: dados.dados_medicos });
     }
-    if (dados.turma_id && (mudouTurno || trocarRegular)) await matricularTurmaRegularNaTransacao(tx, { aluno_id: id, turma_id: dados.turma_id });
+    if (dados.turma_id && (mudouTurno || trocarRegular)) await matricularTurmaRegularNaTransacao(tx, { aluno_id: id, turma_id: dados.turma_id }, { dataInicio: dataInicioRegular });
     if (ativando) {
       const vigente = await lerPlanejamento(tx, id);
       const dataInicio = new Date(agora);
@@ -406,4 +432,82 @@ async function editarAlunoService(id, entrada) {
   }, { isolationLevel: 'ReadCommitted' });
 }
 
-module.exports = { criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService, editarAlunoService };
+async function encerrarVinculosAlunoNaTransacao(tx, aluno) {
+  const id = aluno.id;
+  const agora = agoraInstituicao();
+  const hoje = new Date(agora); hoje.setUTCHours(0, 0, 0, 0);
+  let planejamento = await lerPlanejamento(tx, id);
+  const lerEncerradasSemFim = () => tx.matricula_turma.findMany({
+    where: { aluno_id: id, status: 'INATIVO', data_fim: null }, include: { turma: { include: { horarios: true } } },
+  });
+  planejamento.matriculas.push(...await lerEncerradasSemFim());
+  const turmas = [...new Set(planejamento.matriculas.map((m) => m.turma_id))].sort((a, b) => a - b);
+  for (const turmaId of turmas) await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${turmaId} FOR UPDATE`;
+  planejamento = await lerPlanejamento(tx, id);
+  planejamento.matriculas.push(...await lerEncerradasSemFim());
+  const rascunho = aluno.status === 'RASCUNHO';
+  for (const matricula of planejamento.matriculas) {
+    await tx.matricula_turma.update({ where: { id: matricula.id }, data: {
+      data_fim: fimMatricula(matricula, agora),
+      ...(rascunho && matricula.status === 'PROVISORIO' ? {} : { status: 'INATIVO' }),
+    } });
+  }
+  for (const atendimento of planejamento.atendimentos) {
+    await tx.atendimento_clinico.update({ where: { id: atendimento.id }, data: {
+      data_cancelamento: hoje,
+      ...(rascunho && atendimento.status === 'PROVISORIO' ? {} : { status: 'INATIVO' }),
+    } });
+  }
+  const sessoes = await tx.atendimento_sessao.findMany({ where: {
+    atendimento_clinico: { aluno_id: id }, status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null,
+  } });
+  const futuras = sessoes.filter((s) => inicioOcorrencia(s.data_sessao, s.hora_inicio) > agora.getTime());
+  for (const statusSessao of ['ATIVO', 'PROVISORIO']) {
+    const ids = futuras.filter((s) => s.status === statusSessao).map((s) => s.id);
+    if (ids.length) await tx.atendimento_sessao.updateMany({
+      where: { id: { in: ids }, data_cancelamento: null },
+      data: { data_cancelamento: hoje, ...(rascunho && statusSessao === 'PROVISORIO' ? {} : { status: 'INATIVO' }) },
+    });
+  }
+}
+
+async function alterarStatusAlunoService(id, entrada) {
+  const { status } = alterarStatusAlunoDTO.parse(entrada);
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${id} FOR UPDATE`;
+    const aluno = await tx.aluno.findUnique({ where: { id } });
+    if (!aluno || aluno.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
+    if (status === 'ATIVO' && aluno.status === 'RASCUNHO') {
+      throw Object.assign(new Error('Ative o rascunho pelo formulário do aluno para validar seu planejamento.'), { statusCode: 409 });
+    }
+    if (status === 'INATIVO') await encerrarVinculosAlunoNaTransacao(tx, aluno);
+    await tx.aluno.update({ where: { id }, data: { status } });
+    await tx.pessoa.update({ where: { id: aluno.pessoa_id }, data: { status_geral: status } });
+    return { id, status };
+  }, { isolationLevel: 'ReadCommitted' });
+}
+
+async function excluirAlunoService(id) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${id} FOR UPDATE`;
+    const aluno = await tx.aluno.findUnique({ where: { id } });
+    if (!aluno || aluno.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
+    await encerrarVinculosAlunoNaTransacao(tx, aluno);
+    const responsaveis = await tx.aluno_responsavel.findMany({ where: { aluno_id: id }, select: { pessoa_id: true } });
+    const pessoasIds = [...new Set(responsaveis.map((r) => r.pessoa_id))].sort((a, b) => a - b);
+    for (const pessoaId of pessoasIds) await tx.$queryRaw`SELECT "id" FROM "pessoa" WHERE "id" = ${pessoaId} FOR UPDATE`;
+    await tx.aluno_responsavel.deleteMany({ where: { aluno_id: id } });
+    if (pessoasIds.length) await tx.pessoa.deleteMany({ where: {
+      id: { in: pessoasIds }, alunos_responsavel: { none: {} },
+      aluno: { is: null }, funcionario: { is: null }, usuario: { is: null },
+    } });
+    await tx.aluno_dados_medicos.deleteMany({ where: { aluno_id: id } });
+    await tx.pessoa.update({ where: { id: aluno.pessoa_id }, data: { telefone: null, data_nascimento: null, status_geral: 'INATIVO' } });
+    await tx.aluno.update({ where: { id }, data: {
+      deleted_at: new Date(), status: aluno.status === 'ATIVO' ? 'INATIVO' : aluno.status,
+      turno: null, participa_almoco: null, participa_procan: null, observacoes: null, dias_frequencia: [],
+    } });
+  }, { isolationLevel: 'ReadCommitted' });
+}
+
+module.exports = { criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService, editarAlunoService, alterarStatusAlunoService, excluirAlunoService };

@@ -1,5 +1,49 @@
 const prisma = require('../prismaClient');
-const { criarTurmaDTO, editarTurmaDTO } = require('../dtos/turmaDTO');
+const { criarTurmaDTO, editarTurmaDTO, excluirTurmaDTO } = require('../dtos/turmaDTO');
+const { bloquearProfissionalAtivo } = require('./profissionalService');
+const { agoraInstituicao, fimMatricula } = require('./encerramentoAtividade');
+
+const filtroMatriculasParaEncerrar = {
+    OR: [{ status: 'ATIVO' }, { status: { in: ['PROVISORIO', 'INATIVO'] }, data_fim: null }],
+};
+
+async function bloquearTurmaParaEncerramento(tx, id) {
+    const matriculas = await tx.matricula_turma.findMany({ where: { turma_id: id, ...filtroMatriculasParaEncerrar }, select: { aluno_id: true } });
+    const alunos = new Set(matriculas.map((m) => m.aluno_id));
+    // Mantém a ordem aluno → turma usada pelas inscrições e pela edição do aluno.
+    for (const alunoId of [...alunos].sort((a, b) => a - b)) await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${alunoId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${id} FOR UPDATE`;
+    const atuais = await tx.matricula_turma.findMany({ where: { turma_id: id, ...filtroMatriculasParaEncerrar } });
+    if (atuais.some((m) => !alunos.has(m.aluno_id))) {
+        throw Object.assign(new Error('As matrículas da turma mudaram. Confira os vínculos e confirme novamente.'), {
+            statusCode: 409, confirmacao: { matriculas: atuais.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b),
+                matriculas_ativas: atuais.filter((m) => m.status === 'ATIVO').length },
+            matriculas_ativas: atuais.filter((m) => m.status === 'ATIVO').length,
+        });
+    }
+    return atuais;
+}
+
+function validarConfirmacao(matriculas, confirmacao, obrigatoria = false) {
+    const ids = matriculas.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b);
+    const ativas = matriculas.filter((m) => m.status === 'ATIVO').length;
+    if ((obrigatoria || ids.length || confirmacao) && (JSON.stringify(ids) !== JSON.stringify(confirmacao?.matriculas) || ativas !== confirmacao?.matriculas_ativas)) {
+        throw Object.assign(new Error('Confirme o cancelamento das matrículas atuais da turma.'), {
+            statusCode: 409, confirmacao: { matriculas: ids, matriculas_ativas: ativas },
+            matriculas_ativas: ativas,
+        });
+    }
+}
+
+async function encerrarMatriculasTurma(tx, turma, matriculas) {
+    const agora = agoraInstituicao();
+    for (const matricula of matriculas) {
+        await tx.matricula_turma.update({ where: { id: matricula.id }, data: {
+            data_fim: fimMatricula({ ...matricula, turma }, agora),
+            ...(matricula.status === 'PROVISORIO' ? {} : { status: 'INATIVO' }),
+        } });
+    }
+}
 
 function gerarHorariosTurma({ tipo, turno, hora_inicio, hora_fim, dias_semana }) {
     const converterHora = (hora) => new Date(`1970-01-01T${hora}:00.000Z`);
@@ -15,7 +59,7 @@ function gerarHorariosTurma({ tipo, turno, hora_inicio, hora_fim, dias_semana })
 }
 
 async function listarTurmasService(tipo) {
-    const filtro = tipo ? { tipo } : {};
+    const filtro = { deleted_at: null, ...(tipo ? { tipo } : {}) };
     const turmas = await prisma.turma.findMany({
         where: filtro,
         include: {
@@ -48,6 +92,7 @@ async function listarTurmasRegularesPorTurnoService(turno) {
     const turmas = await prisma.turma.findMany({
         where: {
             tipo: 'REGULAR',
+            deleted_at: null,
             ...(turno ? { turno } : {}),
             status: 'ATIVO'
         },
@@ -84,12 +129,7 @@ async function criarTurmaService(dadosTurma) {
     const horarios = gerarHorariosTurma(dados);
 
     return prisma.$transaction(async (tx) => {
-        const profissional = await tx.funcionario.findUnique({
-            where: { id: profissional_id }, select: { cargo: true }
-        });
-        if (!profissional) {
-            throw Object.assign(new Error('Profissional não encontrado.'), { statusCode: 404 });
-        }
+        const profissional = await bloquearProfissionalAtivo(tx, profissional_id);
         const cargosPermitidos = tipo === 'REGULAR' ? ['professor', 'auxiliar'] : ['professor', 'oficineiro'];
         if (!cargosPermitidos.includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'))) {
             throw Object.assign(new Error(tipo === 'REGULAR'
@@ -122,7 +162,7 @@ async function criarTurmaService(dadosTurma) {
 
 async function obterTurmaService(turma_id) {
   const turma = await prisma.turma.findUnique({
-    where: { id: turma_id },
+    where: { id: turma_id, deleted_at: null },
     select: {
       id: true,
       nome: true,
@@ -140,7 +180,7 @@ async function obterTurmaService(turma_id) {
         orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]
       },
       matriculas: {
-        where: { status: 'ATIVO' },
+        where: { status: 'ATIVO', aluno: { deleted_at: null } },
         orderBy: [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }],
         select: {
           aluno: {
@@ -154,16 +194,24 @@ async function obterTurmaService(turma_id) {
     },
   });
   if (!turma) return null;
+  const cancelamentos = await prisma.matricula_turma.findMany({
+    where: { turma_id, ...filtroMatriculasParaEncerrar }, select: { id: true, status: true },
+  });
   const { matriculas, _count, ...dados } = turma;
-  return { ...dados, possui_matriculas: (_count?.matriculas ?? matriculas.length) > 0, alunos: matriculas.map((matricula) => matricula.aluno) };
+  return { ...dados, possui_matriculas: (_count?.matriculas ?? matriculas.length) > 0, alunos: matriculas.map((matricula) => matricula.aluno),
+    matriculas_ativas: cancelamentos.filter((m) => m.status === 'ATIVO').length,
+    confirmacao_cancelamentos: { matriculas: cancelamentos.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b),
+      matriculas_ativas: cancelamentos.filter((m) => m.status === 'ATIVO').length } };
 }
 
 async function editarTurmaService(id, entrada) {
     const dados = editarTurmaDTO.parse(entrada);
     return prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${id} FOR UPDATE`;
+        let encerrar;
+        if (dados.status === 'INATIVO') encerrar = await bloquearTurmaParaEncerramento(tx, id);
+        else await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${id} FOR UPDATE`;
         const turma = await tx.turma.findUnique({ where: { id }, include: { horarios: true } });
-        if (!turma) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
+        if (!turma || turma.deleted_at) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
         const matriculas = await tx.matricula_turma.groupBy({ by: ['status', 'data_fim'], where: { turma_id: id }, _count: { _all: true } });
         const possuiMatriculas = matriculas.some((grupo) => grupo._count._all > 0);
         const ocupacao = matriculas.filter((grupo) => grupo.status === 'ATIVO').reduce((total, grupo) => total + grupo._count._all, 0);
@@ -185,9 +233,7 @@ async function editarTurmaService(id, entrada) {
         if (possuiMatriculas && (mudouTurno || mudouAno || mudouHorario || mudouDias)) {
             throw Object.assign(new Error('Turmas com matrículas ou histórico não permitem alterar turno, ano letivo, dias ou horários.'), { statusCode: 409 });
         }
-        if (dados.status === 'INATIVO' && ocupacao > 0) {
-            throw Object.assign(new Error('Não é possível inativar uma turma com matrículas ativas.'), { statusCode: 409 });
-        }
+        if (encerrar) validarConfirmacao(encerrar, dados.confirmar_cancelamentos);
         if (dados.capacidade_maxima != null && dados.capacidade_maxima < ocupacao) {
             throw Object.assign(new Error(`A capacidade não pode ser menor que os ${ocupacao} alunos com matrícula ativa.`), { statusCode: 409 });
         }
@@ -195,9 +241,8 @@ async function editarTurmaService(id, entrada) {
             const sala = await tx.ambiente.findUnique({ where: { id: dados.ambiente_id }, select: { id: true } });
             if (!sala) throw Object.assign(new Error('Sala não encontrada.'), { statusCode: 404 });
         }
-        if (dados.profissional_id !== undefined) {
-            const profissional = await tx.funcionario.findUnique({ where: { id: dados.profissional_id }, select: { cargo: true, pessoa: { select: { status_geral: true } } } });
-            if (!profissional) throw Object.assign(new Error('Profissional não encontrado.'), { statusCode: 404 });
+        if (dados.profissional_id !== undefined || dados.status === 'ATIVO') {
+            const profissional = await bloquearProfissionalAtivo(tx, dados.profissional_id ?? turma.profissional_id);
             const permitido = (regular ? ['professor', 'auxiliar'] : ['professor', 'oficineiro']).includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'));
             if (!permitido || profissional.pessoa.status_geral !== 'ATIVO') {
                 throw Object.assign(new Error('Selecione um profissional ativo com função compatível com a turma.'), { statusCode: 400 });
@@ -215,6 +260,7 @@ async function editarTurmaService(id, entrada) {
         }
         const campos = ['nome', 'turno', 'ano_letivo', 'ambiente_id', 'capacidade_maxima', 'descricao', 'profissional_id', 'status'];
         const data = Object.fromEntries(campos.filter((campo) => dados[campo] !== undefined).map((campo) => [campo, dados[campo]]));
+        if (encerrar) await encerrarMatriculasTurma(tx, turma, encerrar);
         await tx.turma.update({ where: { id }, data });
         if (horarios) {
             await tx.turma_horario.deleteMany({ where: { turma_id: id } });
@@ -225,4 +271,16 @@ async function editarTurmaService(id, entrada) {
     }, { isolationLevel: 'ReadCommitted' });
 }
 
-module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService };
+async function excluirTurmaService(id, entrada = {}) {
+    const dados = excluirTurmaDTO.parse(entrada);
+    return prisma.$transaction(async (tx) => {
+        const matriculas = await bloquearTurmaParaEncerramento(tx, id);
+        const turma = await tx.turma.findUnique({ where: { id }, include: { horarios: true } });
+        if (!turma || turma.deleted_at) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
+        validarConfirmacao(matriculas, dados.confirmar_cancelamentos, true);
+        await encerrarMatriculasTurma(tx, turma, matriculas);
+        await tx.turma.update({ where: { id }, data: { status: 'INATIVO', deleted_at: new Date() } });
+    }, { isolationLevel: 'ReadCommitted' });
+}
+
+module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService };

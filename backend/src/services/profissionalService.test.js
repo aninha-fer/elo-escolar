@@ -152,12 +152,17 @@ test('rota oficial lista profissionais com permissão e a rota temporária foi r
 });
 
 function simularEdicao(t, inicial = {}) {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-02T12:00:00.000Z') });
     let estado = {
         profissional: { id: 7, pessoa_id: 50, cargo: 'Professor' },
         pessoa: { id: 50, nome: 'Maria', telefone: '51999999999', status_geral: 'ATIVO' },
         usuarios: [{ id: 3, pessoa_id: 50, status: 'ATIVO' }],
         turmas: [], atendimentos: [], ...inicial,
     };
+    estado.sessoes = inicial.sessoes ?? estado.atendimentos.map((a, i) => ({ id: 80 + i, profissional_id: 7,
+        atendimento_clinico_id: a.id, status: a.status ?? 'ATIVO', data_cancelamento: null, data_sessao: new Date('2026-11-03T00:00:00.000Z'),
+        hora_inicio: new Date('1970-01-01T09:00:00.000Z'), duracao_minutos: 60,
+        atendimento_clinico: { ...a, status: a.status ?? 'ATIVO', data_cancelamento: null } }));
     const chamadas = [];
     const original = prisma.$transaction;
     t.after(() => { prisma.$transaction = original; });
@@ -177,13 +182,20 @@ function simularEdicao(t, inicial = {}) {
                 assert.deepEqual(where, { id: 50 }); chamadas.push('pessoa'); Object.assign(pendente.pessoa, data);
             } },
             turma: { findMany: async ({ where }) => {
-                assert.deepEqual(where, { profissional_id: 7 }); chamadas.push('turmas'); return pendente.turmas;
+                assert.deepEqual(where, { profissional_id: 7, status: 'ATIVO' }); chamadas.push('turmas');
+                return pendente.turmas.filter((t) => (t.status ?? 'ATIVO') === 'ATIVO');
             } },
-            atendimento_clinico: { findMany: async ({ where }) => {
-                assert.deepEqual(where, { profissional_id: 7 }); chamadas.push('atendimentos'); return pendente.atendimentos;
-            } },
+            atendimento_sessao: {
+                findMany: async () => pendente.sessoes.filter((s) => s.status === 'ATIVO' && !s.data_cancelamento && s.atendimento_clinico.status === 'ATIVO' && !s.atendimento_clinico.data_cancelamento),
+                updateMany: async ({ where, data }) => { for (const s of pendente.sessoes) if (where.id.in.includes(s.id)) Object.assign(s, data); },
+            },
+            atendimento_clinico: {
+                findMany: async () => pendente.atendimentos.filter((a) => a.status === 'PROVISORIO' && !a.data_cancelamento)
+                    .map((a) => ({ profissional_id: 7, ...a, sessoes: pendente.sessoes.filter((s) => s.atendimento_clinico_id === a.id) })),
+                updateMany: async ({ where, data }) => { for (const a of pendente.atendimentos) if (where.id.in.includes(a.id)) Object.assign(a, data); },
+            },
             usuario: { updateMany: async ({ where, data }) => {
-                assert.deepEqual(where, { pessoa_id: 50 }); chamadas.push('usuario');
+                assert.deepEqual(where, { pessoa_id: 50, deleted_at: null }); chamadas.push('usuario');
                 if (inicial.falhaUsuario) throw new Error('Falha simulada na conta');
                 for (const usuario of pendente.usuarios) Object.assign(usuario, data);
                 return { count: pendente.usuarios.length };
@@ -243,10 +255,7 @@ test('sem conta vinculada, alteração de status não cria usuário', async (t) 
 
 for (const inicial of [
     { turmas: [{ id: 10, nome: 'Turma A', status: 'ATIVO' }] },
-    { turmas: [{ id: 11, nome: 'Turma histórica', status: 'INATIVO' }] },
     { atendimentos: [{ id: 20, modalidade: 'Psicologia', status: 'ATIVO' }] },
-    { atendimentos: [{ id: 21, modalidade: 'Fisioterapia', status: 'PROVISORIO' }] },
-    { atendimentos: [{ id: 22, modalidade: 'Histórico', status: 'INATIVO' }] },
 ]) {
     test(`vínculo ${JSON.stringify(inicial)} impede inativação sem alterações parciais`, async (t) => {
         const banco = simularEdicao(t, inicial);

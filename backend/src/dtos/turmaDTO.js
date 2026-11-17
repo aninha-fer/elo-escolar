@@ -49,6 +49,13 @@ const getTurmaDTO = z.object({
   id: z.coerce.number().int().positive('O ID da turma deve ser um número positivo.').max(2147483647)
 });
 
+const confirmacaoCancelamentosDTO = z.object({
+  matriculas: z.array(z.number().int().positive()).transform((ids) => [...new Set(ids)].sort((a, b) => a - b)),
+  matriculas_ativas: z.number().int().nonnegative(),
+}).strict();
+
+const excluirTurmaDTO = z.object({ confirmar_cancelamentos: confirmacaoCancelamentosDTO.optional() }).strict();
+
 const editarTurmaDTO = z.object({
   nome: z.string().trim().min(1, 'Informe o nome da turma.'),
   turno: z.enum(['MANHA', 'TARDE']),
@@ -61,9 +68,10 @@ const editarTurmaDTO = z.object({
   hora_fim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   dias_semana: z.array(z.number().int().min(1).max(5)).nonempty(),
   status: z.enum(['ATIVO', 'INATIVO']),
+  confirmar_cancelamentos: confirmacaoCancelamentosDTO,
 }).partial().strict().superRefine((dados, contexto) => {
-  const campos = Object.keys(dados).filter((campo) => dados[campo] !== undefined);
+  const campos = Object.keys(dados).filter((campo) => campo !== 'confirmar_cancelamentos' && dados[campo] !== undefined);
   if (!campos.length) contexto.addIssue({ code: 'custom', message: 'Informe ao menos um campo para atualizar.' });
 });
 
-module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO };
+module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO };

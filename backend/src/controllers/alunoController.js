@@ -1,5 +1,5 @@
-const { criarAlunoDTO, editarAlunoDTO, getAlunoDTO } = require('../dtos/alunoDTO');
-const { editarAlunoService, criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService } = require('../services/alunoService');
+const { criarAlunoDTO, editarAlunoDTO, alterarStatusAlunoDTO, getAlunoDTO } = require('../dtos/alunoDTO');
+const { editarAlunoService, criarAlunoService, listarAlunosService, obterAlunoService, obterOficinasService, obterAtendimentosService, alterarStatusAlunoService, excluirAlunoService } = require('../services/alunoService');
 
 
 async function criarAluno(req, res) {
@@ -35,8 +35,10 @@ async function obterAluno(req, res) {
     const { id } = getAlunoDTO.parse(req.params);
 
     const aluno = await obterAlunoService(id);
+    if (!aluno) return res.status(404).json({ erro: 'Aluno não encontrado.' });
     return res.status(200).json(aluno);
   } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
     console.error(error);
     return res.status(500).json({ erro: 'Erro interno ao obter aluno.' });
   }
@@ -49,6 +51,8 @@ async function obterOficinas(req, res) {
     const oficinas = await obterOficinasService(id);
     return res.status(200).json(oficinas);
   } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.statusCode === 404) return res.status(404).json({ erro: error.message });
     console.error(error);
     return res.status(500).json({ erro: 'Erro interno ao obter oficinas.' });
   }
@@ -61,6 +65,8 @@ async function obterAtendimentos(req, res) {
     const atendimentos = await obterAtendimentosService(id);
     return res.status(200).json(atendimentos);
   } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.statusCode === 404) return res.status(404).json({ erro: error.message });
     console.error(error);
     return res.status(500).json({ erro: 'Erro interno ao obter atendimentos.' });
   }
@@ -81,4 +87,30 @@ async function editarAluno(req, res) {
   }
 }
 
-module.exports = { editarAluno, criarAluno, listarAlunos, obterAluno, obterOficinas, obterAtendimentos };
+async function alterarStatusAluno(req, res) {
+  try {
+    const { id } = getAlunoDTO.parse(req.params);
+    const dados = alterarStatusAlunoDTO.parse(req.body);
+    return res.status(200).json(await alterarStatusAlunoService(id, dados));
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    console.error('Erro ao alterar status do aluno.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao alterar status do aluno.' });
+  }
+}
+
+async function excluirAluno(req, res) {
+  try {
+    const { id } = getAlunoDTO.parse(req.params);
+    await excluirAlunoService(id);
+    return res.status(204).send();
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.statusCode === 404) return res.status(404).json({ erro: error.message });
+    console.error('Erro ao excluir aluno.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao excluir aluno.' });
+  }
+}
+
+module.exports = { editarAluno, criarAluno, listarAlunos, obterAluno, obterOficinas, obterAtendimentos, alterarStatusAluno, excluirAluno };

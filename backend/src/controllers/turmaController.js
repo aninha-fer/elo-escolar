@@ -1,5 +1,5 @@
-const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO } = require('../dtos/turmaDTO');
-const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService } = require('../services/turmaService');
+const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO } = require('../dtos/turmaDTO');
+const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService } = require('../services/turmaService');
 
 async function listarTurmas(req, res) {
   try {
@@ -56,10 +56,26 @@ async function editarTurma(req, res) {
     return res.status(200).json(await editarTurmaService(id, dados));
   } catch (error) {
     if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
-    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message,
+      ...(error.confirmacao ? { confirmacao: error.confirmacao, matriculas_ativas: error.matriculas_ativas } : {}) });
     console.error('Erro ao editar turma.', { nome: error.name, codigo: error.code });
     return res.status(500).json({ erro: 'Erro interno ao editar turma.' });
   }
 }
 
-module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma };
+async function excluirTurma(req, res) {
+  try {
+    const { id } = getTurmaDTO.parse(req.params);
+    const dados = excluirTurmaDTO.parse(req.body ?? {});
+    await excluirTurmaService(id, dados);
+    return res.status(204).send();
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message,
+      ...(error.confirmacao ? { confirmacao: error.confirmacao, matriculas_ativas: error.matriculas_ativas } : {}) });
+    console.error('Erro ao excluir turma.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao excluir turma.' });
+  }
+}
+
+module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma, excluirTurma };

@@ -70,4 +70,18 @@ async function editarUsuario(req, res) {
   }
 }
 
-module.exports = { listarUsuarios, criarUsuario, editarUsuario };
+async function excluirUsuario(req, res) {
+  const parametros = editarUsuarioParamsDTO.safeParse(req.params);
+  if (!parametros.success) {
+    return res.status(400).json({ erro: 'ID do usuário inválido.' });
+  }
+
+  try {
+    await usuariosService.excluirUsuario(parametros.data.id);
+    return res.status(204).send();
+  } catch (erro) {
+    return responderErro(res, erro);
+  }
+}
+
+module.exports = { listarUsuarios, criarUsuario, editarUsuario, excluirUsuario };

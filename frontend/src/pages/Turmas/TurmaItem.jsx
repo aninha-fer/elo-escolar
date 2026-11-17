@@ -2,6 +2,7 @@ import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/f
 import { agruparHorarios } from '../../utils/formatters';
 import { BotaoAcoes } from '../../components/BotaoAcoes';
 import EditIcon from '../../components/icons/EditIcon';
+import { TrashIcon } from '../../components/icons/TrashIcon';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600',
@@ -17,7 +18,7 @@ function formatarDias(dias) {
         : formatarFrequencia(dias).replaceAll(', ', '/');
 }
 
-export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar = false, onEditar, onAlterarStatus }) {
+export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar = false, onEditar, onAlterarStatus, onExcluir }) {
     const grupos = agruparHorarios(turma.horarios);
     const nome = turma.nome || 'Turma sem nome';
     const horarios = grupos.map((grupo) => `${formatarDias(grupo.dias)} ${grupo.inicio}–${grupo.fim}`).join(' · ');
@@ -61,6 +62,7 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                     { id: 'editar', label: 'Editar', disabled: !onEditar, onClick: () => onEditar(turma), icon: <EditIcon/> },
                     { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus,
                         textColor: turma.status === 'INATIVO' ? '#059669' : '#DC2626', onClick: () => onAlterarStatus(turma) },
+                    { id: 'excluir', label: 'Excluir', textColor: '#DC2626', disabled: !onExcluir, onClick: () => onExcluir(turma), icon: <TrashIcon /> },
                 ]} /></div>}
             </article>
         </li>

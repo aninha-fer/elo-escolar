@@ -28,7 +28,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
   const diaAnterior = new Date(inicioSemana.getTime() - DIA_MS);
 
   const aluno = await prisma.aluno.findUnique({ where: { id: aluno_id } });
-  if (!aluno) {
+  if (!aluno || aluno.deleted_at) {
     const erro = new Error('Aluno não encontrado.');
     erro.status = 404;
     throw erro;
@@ -37,10 +37,10 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
   const [matriculas, sessoes] = await Promise.all([
     prisma.matricula_turma.findMany({
       where: {
-        aluno_id, turma: { status: 'ATIVO' },
+        aluno_id,
         OR: [
-          { status: 'ATIVO' },
-          ...(aluno.status === 'RASCUNHO' ? [{ status: 'PROVISORIO', data_fim: null }] : []),
+          { status: 'ATIVO', turma: { status: 'ATIVO', deleted_at: null } },
+          ...(aluno.status === 'RASCUNHO' ? [{ status: 'PROVISORIO', data_fim: null, turma: { status: 'ATIVO', deleted_at: null } }] : []),
           { status: 'INATIVO', data_fim: { not: null } }
         ],
         AND: [

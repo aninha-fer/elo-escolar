@@ -3,6 +3,7 @@ const { obterStatusVinculo } = require('./matriculaService');
 
 const { agoraInstituicao } = require('./encerramentoAtividade');
 const { criarAtendimentoDTO, editarAtendimentoDTO } = require('../dtos/atendimentoDTO');
+const { bloquearProfissionalAtivo } = require('./profissionalService');
 
 const DIAS_DA_SEMANA = new Set([1, 2, 3, 4, 5, 6, 7]);
 
@@ -160,9 +161,9 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
 
   const aluno = await tx.aluno.findUnique({
     where: { id: aluno_id },
-    select: { dias_frequencia: true, status: true }
+    select: { dias_frequencia: true, status: true, deleted_at: true }
   });
-  if (!aluno) {
+  if (!aluno || aluno.deleted_at) {
     const erro = new Error('Aluno não encontrado.');
     erro.statusCode = 404;
     throw erro;
@@ -326,6 +327,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
     const statusVinculo = await validarDisponibilidade(tx, {
       aluno_id, datasSessoes, hora_inicio: horaInicioConvertida, duracao_minutos
     });
+    await bloquearProfissionalAtivo(tx, profissional_id);
 
     validarInicioNaoPassado(data_inicio, hora_inicio);
     const atendimento = await tx.atendimento_clinico.create({
@@ -366,7 +368,7 @@ async function removerAtendimentoProvisorioService({ aluno_id, atendimento_id })
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
     const atendimento = await tx.atendimento_clinico.findFirst({
-      where: { id: atendimento_id, aluno_id }, include: { aluno: { select: { status: true } } }
+      where: { id: atendimento_id, aluno_id, aluno: { deleted_at: null } }, include: { aluno: { select: { status: true } } }
     });
     if (!atendimento) {
       const erro = new Error('Atendimento não encontrado para este aluno.');
@@ -408,7 +410,7 @@ function restricoesAtendimento(atendimento, agora) {
 }
 
 async function buscarAtendimento(tx, aluno_id, atendimento_id) {
-  const atendimento = await tx.atendimento_clinico.findFirst({ where: { id: atendimento_id, aluno_id },
+  const atendimento = await tx.atendimento_clinico.findFirst({ where: { id: atendimento_id, aluno_id, aluno: { deleted_at: null } },
     include: { sessoes: true, profissional: { select: { id: true, pessoa: { select: { nome: true } } } } } });
   if (!atendimento) throw Object.assign(new Error('Atendimento não encontrado para este aluno.'), { statusCode: 404 });
   return atendimento;
@@ -446,8 +448,13 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
   const dados = editarAtendimentoDTO.parse(entrada);
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
-    const atual = await buscarAtendimento(tx, aluno_id, atendimento_id);
+    const referencia = await buscarAtendimento(tx, aluno_id, atendimento_id);
     const agora = agoraInstituicao();
+    const profissionais = [...new Set([referencia.profissional_id, dados.profissional_id,
+      ...referencia.sessoes.filter((s) => !s.data_cancelamento && inicioSessao(s) > agora.getTime()).map((s) => s.profissional_id),
+    ].filter(Number.isInteger))].sort((a, b) => a - b);
+    for (const profissionalId of profissionais) await tx.$queryRaw`SELECT "id" FROM "funcionario" WHERE "id" = ${profissionalId} FOR UPDATE`;
+    const atual = await buscarAtendimento(tx, aluno_id, atendimento_id);
     const restricoes = restricoesAtendimento(atual, agora);
     if (!restricoes.pode_editar) throw Object.assign(new Error('Este atendimento já foi cancelado ou não permite edição após seu início.'), { statusCode: 409 });
     const eventual = atual.tipo_recorrencia === 'EVENTUAL';
@@ -468,10 +475,6 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
     const campos = Object.keys(dados).filter((campo) => JSON.stringify(campo === 'dias_semana' ? [...new Set(dados[campo])].sort() : completos[campo])
       !== JSON.stringify(campo === 'dias_semana' ? [...new Set(base[campo])].sort() : base[campo]));
     if (eventual && ['frequencia', 'dias_semana', 'data_termino'].some((c) => c in dados)) throw criarErroValidacao('Atendimentos eventuais não possuem configuração de recorrência.');
-    if (completos.profissional_id !== atual.profissional_id) {
-      const profissional = await tx.funcionario.findUnique({ where: { id: completos.profissional_id }, select: { pessoa: { select: { status_geral: true } } } });
-      if (!profissional || profissional.pessoa.status_geral !== 'ATIVO') throw criarErroValidacao('Selecione um profissional ativo.');
-    }
     const aluno = await tx.aluno.findUnique({ where: { id: aluno_id } });
     const status = obterStatusVinculo(aluno);
     const futuras = atual.sessoes.filter((s) => !s.data_cancelamento && s.status !== 'INATIVO' && inicioSessao(s) > agora.getTime());
@@ -479,6 +482,7 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
     const hora = converterHora(completos.hora_inicio);
     const diasProtegidos = new Set(atual.sessoes.filter((s) => !s.data_cancelamento && s.status !== 'INATIVO' && inicioSessao(s) <= agora.getTime()).map((s) => s.data_sessao.getTime()));
     const datas = mudouAgenda ? gerarDatasSessoes(completos).filter((d) => obterInicioSessao(d, hora) > agora.getTime() && !diasProtegidos.has(d.getTime())) : futuras.map((s) => s.data_sessao);
+    if (datas.length || campos.includes('profissional_id')) await bloquearProfissionalAtivo(tx, completos.profissional_id);
     if (eventual || campos.includes('data_inicio')) validarInicioNaoPassado(completos.data_inicio, completos.hora_inicio);
     if (mudouAgenda && !restricoes.possui_sessoes_iniciadas && !datas.length) throw criarErroValidacao('Não há sessões futuras na configuração informada.');
     if (restricoes.possui_sessoes_iniciadas && completos.data_termino) {

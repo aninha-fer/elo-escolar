@@ -10,6 +10,7 @@ function resposta() {
     return { status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
 }
 function simular(t, pessoa, falhaCriacao) {
+    simularTransacao(t);
     for (const [entidade, metodo, fn] of [
         ['pessoa', 'findUnique', async ({ where }) => { assert.equal(where.id, 50); return pessoa; }],
         ['usuario', 'findFirst', async () => null],
@@ -26,6 +27,14 @@ function simular(t, pessoa, falhaCriacao) {
         prisma[entidade][metodo] = t.mock.fn(fn);
     }
     t.mock.method(argon2, 'hash', async () => 'hash-simulado');
+}
+
+function simularTransacao(t) {
+    const originais = [prisma.$transaction, prisma.$queryRaw, prisma.funcionario.findUnique];
+    t.after(() => { [prisma.$transaction, prisma.$queryRaw, prisma.funcionario.findUnique] = originais; });
+    prisma.$transaction = async (callback) => callback(prisma);
+    prisma.$queryRaw = async () => [];
+    prisma.funcionario.findUnique = async () => null;
 }
 
 test('pessoa com conta recebe 409 e mensagem associada ao código, sem gerar senha ou gravar', async (t) => {
@@ -100,6 +109,7 @@ test('busca por nome removida não permanece disponível na API de usuários', a
 });
 
 function simularEdicao(t, { existe = true, emailDuplicado = false, falha, status = 'ATIVO', statusPessoa = 'ATIVO' } = {}) {
+    simularTransacao(t);
     const salvo = { id: 7, pessoa_id: 50, email: conta.email, role: 'professor', status, pessoa: { nome: 'Maria', status_geral: statusPessoa } };
     for (const [metodo, fn] of [
         ['findUnique', async ({ where }) => { assert.deepEqual(where, { id: 7 }); return existe ? salvo : null; }],

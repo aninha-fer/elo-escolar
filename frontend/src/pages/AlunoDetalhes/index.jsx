@@ -271,7 +271,7 @@ export function AlunoDetalhes() {
                 {abaAtiva === 'atendimentos' && (
                     <Atendimentos atendimentos={atendimentos} idAluno={id} statusAluno={aluno?.status} onSuccess={atualizarDados} permissao={podeEditar}/>
                 )}
-                {abaAtiva === 'ocorrencias' && <Ocorrencias key={id} ocorrencias={ocorrencias} idAluno={id}
+                {abaAtiva === 'ocorrencias' && <Ocorrencias key={id} ocorrencias={ocorrencias} idAluno={id} statusAluno={aluno?.status}
                     carregando={carregandoOcorrencias} erro={erroOcorrencias}
                     onSuccess={() => setVersaoOcorrencias((versao) => versao + 1)}
                     onTentarNovamente={() => setVersaoOcorrencias((versao) => versao + 1)} />}

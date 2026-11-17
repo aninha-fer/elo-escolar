@@ -90,6 +90,23 @@ export function Profissionais() {
         }
     }
 
+    async function confirmarExclusao() {
+        if (envioStatusEmAndamento.current || operacao?.tipo !== 'excluir') return;
+        envioStatusEmAndamento.current = true;
+        setAlterandoStatus(true);
+        setErroStatus('');
+        setConflitos([]);
+        try {
+            await profissionaisService.excluir(operacao.profissional.id);
+            setProfissionais((atuais) => atuais.filter((p) => p.id !== operacao.profissional.id));
+            setOperacao(null);
+            setAviso('Profissional excluído com sucesso.');
+        } catch (error) {
+            setErroStatus(error.response?.data?.erro || 'Não foi possível excluir o profissional. Tente novamente.');
+            setConflitos(error.response?.data?.conflitos ?? []);
+        } finally { envioStatusEmAndamento.current = false; setAlterandoStatus(false); }
+    }
+
     const termo = normalizarTexto(busca);
     const filtrados = profissionais.filter((profissional) => normalizarTexto(profissional.nome).includes(termo));
 
@@ -117,16 +134,26 @@ export function Profissionais() {
                     <button data-testid="profissionais-tentar-novamente" type="button" className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold" onClick={tentarNovamente}>Tentar novamente</button>
                 </div>
             ) : <TabelaProfissionais profissionais={filtrados} onEditar={(profissional) => abrirOperacao('editar', profissional)}
-                onAlterarStatus={(profissional) => abrirOperacao('status', profissional)} />}
+                onAlterarStatus={(profissional) => abrirOperacao('status', profissional)}
+                onExcluir={(profissional) => abrirOperacao('excluir', profissional)} />}
             {modalAberto && <FormularioProfissional onClose={() => setModalAberto(false)} onCriado={profissionalCriado} />}
             {operacao?.tipo === 'editar' && <FormularioProfissional key={operacao.profissional.id} profissional={operacao.profissional}
                 onClose={() => setOperacao(null)} onSalvo={(profissional) => profissionalAtualizado(profissional, 'Profissional atualizado com sucesso.')} />}
+            {operacao?.tipo === 'excluir' && <ModalConfirmacao testId="profissional-excluir" isOpen estado="atencao" showCancel
+                title="Excluir funcionário?" confirmText="Confirmar exclusão" onClose={fecharConfirmacao}
+                onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus}
+                description={<>Deseja excluir o funcionário <strong>{operacao.profissional.nome}</strong>? Essa ação não pode ser desfeita.
+                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}
+                        {conflitos.map((conflito, indice) => <span key={indice} className="mt-xs block">{conflito.mensagem}</span>)}
+                    </span>}
+                </>} />}
             {operacao?.tipo === 'status' && <ModalConfirmacao testId="profissional-alterar-status" isOpen onClose={fecharConfirmacao} showCancel
                 estado={operacao.profissional.status_geral === 'INATIVO' ? 'confirmacao' : 'atencao'}
                 title={operacao.profissional.status_geral === 'INATIVO' ? 'Ativar profissional?' : 'Inativar profissional?'}
                 description={<>
                     Deseja {operacao.profissional.status_geral === 'INATIVO' ? 'ativar' : 'inativar'} o profissional <strong>{operacao.profissional.nome}</strong>?
-                    {' '}O status da conta de usuário vinculada também será atualizado, se houver.
+                    {' '}O status da usuário vinculado também será atualizado, se houver.
+                    {operacao.profissional.status_geral !== 'INATIVO'}
                     {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}
                         {conflitos.map((conflito, indice) => <span key={indice} className="mt-xs block">{conflito.mensagem}</span>)}
                     </span>}

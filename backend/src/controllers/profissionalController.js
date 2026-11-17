@@ -1,5 +1,5 @@
 const { criarProfissionalDTO, editarProfissionalDTO, editarProfissionalParamsDTO } = require('../dtos/profissionalDTO');
-const { criarProfissionalService, listarProfissionaisService, editarProfissionalService } = require('../services/profissionalService');
+const { criarProfissionalService, listarProfissionaisService, editarProfissionalService, excluirProfissionalService } = require('../services/profissionalService');
 
 async function criarProfissional(req, res) {
   try {
@@ -44,8 +44,23 @@ async function editarProfissional(req, res) {
   }
 }
 
+async function excluirProfissional(req, res) {
+  try {
+    const { id } = editarProfissionalParamsDTO.parse(req.params);
+    await excluirProfissionalService(id);
+    return res.status(204).send();
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.isConflict) return res.status(409).json({ erro: error.message, conflitos: error.detalhes });
+    if (error.statusCode === 404) return res.status(404).json({ erro: error.message });
+    console.error('Erro ao excluir profissional.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Erro interno ao excluir profissional.' });
+  }
+}
+
 module.exports = {
   criarProfissional,
   listarProfissionais,
   editarProfissional,
+  excluirProfissional,
 };

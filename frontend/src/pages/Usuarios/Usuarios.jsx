@@ -91,6 +91,25 @@ export function Usuarios() {
         }
     }
 
+    async function confirmarExclusao() {
+        if (envioStatusEmAndamento.current || operacao?.tipo !== 'excluir') return;
+        envioStatusEmAndamento.current = true;
+        setAlterandoStatus(true);
+        setErroStatus('');
+        try {
+            await usuariosService.excluir(operacao.usuario.id);
+            setUsuarios((atuais) => atuais.filter((usuario) => usuario.id !== operacao.usuario.id));
+            setOperacao(null);
+            setAviso('Usuário excluído com sucesso.');
+            if (operacao.usuario.id === usuarioAtual.id) await recarregarSessao();
+        } catch (error) {
+            setErroStatus(error.response?.data?.erro || 'Não foi possível excluir o usuário. Tente novamente.');
+        } finally {
+            envioStatusEmAndamento.current = false;
+            setAlterandoStatus(false);
+        }
+    }
+
     const busca = normalizarTexto(termoBusca);
     const filtrados = usuarios.filter((usuario) => normalizarTexto(usuario.nome).includes(busca) || normalizarTexto(usuario.email).includes(busca));
 
@@ -123,7 +142,8 @@ export function Usuarios() {
             ) : <TabelaUsuarios usuarios={filtrados}
                 onEditar={(usuario) => abrirOperacao('editar', usuario)}
                 onResetarSenha={(usuario) => abrirOperacao('senha', usuario)}
-                onAlterarStatus={(usuario) => abrirOperacao('status', usuario)} />}
+                onAlterarStatus={(usuario) => abrirOperacao('status', usuario)}
+                onExcluir={(usuario) => abrirOperacao('excluir', usuario)} />}
             {modalAberto && <FormularioUsuario onClose={() => setModalAberto(false)} onCriado={usuarioCriado} />}
             {operacao?.tipo === 'editar' && <EditarUsuario key={operacao.usuario.id} usuario={operacao.usuario}
                 onClose={() => setOperacao(null)} onSalvo={(usuario) => usuarioAtualizado(usuario, 'Usuário atualizado com sucesso.')} />}
@@ -140,6 +160,13 @@ export function Usuarios() {
                 </>}
                 confirmText={operacao.usuario.status === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}
                 onConfirm={confirmarStatus} isConfirmLoading={alterandoStatus} />}
+            {operacao?.tipo === 'excluir' && <ModalConfirmacao testId="usuario-excluir" isOpen onClose={fecharConfirmacao}
+                estado="atencao" showCancel title="Excluir usuário?"
+                description={<>
+                    Deseja excluir o usuário <strong>{operacao.usuario.nome}</strong>? Essa ação não pode ser desfeita.
+                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}</span>}
+                </>}
+                confirmText="Confirmar exclusão" onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus} />}
         </div>
     );
 }

@@ -25,7 +25,7 @@ function matricula(alteracoes = {}) {
   return {
     id: 30, aluno_id: 1, status: 'ATIVO', data_inicio: null, data_fim: null,
     turma: {
-      id: 40, nome: 'Música', tipo: 'OFICINA', status: 'ATIVO',
+      id: 40, nome: 'Música', tipo: 'OFICINA', status: 'ATIVO', deleted_at: null,
       ambiente: { nome: 'Sala 1' }, profissional: { pessoa: { nome: 'João' } },
       horarios: [{ id: 50, dia_semana: 1, hora_inicio: hora('10:00'), hora_fim: hora('11:00') }]
     },
@@ -38,7 +38,7 @@ function corresponde(registro, filtro) {
   return Object.entries(filtro).every(([campo, esperado]) => {
     if (campo === 'AND') return esperado.every((item) => corresponde(registro, item));
     if (campo === 'OR') return esperado.some((item) => corresponde(registro, item));
-    const atual = registro[campo];
+    const atual = campo === 'deleted_at' ? registro[campo] ?? null : registro[campo];
     if (esperado === null || typeof esperado !== 'object') return atual === esperado;
     if ('not' in esperado) return atual != null && atual !== esperado.not;
     if ('lt' in esperado) return atual !== null && atual < esperado.lt;

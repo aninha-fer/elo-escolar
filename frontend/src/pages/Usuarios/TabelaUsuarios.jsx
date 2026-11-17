@@ -1,6 +1,7 @@
 import { BotaoAcoes } from "../../components/BotaoAcoes";
 import EditIcon from "../../components/icons/EditIcon";
 import { KeyIcon } from "../../components/icons/KeyIcon";
+import { TrashIcon } from "../../components/icons/TrashIcon";
 import { formatarStatus } from '../../utils/formatters';
 
 const coresStatus = {
@@ -8,7 +9,7 @@ const coresStatus = {
     INATIVO: 'bg-slate-100 text-slate-400 before:bg-slate-400',
 };
 
-export function TabelaUsuarios({ usuarios = [], onEditar, onResetarSenha, onAlterarStatus }) {
+export function TabelaUsuarios({ usuarios = [], onEditar, onResetarSenha, onAlterarStatus, onExcluir }) {
     const perfis = {
         admin: { nome: 'Administrador', estilo: 'bg-emerald-50 text-emerald-600 before:bg-emerald-600' },
         professor: { nome: 'Professor', estilo: 'bg-slate-100 text-slate-500 before:bg-slate-400' },
@@ -69,8 +70,12 @@ export function TabelaUsuarios({ usuarios = [], onEditar, onResetarSenha, onAlte
                                                 id: 'reset', label: 'Resetar senha', disabled: !ativo || !onResetarSenha, onClick: () => onResetarSenha(usuario), icon: <KeyIcon/>
                                             },
                                             {
-                                                id: 'status', label: inativo ? 'Ativar usuário' : 'Inativar usuário', textColor: inativo ? '#059669' : '#DC2626',
+                                                id: 'status', label: inativo ? 'Ativar usuário' : 'Inativar usuário',
                                                 disabled: (!ativo && !inativo) || !onAlterarStatus, onClick: () => onAlterarStatus(usuario)
+                                            },
+                                            {
+                                                id: 'excluir', label: 'Excluir', textColor: '#DC2626',
+                                                disabled: !onExcluir, onClick: () => onExcluir(usuario), icon: <TrashIcon />
                                             },
                                         ]}
                                     />

@@ -1,0 +1,1 @@
+ALTER TABLE "turma" ADD COLUMN "deleted_at" TIMESTAMPTZ(3);

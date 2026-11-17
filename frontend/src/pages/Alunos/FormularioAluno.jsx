@@ -408,7 +408,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             value={formulario.turma_id}
                             onChange={(event) => atualizarCampo('turma_id', event.target.value)}
                             placeholder="Sem turma regular"
-                            disabled={!formulario.turno}
+                            disabled={!formulario.turno || aluno?.status === 'INATIVO'}
                             options={[
                                 ...(turmaAtual?.status === 'INATIVO' && turmaAtual.turno === formulario.turno
                                     ? [{ value: turmaAtual.id, label: `${turmaAtual.nome} — Inativa`, disabled: true }] : []),

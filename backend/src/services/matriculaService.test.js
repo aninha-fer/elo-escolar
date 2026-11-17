@@ -11,7 +11,7 @@ function corresponde(registro, filtro) {
     return Object.entries(filtro).every(([campo, esperado]) => {
         if (campo === 'AND') return esperado.every((item) => corresponde(registro, item));
         if (campo === 'OR') return esperado.some((item) => corresponde(registro, item));
-        const atual = registro[campo];
+    const atual = campo === 'deleted_at' ? registro[campo] ?? null : registro[campo];
         if (esperado === null || typeof esperado !== 'object') return atual === esperado;
         if ('not' in esperado) return atual != null && atual !== esperado.not;
         if ('in' in esperado) return esperado.in.includes(atual);
@@ -56,7 +56,7 @@ function simularBanco(t, {
     t.mock.timers.enable({ apis: ['Date'], now: new Date(agora) });
     const estado = { transacoes: [], matriculas: [], sessoes: [], atendimentos: [], eventos: [], atualizacoes: new Map() };
     const listarMatriculas = () => [...matriculas, ...estado.matriculas]
-        .map((item) => ({ ...item, ...estado.atualizacoes.get(item.id) }));
+        .map((item) => ({ aluno: aluno ? { deleted_at: null, ...aluno } : null, ...item, ...estado.atualizacoes.get(item.id) }));
     estado.listarMatriculas = listarMatriculas;
     let fila = Promise.resolve();
     const original = prisma.$transaction;
@@ -68,6 +68,7 @@ function simularBanco(t, {
         let liberar;
         const tx = {
             $queryRaw: t.mock.fn(async (sql, id) => {
+                if (sql.join('?').includes('FROM "funcionario"')) return [];
                 if (sql.join('?').includes('FROM "turma"')) {
                     assert.ok(oficinas.some((item) => item.id === id));
                     return [];
@@ -80,6 +81,7 @@ function simularBanco(t, {
                 estado.eventos.push('bloqueio');
                 return [];
             }),
+            funcionario: { findUnique: async () => ({ pessoa: { status_geral: 'ATIVO' } }) },
             aluno: { findUnique: t.mock.fn(async () => {
                 estado.eventos.push('aluno');
                 return aluno;

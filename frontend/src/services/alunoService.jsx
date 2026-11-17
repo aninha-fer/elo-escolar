@@ -1,6 +1,13 @@
 import { api } from './api';
 
 export const alunoService = {
+  async excluir(id) {
+    await api.delete(`/alunos/${id}`);
+  },
+  async alterarStatus(id, status) {
+    const { data } = await api.patch(`/alunos/${id}/status`, { status });
+    return data;
+  },
   async editar(id, dadosAluno) {
     const { data } = await api.patch(`/alunos/${id}`, dadosAluno);
     return data;

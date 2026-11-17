@@ -6,10 +6,12 @@ const camposPublicos = {
     email: true,
     role: true,
     status: true,
+    deleted_at: true,
     pessoa: {
         select: {
             nome: true,
-            status_geral: true
+            status_geral: true,
+            funcionario: { select: { deleted_at: true } },
         }
     },
 };
@@ -38,7 +40,8 @@ async function verificarCredenciais({ email, senha }) {
     const hash = usuario?.senha_hash ?? (await hashFicticio);
     const senhaCorreta = await argon2.verify(hash, senha);
 
-    if (!senhaCorreta || usuario?.status !== 'ATIVO' || usuario?.pessoa.status_geral !== 'ATIVO') {
+    if (!senhaCorreta || !usuario?.senha_hash || usuario.deleted_at || usuario.pessoa.funcionario?.deleted_at
+        || usuario.status !== 'ATIVO' || usuario.pessoa.status_geral !== 'ATIVO') {
         return null;
     }
 
@@ -51,7 +54,8 @@ async function buscarIdentidadePorId(id) {
         select: camposPublicos,
     });
 
-    if (usuario?.status !== 'ATIVO' || usuario?.pessoa.status_geral !== 'ATIVO') {
+    if (!usuario || usuario.deleted_at || usuario.pessoa.funcionario?.deleted_at
+        || usuario.status !== 'ATIVO' || usuario.pessoa.status_geral !== 'ATIVO') {
         return null;
     }
 

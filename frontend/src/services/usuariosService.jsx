@@ -13,4 +13,7 @@ export const usuariosService = {
         const { data } = await api.patch(`/usuarios/${id}`, dadosUsuario);
         return data;
     },
+    async excluir(id) {
+        await api.delete(`/usuarios/${id}`);
+    },
 };
