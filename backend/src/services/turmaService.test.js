@@ -17,7 +17,8 @@ function simularTransacao(t, { cargo = 'Professor', profissionalExiste = true, s
     prisma.$transaction = t.mock.fn(async (callback, options) => {
         assert.equal(options.isolationLevel, 'ReadCommitted');
         const resultado = await callback({
-            funcionario: { findUnique: async () => profissionalExiste ? { cargo } : null },
+            $queryRaw: async () => [],
+            funcionario: { findUnique: async () => profissionalExiste ? { cargo, pessoa: { status_geral: 'ATIVO' } } : null },
             ambiente: { findUnique: async () => salaExiste ? { id: 2 } : null },
             turma: {
                 create: async ({ data }) => { estado.gravacoes++; pendente = { id: 10, ...data }; return pendente; },
@@ -117,6 +118,9 @@ function resposta() {
 }
 
 function simularConsultaTurma(t, consultar) {
+    const buscarMatriculas = prisma.matricula_turma.findMany;
+    t.after(() => { prisma.matricula_turma.findMany = buscarMatriculas; });
+    prisma.matricula_turma.findMany = async () => [];
     const original = prisma.turma.findUnique;
     t.after(() => { prisma.turma.findUnique = original; });
     prisma.turma.findUnique = t.mock.fn(consultar);
@@ -132,8 +136,8 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
             profissional: { id: 2, cargo: 'Professor', pessoa: { nome: 'Maria' } }, ano_letivo: 2026,
             status: 'ATIVO', created_at: new Date('2026-01-01T00:00:00.000Z'), horarios: [horario] };
         simularConsultaTurma(t, async ({ where, select }) => {
-            assert.deepEqual(where, { id: 10 });
-            assert.deepEqual(select.matriculas.where, { status: 'ATIVO' });
+            assert.deepEqual(where, { id: 10, deleted_at: null });
+            assert.deepEqual(select.matriculas.where, { status: 'ATIVO', aluno: { deleted_at: null } });
             assert.deepEqual(select.matriculas.orderBy, [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }]);
             assert.deepEqual(select.matriculas.select, { aluno: { select: {
                 id: true, dias_frequencia: true, pessoa: { select: { nome: true } }
@@ -143,7 +147,8 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
             assert.deepEqual(select.ambiente, { select: { id: true, nome: true } });
             return { ...dados, matriculas: [{ aluno }] };
         });
-        assert.deepEqual(await obterTurmaService(10), { ...dados, possui_matriculas: true, alunos: [aluno] });
+        assert.deepEqual(await obterTurmaService(10), { ...dados, possui_matriculas: true, alunos: [aluno],
+            matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
     });
 }
 
@@ -180,13 +185,13 @@ test('controller valida ID antes de consultar e responde 400 para valores invál
 
 test('controller responde 200 convertendo o ID da URL para número', async (t) => {
     simularConsultaTurma(t, async ({ where }) => {
-        assert.deepEqual(where, { id: 12 });
+        assert.deepEqual(where, { id: 12, deleted_at: null });
         return { id: 12, horarios: [], matriculas: [] };
     });
     const res = resposta();
     await obterTurma({ params: { id: '12' } }, res);
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, { id: 12, horarios: [], possui_matriculas: false, alunos: [] });
+    assert.deepEqual(res.body, { id: 12, horarios: [], possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
 });
 
 test('erro do banco retorna 500 sem expor detalhes internos', async (t) => {
@@ -221,7 +226,7 @@ test('GET /api/turmas/:id respeita permissão de leitura e não captura /turmas/
     for (const [role, codigo] of [[null, 401], ['outro', 403], ['professor', 200], ['admin', 200]]) {
         const response = await fetch(`${base}/1`, { headers: role ? { 'x-test-role': role } : {} });
         assert.equal(response.status, codigo);
-        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], possui_matriculas: false, alunos: [] });
+        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
     }
     assert.equal(consultar.mock.callCount(), 2);
     const regulares = await fetch(`${base}/regulares`, { headers: { 'x-test-role': 'professor' } });

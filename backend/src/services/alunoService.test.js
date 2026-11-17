@@ -31,6 +31,9 @@ function corresponde(registro, filtro) {
 
 function simularBanco(t, registros, agora = '2026-10-26T20:30:00.000Z') {
   t.mock.timers.enable({ apis: ['Date'], now: new Date(agora) });
+  const alunoOriginal = prisma.aluno.findUnique;
+  t.after(() => { prisma.aluno.findUnique = alunoOriginal; });
+  prisma.aluno.findUnique = async () => ({ id: 1, deleted_at: null });
   const original = prisma.atendimento_clinico.findMany;
   t.after(() => { prisma.atendimento_clinico.findMany = original; });
   const consulta = t.mock.fn(async ({ where, orderBy }) =>

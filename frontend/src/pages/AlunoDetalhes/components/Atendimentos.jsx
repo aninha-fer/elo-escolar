@@ -53,7 +53,7 @@ export function Atendimentos({ atendimentos = [], idAluno, statusAluno, onSucces
         <section className="overflow-hidden rounded-md border border-gray-300 bg-bg-surface">
             <header className="flex items-center justify-between gap-md border-b border-gray-300 px-lg py-md">
                 <h2 className="text-base font-bold text-text-main">Atendimentos Clínicos ({atendimentos.length})</h2>
-                {permissao && <Button data-testid="aluno-atendimentos-novo" disabled={carregando || cancelando || statusAluno === 'INATIVO'} onClick={() => { setErro(''); setOperacao({ tipo: 'criar' }); }}>
+                {permissao && <Button data-testid="aluno-atendimentos-novo" tooltip={statusAluno === 'INATIVO' ? 'Este aluno está inativo.' : undefined} disabled={carregando || cancelando || statusAluno === 'INATIVO'} onClick={() => { setErro(''); setOperacao({ tipo: 'criar' }); }}>
                     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                     Novo Atendimento
                 </Button>}

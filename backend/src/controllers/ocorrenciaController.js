@@ -3,7 +3,7 @@ const service = require('../services/ocorrenciaService');
 
 function tratarErro(error, res) {
     if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
-    if ([400, 404].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
     if (error.code === 'P2025') return res.status(404).json({ erro: 'Ocorrência não encontrada.' });
     console.error('Erro ao processar ocorrência.', { nome: error.name, codigo: error.code });
     return res.status(500).json({ erro: 'Não foi possível processar a ocorrência.' });

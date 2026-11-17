@@ -12,6 +12,9 @@ function normalizarProfissional(profissional) {
 }
 
 export const profissionaisService = {
+    async excluir(id) {
+        await api.delete(`/profissionais/${id}`);
+    },
     async listarTodos(signal) {
         const { data } = await api.get('/profissionais', { signal });
         return data.map(normalizarProfissional);

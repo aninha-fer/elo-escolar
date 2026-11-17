@@ -1,6 +1,9 @@
 import { api } from './api';
 
 export const turmasService = {
+  async excluir(id, dados) {
+    await api.delete(`/turmas/${id}`, { data: dados });
+  },
   async editar(id, dadosTurma) {
     const { data } = await api.patch(`/turmas/${id}`, dadosTurma);
     return data;

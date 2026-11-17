@@ -5,7 +5,7 @@ const { fimMatricula, agoraInstituicao } = require('./encerramentoAtividade');
 const DIA_MS = 86400000;
 
 function obterStatusVinculo(aluno) {
-    if (!aluno || !['ATIVO', 'RASCUNHO'].includes(aluno.status)) {
+    if (!aluno || aluno.deleted_at || !['ATIVO', 'RASCUNHO'].includes(aluno.status)) {
         const erro = new Error('Aluno não encontrado ou inativo.');
         erro.statusCode = 404;
         throw erro;
@@ -19,13 +19,13 @@ async function bloquearTurmas(tx, ids) {
     }
 }
 
-async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }) {
+async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }, { dataInicio } = {}) {
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
     const aluno = await tx.aluno.findUnique({ where: { id: aluno_id } });
     const status = obterStatusVinculo(aluno);
     await bloquearTurmas(tx, [turma_id]);
     const turma = await tx.turma.findUnique({ where: { id: turma_id }, include: { horarios: true } });
-    if (!turma || turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
+    if (!turma || turma.deleted_at || turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
         const erro = new Error('A turma regular informada não existe ou está inativa.');
         erro.statusCode = 400;
         throw erro;
@@ -49,7 +49,7 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }) {
         erro.detalhes = detalhes;
         throw erro;
     }
-    return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: status === 'ATIVO' ? obterDataInicioMatricula() : null } });
+    return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: status === 'ATIVO' ? dataInicio ?? obterDataInicioMatricula() : null } });
 }
 
 async function matricularTurmaRegularService(dados) {
@@ -145,6 +145,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
         where: {
             id: { in: oficinas_ids },
             tipo: 'OFICINA',
+            deleted_at: null,
             status: 'ATIVO'
         },
         include: { horarios: true }
@@ -336,7 +337,7 @@ async function cancelarOficinaService({ aluno_id, matricula_id }) {
             id: true, aluno_id: true, turma_id: true, status: true, data_inicio: true, data_fim: true, turma: { select: { horarios: true } }
         };
         const matricula = await tx.matricula_turma.findFirst({
-            where: { id: matricula_id, aluno_id, turma: { tipo: 'OFICINA' } },
+            where: { id: matricula_id, aluno_id, aluno: { deleted_at: null }, turma: { tipo: 'OFICINA' } },
             select
         });
         if (!matricula) {
@@ -344,10 +345,10 @@ async function cancelarOficinaService({ aluno_id, matricula_id }) {
             erro.statusCode = 404;
             throw erro;
         }
-        if (matricula.status === 'INATIVO') {
+        if (matricula.status === 'INATIVO' && matricula.data_fim) {
             return { mensagem: 'A inscrição já está cancelada.', matricula };
         }
-        if (matricula.status !== 'ATIVO') {
+        if (!['ATIVO', 'INATIVO'].includes(matricula.status)) {
             const erro = new Error('Use a remoção de vínculo provisório para retirar esta inscrição do planejamento.');
             erro.statusCode = 409;
             throw erro;
@@ -367,7 +368,7 @@ async function removerMatriculaProvisoriaService({ aluno_id, matricula_id }) {
     return prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
         const matricula = await tx.matricula_turma.findFirst({
-            where: { id: matricula_id, aluno_id }, include: { aluno: { select: { status: true } } }
+            where: { id: matricula_id, aluno_id, aluno: { deleted_at: null } }, include: { aluno: { select: { status: true } } }
         });
         if (!matricula) {
             const erro = new Error('Matrícula não encontrada para este aluno.');

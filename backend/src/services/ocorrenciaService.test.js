@@ -15,7 +15,19 @@ function resposta() {
 function simular(t) {
     t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-16T01:30:00Z') });
     simularMetodo(t, prisma.aluno, 'findUnique', async () => ({ id: 10 }));
+    simularMetodo(t, prisma, '$transaction', async (callback) => callback(prisma));
+    simularMetodo(t, prisma, '$queryRaw', async () => []);
 }
+
+test('criação de ocorrência rejeita aluno inativo sem gravar', async (t) => {
+    simular(t);
+    prisma.aluno.findUnique = async () => ({ id: 10, status: 'INATIVO' });
+    simularMetodo(t, prisma.ocorrencia_aluno, 'create', () => assert.fail('Não pode criar ocorrência para inativo.'));
+    const res = resposta();
+    await controller.criarOcorrencia({ params, body: dados, usuario: { id: 7 } }, res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body.erro, /inativo/);
+});
 
 function simularMetodo(t, objeto, campo, implementacao) {
     const original = objeto[campo];
@@ -105,6 +117,7 @@ test('PATCH de texto altera somente o texto e rejeita corpo vazio e data futura'
 });
 
 test('edição e exclusão de ocorrência de outro aluno retornam 404', async (t) => {
+    simular(t);
     simularMetodo(t, prisma.ocorrencia_aluno, 'findUnique', async () => null);
     simularMetodo(t, prisma.ocorrencia_aluno, 'deleteMany', async ({ where }) => {
         assert.deepEqual(where, { id: 20, aluno_id: 10 });
@@ -118,6 +131,7 @@ test('edição e exclusão de ocorrência de outro aluno retornam 404', async (t
 });
 
 test('exclusão remove apenas a ocorrência indicada e retorna 204', async (t) => {
+    simular(t);
     simularMetodo(t, prisma.ocorrencia_aluno, 'deleteMany', async () => ({ count: 1 }));
     const res = resposta();
     await controller.excluirOcorrencia({ params }, res);

@@ -95,4 +95,6 @@ const getAgendaQueryDTO = z.object({
     }, 'Data inválida.').optional()
 });
 
-module.exports = { criarAlunoDTO, editarAlunoDTO, getAgendaAlunoDTO, getAgendaQueryDTO, getAlunoDTO };
+const alterarStatusAlunoDTO = z.object({ status: z.enum(['ATIVO', 'INATIVO']) }).strict();
+
+module.exports = { criarAlunoDTO, editarAlunoDTO, alterarStatusAlunoDTO, getAgendaAlunoDTO, getAgendaQueryDTO, getAlunoDTO };

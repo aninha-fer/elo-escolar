@@ -1,4 +1,56 @@
 const prisma = require('../prismaClient');
+const { agoraInstituicao, inicioOcorrencia } = require('./encerramentoAtividade');
+
+async function bloquearProfissionalAtivo(tx, id) {
+    await tx.$queryRaw`SELECT "id" FROM "funcionario" WHERE "id" = ${id} FOR UPDATE`;
+    const profissional = await tx.funcionario.findUnique({ where: { id },
+        select: { id: true, cargo: true, deleted_at: true, pessoa: { select: { status_geral: true } } } });
+    if (!profissional || profissional.deleted_at) throw Object.assign(new Error('Profissional não encontrado.'), { statusCode: 404 });
+    if (profissional.pessoa.status_geral !== 'ATIVO') throw Object.assign(new Error('Selecione um profissional ativo.'), { statusCode: 400 });
+    return profissional;
+}
+
+async function validarEncerramentoProfissional(tx, id, acao) {
+    const agora = agoraInstituicao();
+    const [turmas, sessoes] = await Promise.all([
+        tx.turma.findMany({ where: { profissional_id: id, status: 'ATIVO' }, select: { id: true, nome: true } }),
+        tx.atendimento_sessao.findMany({ where: {
+            status: 'ATIVO', data_cancelamento: null,
+            atendimento_clinico: { status: 'ATIVO', data_cancelamento: null },
+            OR: [{ profissional_id: id }, { atendimento_clinico: { profissional_id: id } }],
+        }, include: { atendimento_clinico: { select: { id: true, modalidade: true } } } }),
+    ]);
+    const vigentes = sessoes.filter((s) => inicioOcorrencia(s.data_sessao, s.hora_inicio) + s.duracao_minutos * 60000 > agora.getTime());
+    const atendimentos = [...new Map(vigentes.map((s) => [s.atendimento_clinico.id, s.atendimento_clinico])).values()];
+    if (turmas.length || atendimentos.length) {
+        throw Object.assign(new Error(`Não é possível ${acao} um profissional responsável por turmas ativas ou atendimentos ativos ainda não concluídos.`), {
+            isConflict: true,
+            detalhes: [
+                ...turmas.map((turma) => ({ codigo: 'TURMA_VINCULADA', turma_id: turma.id, mensagem: `Responsável pela turma ${turma.nome}.` })),
+                ...atendimentos.map((a) => ({ codigo: 'ATENDIMENTO_VINCULADO', atendimento_id: a.id, mensagem: `Responsável pelo atendimento ${a.modalidade} (código ${a.id}).` })),
+            ],
+        });
+    }
+    return agora;
+}
+
+async function cancelarPlanejamentoProfissional(tx, id, agora) {
+    const atendimentos = await tx.atendimento_clinico.findMany({ where: {
+        status: 'PROVISORIO', data_cancelamento: null,
+        OR: [{ profissional_id: id }, { sessoes: { some: { profissional_id: id, status: 'PROVISORIO', data_cancelamento: null } } }],
+    }, include: { sessoes: true } });
+    const relacionados = atendimentos.filter((a) => a.profissional_id === id || a.sessoes.some((s) =>
+        s.profissional_id === id && s.status === 'PROVISORIO' && !s.data_cancelamento && inicioOcorrencia(s.data_sessao, s.hora_inicio) > agora.getTime()));
+    const hoje = new Date(agora); hoje.setUTCHours(0, 0, 0, 0);
+    const futuras = relacionados.flatMap((a) => a.sessoes.filter((s) => s.status === 'PROVISORIO' && !s.data_cancelamento
+        && inicioOcorrencia(s.data_sessao, s.hora_inicio) > agora.getTime()).map((s) => s.id));
+    if (relacionados.length) await tx.atendimento_clinico.updateMany({
+        where: { id: { in: relacionados.map((a) => a.id) }, status: 'PROVISORIO', data_cancelamento: null }, data: { data_cancelamento: hoje },
+    });
+    if (futuras.length) await tx.atendimento_sessao.updateMany({
+        where: { id: { in: futuras }, status: 'PROVISORIO', data_cancelamento: null }, data: { data_cancelamento: hoje },
+    });
+}
 
 async function criarProfissionalService(dadosProfissional) {
     const { nome, telefone, email, cargo } = dadosProfissional;
@@ -46,6 +98,7 @@ async function criarProfissionalService(dadosProfissional) {
 
 async function listarProfissionaisService() {
     const profissionais = await prisma.funcionario.findMany({
+        where: { deleted_at: null },
         select: {
             id: true,
             pessoa_id: true,
@@ -72,9 +125,9 @@ async function editarProfissionalService(id, dados) {
         await tx.$queryRaw`SELECT "id" FROM "funcionario" WHERE "id" = ${id} FOR UPDATE`;
         const profissional = await tx.funcionario.findUnique({
             where: { id },
-            select: { id: true, pessoa_id: true, pessoa: { select: { status_geral: true } } }
+            select: { id: true, pessoa_id: true, deleted_at: true, pessoa: { select: { status_geral: true } } }
         });
-        if (!profissional) {
+        if (!profissional || profissional.deleted_at) {
             throw Object.assign(new Error('Profissional não encontrado.'), { statusCode: 404 });
         }
         if (profissional.pessoa.status_geral === 'INATIVO' &&
@@ -82,19 +135,8 @@ async function editarProfissionalService(id, dados) {
             throw Object.assign(new Error('Ative o profissional antes de editar seus dados.'), { statusCode: 409 });
         }
         if (dados.status_geral === 'INATIVO') {
-            const [turmas, atendimentos] = await Promise.all([
-                tx.turma.findMany({ where: { profissional_id: id }, select: { id: true, nome: true } }),
-                tx.atendimento_clinico.findMany({ where: { profissional_id: id }, select: { id: true, modalidade: true } }),
-            ]);
-            if (turmas.length || atendimentos.length) {
-                const erro = new Error('Não é possível inativar um profissional responsável por turmas ou atendimentos.');
-                erro.isConflict = true;
-                erro.detalhes = [
-                    ...turmas.map((turma) => ({ codigo: 'TURMA_VINCULADA', turma_id: turma.id, mensagem: `Responsável pela turma ${turma.nome}.` })),
-                    ...atendimentos.map((atendimento) => ({ codigo: 'ATENDIMENTO_VINCULADO', atendimento_id: atendimento.id, mensagem: `Responsável pelo atendimento ${atendimento.modalidade} (código ${atendimento.id}).` })),
-                ];
-                throw erro;
-            }
+            const agora = await validarEncerramentoProfissional(tx, id, 'inativar');
+            await cancelarPlanejamentoProfissional(tx, id, agora);
         }
         const dadosPessoa = {
             ...(dados.nome !== undefined ? { nome: dados.nome } : {}),
@@ -108,7 +150,7 @@ async function editarProfissionalService(id, dados) {
             await tx.funcionario.update({ where: { id }, data: { cargo: dados.cargo } });
         }
         if (dados.status_geral !== undefined) {
-            await tx.usuario.updateMany({ where: { pessoa_id: profissional.pessoa_id }, data: { status: dados.status_geral } });
+            await tx.usuario.updateMany({ where: { pessoa_id: profissional.pessoa_id, deleted_at: null }, data: { status: dados.status_geral } });
         }
         const atualizado = await tx.funcionario.findUnique({
             where: { id },
@@ -121,8 +163,24 @@ async function editarProfissionalService(id, dados) {
     }, { isolationLevel: 'ReadCommitted' });
 }
 
+async function excluirProfissionalService(id) {
+    return prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "funcionario" WHERE "id" = ${id} FOR UPDATE`;
+        const profissional = await tx.funcionario.findUnique({ where: { id }, select: { id: true, pessoa_id: true, deleted_at: true } });
+        if (!profissional || profissional.deleted_at) throw Object.assign(new Error('Profissional não encontrado.'), { statusCode: 404 });
+        const agora = await validarEncerramentoProfissional(tx, id, 'excluir');
+        await cancelarPlanejamentoProfissional(tx, id, agora);
+        const deleted_at = new Date();
+        await tx.pessoa.update({ where: { id: profissional.pessoa_id }, data: { telefone: null, data_nascimento: null, status_geral: 'INATIVO' } });
+        await tx.usuario.updateMany({ where: { pessoa_id: profissional.pessoa_id, deleted_at: null }, data: { deleted_at, email: null, senha_hash: null, status: 'INATIVO' } });
+        await tx.funcionario.update({ where: { id }, data: { deleted_at } });
+    }, { isolationLevel: 'ReadCommitted' });
+}
+
 module.exports = {
     criarProfissionalService,
     listarProfissionaisService,
     editarProfissionalService,
+    excluirProfissionalService,
+    bloquearProfissionalAtivo,
 };

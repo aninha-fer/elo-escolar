@@ -155,10 +155,11 @@ function simularBanco(t, {
   const tx = {
     $queryRaw: t.mock.fn(async (sql, id) => {
       eventos.push('bloqueio');
-      assert.match(sql.join('?'), /SELECT "id" FROM "aluno" WHERE "id" = \? FOR UPDATE/);
-      assert.equal(id, dadosBase.aluno_id);
+      assert.match(sql.join('?'), /SELECT "id" FROM "(aluno|funcionario)" WHERE "id" = \? FOR UPDATE/);
+      assert.equal(id, sql.join('?').includes('FROM "funcionario"') ? dadosBase.profissional_id : dadosBase.aluno_id);
       return [];
     }),
+    funcionario: { findUnique: async () => ({ pessoa: { status_geral: 'ATIVO' } }) },
     aluno: { findUnique: t.mock.fn(async () => {
       eventos.push('aluno');
       return aluno ? { status: 'ATIVO', ...aluno } : aluno;
@@ -201,7 +202,7 @@ function verificarSemGravacao(tx) {
 test('cria atendimento e sessões após bloquear o aluno e consultar disponibilidade', async (t) => {
   const { tx, eventos } = simularBanco(t);
   assert.equal((await agendarAtendimentoService(dadosBase)).id, 99);
-  assert.deepEqual(eventos, ['bloqueio', 'aluno']);
+  assert.deepEqual(eventos, ['bloqueio', 'aluno', 'bloqueio']);
   assert.equal(tx.atendimento_clinico.create.mock.callCount(), 1);
   assert.deepEqual(tx.atendimento_sessao.createMany.mock.calls[0].arguments[0].data, [{
     atendimento_clinico_id: 99, profissional_id: 2, data_sessao: data('2026-10-26'),
@@ -426,6 +427,7 @@ test('duas criações simultâneas consultam a agenda após adquirir o bloqueio'
     const txConcorrente = {
       ...tx,
       async $queryRaw(...args) {
+        if (args[0].join('?').includes('FROM "funcionario"')) return tx.$queryRaw(...args);
         const anterior = fila;
         fila = new Promise((resolve) => { liberar = resolve; });
         await anterior;

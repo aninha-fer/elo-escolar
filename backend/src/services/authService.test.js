@@ -25,6 +25,9 @@ for (const [descricao, usuario, permitido] of [
     ['usuário inativo e pessoa ativa', { ...ativo, status: 'INATIVO' }, false],
     ['usuário ativo e pessoa inativa', { ...ativo, pessoa: { ...ativo.pessoa, status_geral: 'INATIVO' } }, false],
     ['usuário inexistente', null, false],
+    ['usuário excluído mesmo com status ativo', { ...ativo, deleted_at: new Date() }, false],
+    ['funcionário excluído mesmo com pessoa ativa', { ...ativo, pessoa: { ...ativo.pessoa, funcionario: { deleted_at: new Date() } } }, false],
+    ['conta excluída sem credenciais', { ...ativo, status: 'INATIVO', email: null, senha_hash: null, deleted_at: new Date() }, false],
 ]) {
     test(`autenticação e identidade respeitam ${descricao}`, async (t) => {
         simular(t, usuario);
@@ -37,6 +40,16 @@ for (const [descricao, usuario, permitido] of [
 test('usuário ativo continua bloqueado com senha incorreta', async (t) => {
     simular(t, ativo, false);
     assert.equal(await verificarCredenciais({ email: ativo.email, senha: 'senha-incorreta' }), null);
+});
+
+test('exclusão invalida sessão autenticada mesmo se os status forem restaurados indevidamente', async (t) => {
+    simular(t, { ...ativo, deleted_at: new Date() });
+    let destruida = false;
+    const req = { session: { usuarioId: 1, autenticadoEm: Date.now(), destroy(callback) { destruida = true; callback(); } } };
+    const res = { status(code) { this.code = code; return this; }, json() { return this; }, clearCookie() {} };
+    await requireAuth(req, res, () => assert.fail('Conta excluída não pode acessar a API.'));
+    assert.equal(destruida, true);
+    assert.equal(res.code, 401);
 });
 
 test('inativação invalida a sessão na próxima requisição e reativação permite novo login', async (t) => {

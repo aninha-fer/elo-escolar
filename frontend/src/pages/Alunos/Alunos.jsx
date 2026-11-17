@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FiltroEstado } from "../../components/FiltroEstado";
 import { Button } from "../../components/Button";
 import { TabelaAlunos } from "./TabelaAlunos";
@@ -6,6 +6,7 @@ import { alunoService } from '../../services/alunoService';
 import { Input } from "../../components/Input";
 import { FormularioAluno } from './FormularioAluno';
 import { useAuth } from '../../contexts/AuthContext';
+import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
 function normalizarTexto(valor = '') {
     return String(valor)
@@ -22,6 +23,15 @@ export function Alunos() {
     const [erroEdicao, setErroEdicao] = useState('');
     const [carregandoEdicao, setCarregandoEdicao] = useState(false);
     const [tentativa, setTentativa] = useState(0);
+    const [alunoStatus, setAlunoStatus] = useState(null);
+    const [alterandoStatus, setAlterandoStatus] = useState(false);
+    const [erroStatus, setErroStatus] = useState('');
+    const [aviso, setAviso] = useState('');
+    const envioStatus = useRef(false);
+    const [alunoExclusao, setAlunoExclusao] = useState(null);
+    const [excluindo, setExcluindo] = useState(false);
+    const [erroExclusao, setErroExclusao] = useState('');
+    const envioExclusao = useRef(false);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -99,6 +109,49 @@ export function Alunos() {
     function fecharModal() { setIsModalOpen(false); setAlunoEdicao(null); }
     function alunoSalvo() { fecharModal(); setTentativa((v) => v + 1); }
 
+    function abrirStatus(aluno) {
+        setErroStatus('');
+        setAviso('');
+        setAlunoStatus(aluno);
+    }
+
+    async function confirmarStatus() {
+        if (envioStatus.current || !alunoStatus) return;
+        envioStatus.current = true;
+        setAlterandoStatus(true);
+        setErroStatus('');
+        const ativando = alunoStatus.status === 'INATIVO';
+        try {
+            await alunoService.alterarStatus(alunoStatus.id, ativando ? 'ATIVO' : 'INATIVO');
+            setAlunoStatus(null);
+            setAviso(ativando ? 'Aluno ativado com sucesso.' : 'Aluno inativado com sucesso.');
+            setTentativa((atual) => atual + 1);
+        } catch (error) {
+            setErroStatus(error.response?.data?.erro || 'Não foi possível alterar o status do aluno. Tente novamente.');
+        } finally { envioStatus.current = false; setAlterandoStatus(false); }
+    }
+
+    function abrirExclusao(aluno) {
+        setErroExclusao('');
+        setAviso('');
+        setAlunoExclusao(aluno);
+    }
+
+    async function confirmarExclusao() {
+        if (envioExclusao.current || !alunoExclusao) return;
+        envioExclusao.current = true;
+        setExcluindo(true);
+        setErroExclusao('');
+        try {
+            await alunoService.excluir(alunoExclusao.id);
+            setAlunoExclusao(null);
+            setAviso('Aluno excluído com sucesso.');
+            setTentativa((atual) => atual + 1);
+        } catch (error) {
+            setErroExclusao(error.response?.data?.erro || 'Não foi possível excluir o aluno. Tente novamente.');
+        } finally { envioExclusao.current = false; setExcluindo(false); }
+    }
+
     return (
         <div className="flex flex-col gap-lg">
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
@@ -163,7 +216,28 @@ export function Alunos() {
             </div>
             {carregandoEdicao && <p role="status">Carregando dados para edição...</p>}
             {erroEdicao && <p role="alert" className="text-sm text-red-700">{erroEdicao}</p>}
-            <TabelaAlunos alunos={alunosFiltrados} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined} />
+            {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
+            <TabelaAlunos alunos={alunosFiltrados} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
+                onAlterarStatus={podeEditar && !carregandoEdicao ? abrirStatus : undefined}
+                onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />
+            {podeEditar && alunoExclusao && <ModalConfirmacao testId="aluno-excluir" isOpen estado="atencao" showCancel
+                title="Excluir aluno?" confirmText="Confirmar exclusão" isConfirmLoading={excluindo} onConfirm={confirmarExclusao}
+                onClose={() => { if (!envioExclusao.current) setAlunoExclusao(null); }}
+                description={<>Deseja excluir o aluno <strong>{alunoExclusao.nome}</strong>? Essa ação não pode ser desfeita.
+                    {erroExclusao && <span role="alert" className="mt-md block text-sm text-red-700">{erroExclusao}</span>}
+                </>} />}
+            {podeEditar && alunoStatus && <ModalConfirmacao testId="aluno-alterar-status" isOpen
+                onClose={() => { if (!envioStatus.current) setAlunoStatus(null); }}
+                estado={alunoStatus.status === 'INATIVO' ? 'confirmacao' : 'atencao'} showCancel
+                title={alunoStatus.status === 'INATIVO' ? 'Ativar aluno?' : 'Inativar aluno?'}
+                confirmText={alunoStatus.status === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}
+                isConfirmLoading={alterandoStatus} onConfirm={confirmarStatus}
+                description={<>Deseja {alunoStatus.status === 'INATIVO' ? 'ativar' : 'inativar'} <strong>{alunoStatus.nome}</strong>?{' '}
+                    {alunoStatus.status === 'INATIVO'
+                        ? 'Ele voltará a ser elegível para turmas e atendimentos.'
+                        : 'As matrículas e os atendimentos serão encerrados.'}
+                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}</span>}
+                </>} />}
         </div>
     )
 }

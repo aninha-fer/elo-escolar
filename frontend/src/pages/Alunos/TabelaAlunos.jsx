@@ -2,8 +2,9 @@ import { BotaoAcoes } from '../../components/BotaoAcoes';
 import { useNavigate } from 'react-router-dom';
 import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/formatters';
 import EditIcon from '../../components/icons/EditIcon';
+import { TrashIcon } from '../../components/icons/TrashIcon';
 
-export function TabelaAlunos({ alunos = [], onAcao }) {
+export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, alterandoStatus = false }) {
     const navigate = useNavigate();
 
     const estilosStatus = {
@@ -111,9 +112,13 @@ export function TabelaAlunos({ alunos = [], onAcao }) {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    {onAcao && <div className="inline-flex" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                                        <BotaoAcoes testId={`aluno-${aluno.id}-acoes`} label={`Ações para ${nome}`} options={[
-                                            { id: 'editar', label: 'Editar', onClick: () => onAcao(aluno), icon: <EditIcon /> },
+                                    {(onAcao || onAlterarStatus || onExcluir) && <div className="inline-flex" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                                        <BotaoAcoes testId={`aluno-${aluno.id}-acoes`} label={`Ações para ${nome}`} disabled={alterandoStatus} options={[
+                                            { id: 'editar', label: 'Editar', disabled: !onAcao, onClick: () => onAcao?.(aluno), icon: <EditIcon /> },
+                                            { id: 'status', label: status === 'INATIVO' ? 'Ativar aluno' : 'Inativar aluno',
+                                                disabled: !onAlterarStatus, onClick: () => onAlterarStatus?.(aluno) },
+                                            { id: 'excluir', label: 'Excluir', textColor: '#DC2626', icon: <TrashIcon />,
+                                                disabled: !onExcluir, onClick: () => onExcluir?.(aluno) },
                                         ]} />
                                     </div>}
                                 </td>

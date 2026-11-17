@@ -23,13 +23,22 @@ function simular(t, opcoes = {}) {
         assert.equal(options.isolationLevel, 'ReadCommitted');
         const pendente = structuredClone(estado);
         const resultado = await callback({
-            $queryRaw: async (sql, id) => { assert.equal(id, 10); assert.ok(sql.join('?').includes('FOR UPDATE')); chamadas.push('bloqueio'); },
+            $queryRaw: async (sql, id) => { if (sql.join('?').includes('FROM "funcionario"')) assert.ok(Number.isInteger(id)); else assert.equal(id, 10); assert.ok(sql.join('?').includes('FOR UPDATE')); chamadas.push('bloqueio'); },
             turma: {
                 findUnique: async ({ where }) => { assert.equal(chamadas[0], 'bloqueio'); assert.deepEqual(where, { id: 10 });
                     return pendente.turma ? { ...pendente.turma, horarios: pendente.horarios } : null; },
                 update: async ({ data }) => { chamadas.push('turma'); Object.assign(pendente.turma, data); },
             },
-            matricula_turma: { groupBy: async ({ where, by }) => {
+            matricula_turma: {
+                findMany: async () => pendente.matriculas.map((status, indice) => ({ id: indice + 1, aluno_id: 10, turma_id: 10,
+                    status, data_inicio: null, data_fim: pendente.encerramentos?.[indice] ?? opcoes.fimProvisorio ?? null }))
+                    .filter((m) => m.status === 'ATIVO' || m.data_fim === null),
+                update: async ({ where, data }) => {
+                    pendente.encerramentos ??= {};
+                    pendente.encerramentos[where.id - 1] = data.data_fim;
+                    if (data.status) pendente.matriculas[where.id - 1] = data.status;
+                },
+                groupBy: async ({ where, by }) => {
                 assert.deepEqual(where, { turma_id: 10 }); assert.deepEqual(by, ['status', 'data_fim']);
                 return [...new Set(pendente.matriculas)].map((status) => ({ status, data_fim: opcoes.fimProvisorio ?? null, _count: { _all: pendente.matriculas.filter((item) => item === status).length } }));
             } },
@@ -99,16 +108,18 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
 }
 
 for (const tipo of ['REGULAR', 'OFICINA']) {
-    test(`${tipo}: matrícula ativa impede inativação mesmo junto de provisórios`, async (t) => {
+    test(`${tipo}: inativação exige confirmação quando há matrículas ativas e provisórias`, async (t) => {
         const banco = simular(t, { tipo, estado: { matriculas: ['ATIVO', 'PROVISORIO'] } });
         assert.equal((await editar({ status: 'INATIVO', ambiente_id: 2, nome: 'Não deve gravar' })).code, 409);
         assert.equal(banco.estado.turma.status, 'ATIVO'); assert.equal(banco.estado.turma.nome, 'Turma A');
     });
-    test(`${tipo}: somente provisórios permitem inativação sem encerrar as matrículas`, async (t) => {
+    test(`${tipo}: inativação confirmada encerra provisórios mantendo o status`, async (t) => {
         const banco = simular(t, { tipo, estado: { matriculas: ['PROVISORIO', 'PROVISORIO'] } });
-        assert.equal((await editar({ status: 'INATIVO' })).code, 200);
+        assert.equal((await editar({ status: 'INATIVO' })).code, 409);
+        assert.equal((await editar({ status: 'INATIVO', confirmar_cancelamentos: { matriculas: [1, 2], matriculas_ativas: 0 } })).code, 200);
         assert.equal(banco.estado.turma.status, 'INATIVO');
         assert.deepEqual(banco.estado.matriculas, ['PROVISORIO', 'PROVISORIO']);
+        assert.ok(Object.values(banco.estado.encerramentos).every((fim) => fim instanceof Date));
     });
 }
 
@@ -184,13 +195,17 @@ for (const [opcoes, body, esperado] of [
 }
 
 test('detalhe sinaliza histórico mesmo sem alunos com matrícula ativa', async (t) => {
+    const buscarMatriculas = prisma.matricula_turma.findMany;
+    t.after(() => { prisma.matricula_turma.findMany = buscarMatriculas; });
+    prisma.matricula_turma.findMany = async () => [];
     const original = prisma.turma.findUnique;
     t.after(() => { prisma.turma.findUnique = original; });
     prisma.turma.findUnique = async ({ select }) => {
         assert.deepEqual(select._count, { select: { matriculas: true } });
         return { id: 10, horarios: [], matriculas: [], _count: { matriculas: 1 } };
     };
-    assert.deepEqual(await obterTurmaService(10), { id: 10, horarios: [], alunos: [], possui_matriculas: true });
+    assert.deepEqual(await obterTurmaService(10), { id: 10, horarios: [], alunos: [], possui_matriculas: true,
+        matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
 });
 
 test('provisório encerrado permite inativação, mas ainda constitui histórico da turma', async (t) => {

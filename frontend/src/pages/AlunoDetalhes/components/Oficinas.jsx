@@ -183,7 +183,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAlu
                 <h2 className="text-base font-bold text-text-main">
                     Inscrições Ativas ({quantidadeAtivas})
                 </h2>
-                {permissao && <Button data-testid="aluno-oficinas-inscrever" onClick={abrirModal}>
+                {permissao && <Button data-testid="aluno-oficinas-inscrever" tooltip={statusAluno === 'INATIVO' ? 'Este aluno está inativo.' : undefined} onClick={abrirModal} disabled={statusAluno === 'INATIVO'}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M6.99365 2.914V11.0732" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M2.91406 6.99361H11.0733" stroke="white" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />

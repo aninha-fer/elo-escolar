@@ -1,6 +1,7 @@
 import { formatarStatus, formatarTelefone } from '../../utils/formatters';
 import { BotaoAcoes } from '../../components/BotaoAcoes';
 import EditIcon from '../../components/icons/EditIcon';
+import { TrashIcon } from '../../components/icons/TrashIcon';
 
 const coresFuncao = {
     Professor: 'bg-blue-50 text-blue-600',
@@ -17,7 +18,7 @@ function obterIniciais(nome) {
     return nome.trim().split(/\s+/).slice(0, 2).map((parte) => parte[0]).join('').toLocaleUpperCase('pt-BR');
 }
 
-export function TabelaProfissionais({ profissionais = [], onEditar, onAlterarStatus }) {
+export function TabelaProfissionais({ profissionais = [], onEditar, onAlterarStatus, onExcluir }) {
     return (
         <div className="w-full overflow-x-auto rounded-md border border-slate-200 bg-bg-surface shadow-sm">
             <table className="w-max min-w-full table-auto border-collapse text-left text-sm">
@@ -58,8 +59,10 @@ export function TabelaProfissionais({ profissionais = [], onEditar, onAlterarSta
                                 <td className="px-lg py-md text-right">
                                     <BotaoAcoes testId={`profissional-${profissional.id}-acoes`} label={`Ações para ${nome}`} options={[
                                         { id: 'editar', label: 'Editar', disabled: !ativo || !onEditar, onClick: () => onEditar(profissional), icon: <EditIcon/> },
-                                        { id: 'status', label: inativo ? 'Ativar profissional' : 'Inativar profissional', textColor: inativo ? '#059669' : '#DC2626',
+                                        { id: 'status', label: inativo ? 'Ativar profissional' : 'Inativar profissional',
                                             disabled: (!ativo && !inativo) || !onAlterarStatus, onClick: () => onAlterarStatus(profissional) },
+                                        { id: 'excluir', label: 'Excluir', textColor: '#DC2626', icon: <TrashIcon />,
+                                            disabled: !onExcluir, onClick: () => onExcluir?.(profissional) },
                                     ]} />
                                 </td>
                             </tr>

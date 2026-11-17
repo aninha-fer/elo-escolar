@@ -8,7 +8,7 @@ import { ocorrenciasService } from '../../../services/ocorrenciasService';
 import { formatarDataBR, formatarDataHoraInstituicao } from '../../../utils/formatters';
 import { FormularioOcorrencia } from './FormularioOcorrencia';
 
-export function Ocorrencias({ ocorrencias = [], idAluno, onSuccess, carregando, erro, onTentarNovamente }) {
+export function Ocorrencias({ ocorrencias = [], idAluno, statusAluno, onSuccess, carregando, erro, onTentarNovamente }) {
     const [operacao, setOperacao] = useState(null);
     const [excluindo, setExcluindo] = useState(false);
     const [erroExclusao, setErroExclusao] = useState('');
@@ -34,7 +34,7 @@ export function Ocorrencias({ ocorrencias = [], idAluno, onSuccess, carregando, 
         <header className="flex flex-wrap items-center justify-between gap-md border-b border-gray-300 px-lg py-md">
             <div><h2 className="text-base font-bold text-text-main">Ocorrências do aluno</h2>
                 <p className="mt-xs text-sm text-text-muted">Registro de situações relevantes observadas no dia a dia.</p></div>
-            <Button data-testid="aluno-ocorrencias-nova" onClick={() => setOperacao({ tipo: 'criar' })} disabled={excluindo}>
+            <Button data-testid="aluno-ocorrencias-nova" tooltip={statusAluno === 'INATIVO' ? 'Este aluno está inativo.' : undefined} onClick={() => setOperacao({ tipo: 'criar' })} disabled={excluindo || statusAluno === 'INATIVO'}>
                 <span aria-hidden="true">+</span> Nova ocorrência
             </Button>
         </header>

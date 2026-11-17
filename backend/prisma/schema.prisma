@@ -66,12 +66,13 @@ model aluno {
   id               Int          @id @default(autoincrement())
   pessoa_id        Int          @unique
   pessoa           pessoa       @relation(fields: [pessoa_id], references: [id])
-  turno            turno_padrao
-  participa_almoco Boolean      @default(false)
-  participa_procan Boolean      @default(false)
+  turno            turno_padrao?
+  participa_almoco Boolean?     @default(false)
+  participa_procan Boolean?     @default(false)
   observacoes      String?      @db.Text
   status           status_aluno @default(RASCUNHO)
   dias_frequencia  Int[]
+  deleted_at       DateTime?    @db.Timestamptz(3)
 
   matriculas_turmas     matricula_turma[]
   atendimentos_clinicos atendimento_clinico[]
@@ -111,6 +112,7 @@ model funcionario {
   pessoa_id Int    @unique
   pessoa    pessoa @relation(fields: [pessoa_id], references: [id])
   cargo     String
+  deleted_at DateTime? @db.Timestamptz(3)
 
   turmas                turma[]
   atendimentos_clinicos atendimento_clinico[]
@@ -121,10 +123,11 @@ model usuario {
   id         Int    @id @default(autoincrement())
   pessoa_id  Int    @unique
   pessoa     pessoa @relation(fields: [pessoa_id], references: [id])
-  email      String @unique
-  senha_hash String
+  email      String? @unique
+  senha_hash String?
   role       String
   status     status_simples @default(ATIVO)
+  deleted_at DateTime? @db.Timestamptz(3)
   ocorrencias ocorrencia_aluno[]
 }
 
@@ -163,6 +166,7 @@ model turma {
   profissional      funcionario  @relation(fields: [profissional_id], references: [id])
   ano_letivo        Int?
   status            status_simples       @default(ATIVO)
+  deleted_at        DateTime?    @db.Timestamptz(3)
   created_at        DateTime     @default(now()) @db.Timestamptz(3)
 
   horarios   turma_horario[]
