@@ -3,6 +3,10 @@ import { api } from './api';
 const tratarSessaoLocalmente = { tratarSessaoLocalmente: true };
 
 export const authService = {
+  async trocarSenhaInicial(dados) {
+    const { data } = await api.post('/auth/primeiro-acesso/senha', dados, tratarSessaoLocalmente);
+    return data;
+  },
   async login({ email, senha }) {
     const { data } = await api.post(
       '/auth/login',

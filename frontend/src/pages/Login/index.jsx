@@ -1,8 +1,12 @@
 import { LoginBrandPanel } from './components/LoginBrandPanel';
 import { LoginForm } from './components/LoginForm';
 import './login.css';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function Login() {
+    const { status, usuario } = useAuth();
+    if (status === 'autenticado') return <Navigate to={usuario.deve_trocar_senha ? '/primeiro-acesso' : '/'} replace />;
     return (
         <main className="login-page grid min-h-dvh bg-bg-main font-sans">
             <LoginBrandPanel />

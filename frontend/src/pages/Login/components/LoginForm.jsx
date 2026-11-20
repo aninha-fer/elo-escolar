@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { LoginIcon } from './LoginIcon';
 
 export function LoginForm() {
+    const location = useLocation();
+    const { entrar, avisoSessao } = useAuth();
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [mostrarSenha, setMostrarSenha] = useState(false);
     const [erros, setErros] = useState({});
-    const [aviso, setAviso] = useState('');
+    const [aviso, setAviso] = useState(location.state?.aviso || avisoSessao || '');
     const navigate = useNavigate();
-    const { entrar } = useAuth();
     const [enviando, setEnviando] = useState(false);
 
     function alterarCampo(campo, valor) {

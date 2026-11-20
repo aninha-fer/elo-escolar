@@ -93,6 +93,7 @@ async function criarUsuarioNaTransacao(tx, dados) {
         email: dados.email,
         role: dados.role,
         senha_hash: senhaHash,
+        deve_trocar_senha: true,
         status: 'ATIVO',
         pessoa,
       },
@@ -172,6 +173,8 @@ async function editarUsuarioNaTransacao(tx, id, dados) {
   };
   if (dados.senha !== undefined) {
     data.senha_hash = await argon2.hash(dados.senha, { type: argon2.argon2id });
+    data.deve_trocar_senha = true;
+    data.senha_versao = { increment: 1 };
   }
 
   try {

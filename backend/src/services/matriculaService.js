@@ -1,3 +1,5 @@
+const { sincronizarTurmasExpiradas } = require('./encerramentoTurmaService');
+const { bloquearCalendarios, inicioMatriculaRegular, diaLetivo, fimLetivo } = require('./calendarioLetivo');
 const prisma = require('../prismaClient');
 
 const { fimMatricula, agoraInstituicao } = require('./encerramentoAtividade');
@@ -24,12 +26,13 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }, { d
     const aluno = await tx.aluno.findUnique({ where: { id: aluno_id } });
     const status = obterStatusVinculo(aluno);
     await bloquearTurmas(tx, [turma_id]);
-    const turma = await tx.turma.findUnique({ where: { id: turma_id }, include: { horarios: true } });
+    const turma = await tx.turma.findUnique({ where: { id: turma_id }, include: { ano_letivo: true, horarios: true } });
     if (!turma || turma.deleted_at || turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
         const erro = new Error('A turma regular informada não existe ou está inativa.');
         erro.statusCode = 400;
         throw erro;
     }
+    const inicioRegular = inicioMatriculaRegular(turma, dataInicio);
     const detalhes = [];
     if (turma.turno !== aluno.turno) detalhes.push({ codigo: 'TURNO_INCOMPATIVEL', mensagem: 'O turno da turma regular deve coincidir com o turno do aluno.' });
     if (aluno.dias_frequencia.some((dia) => !turma.horarios.some((horario) => horario.dia_semana === dia))) {
@@ -49,11 +52,12 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }, { d
         erro.detalhes = detalhes;
         throw erro;
     }
-    return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: status === 'ATIVO' ? dataInicio ?? obterDataInicioMatricula() : null } });
+    return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: status === 'ATIVO' ? inicioRegular : null } });
 }
 
 async function matricularTurmaRegularService(dados) {
-    return prisma.$transaction((tx) => matricularTurmaRegularNaTransacao(tx, dados), { isolationLevel: 'ReadCommitted' });
+    await sincronizarTurmasExpiradas({ alunoIds: [dados.aluno_id] });
+    return prisma.$transaction(async (tx) => { await bloquearCalendarios(tx); return matricularTurmaRegularNaTransacao(tx, dados); }, { isolationLevel: 'ReadCommitted' });
 }
 
 function obterDataInicioMatricula() {
@@ -79,6 +83,7 @@ async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, st
             atendimento_clinico: { select: { modalidade: true } }
         }
     });
+    const calendarios = await tx.ano_letivo.findMany();
     const conflitos = [];
     for (const sessao of sessoes) {
         const inicioSessao = obterInicio(sessao.data_sessao, sessao.hora_inicio);
@@ -93,9 +98,11 @@ async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, st
                 dia.setUTCDate(dia.getUTCDate() + (horario.dia_semana - (dia.getUTCDay() || 7) + 7) % 7);
 
                 for (; dia.getTime() < fimSessao; dia.setUTCDate(dia.getUTCDate() + 7)) {
+                    if (!diaLetivo(calendarios, dia)) continue;
                     const inicioOficina = obterInicio(dia, horario.hora_inicio);
                     let fimOficina = obterInicio(dia, horario.hora_fim);
                     if (fimOficina < inicioOficina) fimOficina += DIA_MS;
+                    fimOficina = fimLetivo(calendarios, dia, fimOficina);
                     if (inicioOficina < fimSessao && fimOficina > inicioSessao) {
                         conflitos.push({
                             codigo: 'CHOQUE_HORARIO_ATENDIMENTO',
@@ -124,6 +131,7 @@ async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, st
 
 async function matricularOficinasService({ aluno_id, oficinas_ids }) {
     return prisma.$transaction(async (tx) => {
+        await bloquearCalendarios(tx);
         // Compartilha o bloqueio usado na criação de atendimentos para o mesmo aluno.
         await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
         return matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids });

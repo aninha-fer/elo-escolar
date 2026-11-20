@@ -14,11 +14,335 @@ const { criarTurmaService } = require('./turmaService');
 const { criarUsuario, editarUsuario, listarUsuarios, excluirUsuario } = require('./usuarioService');
 const { buscarIdentidadePorId } = require('./authService');
 const { prepararNovaTurmaService, criarTurmaAPartirService } = require('./turmaService');
+const { criarAnoLetivoService, editarAnoLetivoService } = require('./anoLetivoService');
+const { sincronizarTurmasExpiradas } = require('./encerramentoTurmaService');
 
 const data = (valor) => new Date(`${valor}T00:00:00.000Z`);
 const hora = (valor) => new Date(`1970-01-01T${valor}:00.000Z`);
+
+test('Home mostra somente regulares ativas do ano solicitado, inclusive antes do período letivo', async (t) => {
+  simularBanco(t, { turma: [turma(20, 'REGULAR'), { ...turma(30, 'REGULAR'), ano_letivo_id: 2027 },
+    { ...turma(40, 'REGULAR'), status: 'INATIVO' }, { ...turma(50, 'REGULAR'), deleted_at: new Date() }, turma(60)] });
+  t.mock.timers.setTime(new Date('2026-01-03T12:00:00Z').getTime());
+  assert.deepEqual((await listarTurmasService('REGULAR', null, { status: 'ATIVO', ano: 2026 })).map((t) => t.id), [20]);
+  assert.deepEqual(await listarTurmasService('REGULAR', null, { status: 'ATIVO', ano: 2028 }), []);
+  assert.equal((await listarTurmasService('REGULAR')).length, 3);
+});
+
+test('calendário da Home recebe todas as oficinas ativas nas férias, sem limitar a vinte registros', async (t) => {
+  simularBanco(t, { turma: [
+    ...Array.from({ length: 25 }, (_, i) => turma(i + 10)),
+    { ...turma(60), status: 'INATIVO' }, { ...turma(70), deleted_at: new Date() }, turma(80, 'REGULAR'),
+  ] });
+  t.mock.timers.setTime(new Date('2026-01-03T12:00:00Z').getTime());
+  const oficinas = await listarTurmasService('OFICINA', null, { status: 'ATIVO' });
+  assert.equal(oficinas.length, 25);
+  assert.ok(oficinas.every((o) => o.status === 'ATIVO' && o.tipo === 'OFICINA'));
+  assert.equal((await listarTurmasService('OFICINA')).length, 26);
+});
+
+function calendarioTeste(id, inicio, fim) {
+  return { id, ano: id, data_inicio: data(inicio), data_fim: data(fim), created_at: new Date('2026-01-01T12:00:00Z'), updated_at: new Date('2026-01-01T12:00:00Z') };
+}
+
+function planejamentoExpirado() {
+  const inicial = planejamentoParaStatus();
+  inicial.ano_letivo = [calendarioTeste(2026, '2026-02-03', '2026-11-01'), calendarioTeste(2027, '2027-02-08', '2027-12-18')];
+  inicial.turma[0].capacidade_maxima = 10;
+  return inicial;
+}
+
+test('expiração tardia encerra somente regular e preserva oficinas, clínicas e histórico escolar', async (t) => {
+  const banco = simularBanco(t, planejamentoExpirado());
+  const outras = structuredClone({ oficina: banco.matricula_turma[1], clinicas: banco.atendimento_clinico, sessoes: banco.atendimento_sessao });
+  t.mock.timers.setTime(new Date('2027-01-10T15:00:00Z').getTime());
+  await sincronizarTurmasExpiradas();
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  assert.equal(banco.turma[1].status, 'ATIVO');
+  assert.equal(banco.matricula_turma[0].status, 'INATIVO');
+  assert.deepEqual(banco.matricula_turma[0].data_fim, data('2026-11-01'));
+  assert.deepEqual({ oficina: banco.matricula_turma[1], clinicas: banco.atendimento_clinico, sessoes: banco.atendimento_sessao }, outras);
+  assert.ok((await obterAgendaAlunoService(1, '2026-10-26')).eventos.some((e) => e.tipo === 'REGULAR'));
+  const antes = structuredClone(banco), transacoes = prisma.$transaction.mock.callCount();
+  await sincronizarTurmasExpiradas();
+  assert.equal(prisma.$transaction.mock.callCount(), transacoes);
+  assert.deepEqual(banco, antes);
+});
+
+test('expiração respeita status e datas de todos os vínculos, inclusive cancelamento antes do início', async (t) => {
+  const inicial = planejamentoExpirado();
+  inicial.matricula_turma = [
+    { id: 1, aluno_id: 1, turma_id: 10, status: 'ATIVO', data_inicio: data('2026-03-01'), data_fim: data('2026-10-01') },
+    { id: 2, aluno_id: 1, turma_id: 10, status: 'PROVISORIO', data_inicio: null, data_fim: null },
+    { id: 3, aluno_id: 1, turma_id: 10, status: 'INATIVO', data_inicio: data('2026-03-01'), data_fim: null },
+    { id: 4, aluno_id: 1, turma_id: 10, status: 'INATIVO', data_inicio: data('2026-03-01'), data_fim: data('2026-09-01') },
+    { id: 5, aluno_id: 1, turma_id: 10, status: 'ATIVO', data_inicio: data('2027-01-10'), data_fim: null },
+    { id: 6, aluno_id: 1, turma_id: 10, status: 'PROVISORIO', data_inicio: null, data_fim: data('2026-10-01') },
+  ];
+  const banco = simularBanco(t, inicial), historico = structuredClone(banco.matricula_turma[3]);
+  await sincronizarTurmasExpiradas();
+  assert.deepEqual(banco.matricula_turma.map((m) => [m.status, m.data_fim.toISOString().slice(0, 10)]), [
+    ['INATIVO', '2026-10-01'], ['PROVISORIO', '2026-11-01'], ['INATIVO', '2026-11-01'],
+    ['INATIVO', '2026-09-01'], ['INATIVO', '2026-11-01'], ['PROVISORIO', '2026-10-01'],
+  ]);
+  assert.deepEqual(banco.matricula_turma[3], historico);
+  assert.deepEqual(banco.matricula_turma[4].data_inicio, data('2027-01-10'));
+  assert.equal((await obterAgendaAlunoService(1, '2027-01-11')).eventos.some((e) => e.tipo === 'REGULAR'), false);
+});
+
+test('expiração ignora oficina, regular futura, inativa e excluída; encerra regular sem matrículas', async (t) => {
+  const inicial = planejamentoExpirado();
+  inicial.turma.push({ ...turma(30, 'REGULAR'), ano_letivo_id: 2027 }, { ...turma(31, 'REGULAR'), status: 'INATIVO' },
+    { ...turma(32, 'REGULAR'), deleted_at: new Date() }, turma(33, 'REGULAR'));
+  const banco = simularBanco(t, inicial), originais = structuredClone(banco.turma.slice(1,5));
+  await sincronizarTurmasExpiradas();
+  assert.deepEqual(banco.turma.slice(1,5), originais);
+  assert.equal(banco.turma.at(-1).status, 'INATIVO');
+});
+
+test('sincronizações simultâneas encerram uma só vez e não exigem confirmação', async (t) => {
+  const banco = simularBanco(t, planejamentoExpirado());
+  await Promise.all([sincronizarTurmasExpiradas(), sincronizarTurmasExpiradas()]);
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  assert.equal(banco.matricula_turma[0].status, 'INATIVO');
+  assert.deepEqual(banco.matricula_turma[0].data_fim, data('2026-11-01'));
+});
+
+test('falha ao inativar turma desfaz os encerramentos da mesma transação', async (t) => {
+  const banco = simularBanco(t, planejamentoExpirado()), antes = structuredClone(banco), original = prisma.$transaction;
+  prisma.$transaction = (callback, options) => original(async (tx) => {
+    tx.turma.update = async () => { throw new Error('Falha simulada no encerramento'); };
+    return callback(tx);
+  }, options);
+  await assert.rejects(() => sincronizarTurmasExpiradas(), /Falha simulada/);
+  assert.deepEqual(banco, antes);
+});
+
+test('regular expirada não pode ser reativada, mas continua editável', async (t) => {
+  const banco = simularBanco(t, planejamentoExpirado());
+  await assert.rejects(() => editarTurmaService(10, { status: 'ATIVO' }), { statusCode: 409 });
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  const editada = await editarTurmaService(10, { nome: 'Nome revisado' });
+  assert.equal(editada.nome, 'Nome revisado');
+  assert.equal(editada.status, 'INATIVO');
+  assert.equal(editada.expirada, true);
+  assert.equal((await obterTurmaService(10)).expirada, true);
+});
+
+test('matrícula no próximo ano encerra vínculo expirado antes de validar unicidade', async (t) => {
+  const inicial = planejamentoExpirado();
+  inicial.turma.push({ ...turma(30, 'REGULAR', 10), ano_letivo_id: 2027 });
+  const banco = simularBanco(t, inicial);
+  assert.equal((await obterAlunoService(1)).turma_regular, null);
+  const nova = await matricularTurmaRegularService({ aluno_id: 1, turma_id: 30 });
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  assert.equal(nova.status, 'ATIVO');
+  assert.deepEqual(nova.data_inicio, data('2027-02-08'));
+  assert.equal((await obterAlunoService(1)).turma_regular.id, 30);
+});
+
+test('escopo por aluno não encerra turmas expiradas sem relação com ele', async (t) => {
+  const inicial = planejamentoExpirado(); inicial.turma.push(turma(30, 'REGULAR'));
+  const banco = simularBanco(t, inicial);
+  await sincronizarTurmasExpiradas({ alunoIds: [1] });
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  assert.equal(banco.turma.at(-1).status, 'ATIVO');
+});
+
+test('origem expirada é encerrada antes da preparação e cancelamento anterior ao início não recebe ano anterior', async (t) => {
+  const inicial = planejamentoExpirado();
+  inicial.matricula_turma[0].data_inicio = data('2027-01-10');
+  const banco = simularBanco(t, inicial);
+  const preparacao = await prepararNovaTurmaService(10);
+  assert.equal(preparacao.origem.status, 'INATIVO');
+  assert.equal(preparacao.origem.expirada, true);
+  assert.equal(preparacao.alunos.find((a) => a.id === 1).ano_anterior, false);
+  assert.deepEqual(banco.matricula_turma[0].data_inicio, data('2027-01-10'));
+});
+
+test('inativação manual concorrente com expiração preserva o término letivo', async (t) => {
+  const banco = simularBanco(t, planejamentoExpirado());
+  const resultados = await Promise.allSettled([
+    sincronizarTurmasExpiradas(), editarTurmaService(10, { status: 'INATIVO', confirmar_cancelamentos: { matriculas: [1], matriculas_ativas: 1 } }),
+  ]);
+  assert.equal(resultados[0].status, 'fulfilled');
+  if (resultados[1].status === 'rejected') assert.equal(resultados[1].reason.statusCode, 409);
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  assert.equal(banco.matricula_turma[0].status, 'INATIVO');
+  assert.deepEqual(banco.matricula_turma[0].data_fim, data('2026-11-01'));
+});
+
+test('matrícula concorrente em turma expirada é impedida enquanto a sincronização encerra vínculos', async (t) => {
+  const banco = simularBanco(t, planejamentoExpirado());
+  const antes = banco.matricula_turma.length;
+  const resultados = await Promise.allSettled([
+    sincronizarTurmasExpiradas(), matricularTurmaRegularService({ aluno_id: 2, turma_id: 10 }),
+  ]);
+  assert.equal(resultados[0].status, 'fulfilled');
+  assert.equal(resultados[1].status, 'rejected');
+  assert.equal(banco.matricula_turma.length, antes);
+  assert.equal(banco.turma[0].status, 'INATIVO');
+});
+
+test('releitura dentro da transação respeita calendário atualizado após a identificação', async (t) => {
+  const banco = simularBanco(t, planejamentoExpirado()), original = prisma.$transaction;
+  prisma.$transaction = (callback, options) => {
+    banco.ano_letivo[0].data_fim = data('2026-12-19');
+    return original(callback, options);
+  };
+  await sincronizarTurmasExpiradas();
+  assert.equal(banco.turma[0].status, 'ATIVO');
+  assert.equal(banco.matricula_turma[0].data_fim, null);
+});
+
+test('vínculo detectado depois dos bloqueios repete a transação sem confirmação', async (t) => {
+  const inicial = planejamentoExpirado();
+  inicial.matricula_turma.push({ id: 3, aluno_id: 2, turma_id: 10, status: 'ATIVO', data_inicio: data('2026-10-01'), data_fim: null });
+  const banco = simularBanco(t, inicial), original = prisma.$transaction;
+  let transacoes = 0;
+  prisma.$transaction = (callback, options) => original(async (tx) => {
+    transacoes++;
+    if (transacoes === 1) {
+      const consultar = tx.matricula_turma.findMany;
+      let leituras = 0;
+      tx.matricula_turma.findMany = async (params) => {
+        const registros = await consultar(params);
+        return ++leituras === 1 ? registros.filter((m) => m.aluno_id !== 2) : registros;
+      };
+    }
+    return callback(tx);
+  }, options);
+  await sincronizarTurmasExpiradas();
+  assert.equal(transacoes, 2);
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  assert.ok(banco.matricula_turma.filter((m) => m.turma_id === 10).every((m) => m.status === 'INATIVO' && +m.data_fim === +data('2026-11-01')));
+});
+
+async function confirmarTermino(id, dados) {
+  let confirmacao;
+  await assert.rejects(() => editarAnoLetivoService(id, dados), (erro) => { confirmacao = erro.confirmacao; return erro.statusCode === 409 && Boolean(confirmacao); });
+  return editarAnoLetivoService(id, { ...dados, confirmar_alteracao_fim: confirmacao });
+}
+
+test('antecipar início futuro reajusta quem aguardava calendário, preserva ingresso posterior, encerrados e provisórios', async (t) => {
+  const banco = simularBanco(t, {
+    ano_letivo: [calendarioTeste(2027, '2027-02-08', '2027-12-18')], turma: [{ ...turma(20, 'REGULAR', 10), ano_letivo_id: 2027 }],
+    matricula_turma: [
+      { id: 1, aluno_id: 1, turma_id: 20, status: 'ATIVO', data_inicio: data('2027-02-08'), data_fim: null },
+      { id: 2, aluno_id: 2, turma_id: 20, status: 'ATIVO', data_inicio: data('2027-03-01'), data_fim: null },
+      { id: 3, aluno_id: 3, turma_id: 20, status: 'PROVISORIO', data_inicio: null, data_fim: null },
+      { id: 4, aluno_id: 1, turma_id: 20, status: 'INATIVO', data_inicio: data('2026-02-03'), data_fim: data('2026-05-01') },
+    ],
+  });
+  const historico = structuredClone(banco.matricula_turma.slice(1));
+  await editarAnoLetivoService(2027, { data_inicio: '2027-02-01' });
+  assert.deepEqual(banco.matricula_turma[0].data_inicio, data('2027-02-01'));
+  assert.deepEqual(banco.matricula_turma.slice(1), historico);
+  await editarAnoLetivoService(2027, { data_inicio: '2027-03-02' });
+  assert.deepEqual(banco.matricula_turma[0].data_inicio, data('2027-03-02'));
+  assert.deepEqual(banco.matricula_turma[1].data_inicio, data('2027-03-02'));
+});
+
+test('alterar término exige confirmação atual e preserva matrículas, turmas e todas as sessões clínicas', async (t) => {
+  const inicial = planejamentoParaStatus();
+  inicial.ano_letivo = [calendarioTeste(2026, '2026-02-03', '2026-12-19')];
+  const banco = simularBanco(t, inicial);
+  const antes = structuredClone({ matriculas: banco.matricula_turma, atendimentos: banco.atendimento_clinico, sessoes: banco.atendimento_sessao, turmas: banco.turma });
+  await confirmarTermino(2026, { data_fim: '2026-12-18' });
+  assert.deepEqual({ matriculas: banco.matricula_turma, atendimentos: banco.atendimento_clinico, sessoes: banco.atendimento_sessao, turmas: banco.turma }, antes);
+});
+
+for (const status of ['ATIVO', 'PROVISORIO']) {
+  test(`ampliar calendário bloqueia conflito de oficina com atendimento ${status} sem nenhuma gravação`, async (t) => {
+    const inicial = {
+      ano_letivo: [calendarioTeste(2026, '2026-02-03', '2026-12-19')],
+      aluno: [aluno(1, status === 'PROVISORIO' ? 'RASCUNHO' : 'ATIVO')], pessoa: [{ id: 1, nome: 'Aluno' }],
+      turma: [turma(10)],
+      matricula_turma: [{ id: 1, aluno_id: 1, turma_id: 10, status, data_inicio: status === 'ATIVO' ? data('2026-11-01') : null, data_fim: null }],
+      atendimento_clinico: [{ id: 60, aluno_id: 1, profissional_id: 1, modalidade: 'Psicologia', status, data_cancelamento: null }],
+      atendimento_sessao: [{ id: 70, atendimento_clinico_id: 60, status, data_cancelamento: null, data_sessao: data('2026-12-21'), hora_inicio: hora('09:30'), duracao_minutos: 30 }],
+    };
+    const banco = simularBanco(t, inicial), antes = structuredClone(banco);
+    await assert.rejects(() => confirmarTermino(2026, { data_fim: '2026-12-23' }), (erro) => {
+      assert.equal(erro.statusCode, 409);
+      assert.equal(erro.conflitos[0].oficina_nome, 'Turma 10');
+      assert.equal(erro.conflitos[0].sessao_id, 70);
+      return true;
+    });
+    assert.deepEqual(banco, antes);
+  });
+}
+
+test('criação de calendário verifica conflitos novos e não duplica conflito já coberto por outro calendário', async (t) => {
+  const inicial = planejamentoParaStatus();
+  inicial.ano_letivo = [calendarioTeste(2026, '2026-02-03', '2026-12-19')];
+  inicial.atendimento_sessao = [{ id: 70, atendimento_clinico_id: 60, status: 'ATIVO', data_cancelamento: null, data_sessao: data('2027-01-04'), hora_inicio: hora('10:30'), duracao_minutos: 30 }];
+  inicial.turma.find((t) => t.tipo === 'OFICINA').horarios[0].hora_fim = hora('11:00');
+  const banco = simularBanco(t, inicial);
+  await assert.rejects(() => criarAnoLetivoService({ ano: 2027, data_inicio: '2027-01-04', data_fim: '2027-12-18' }), (erro) => erro.conflitos?.length === 1);
+  assert.equal(banco.ano_letivo.length, 1);
+  banco.ano_letivo.push(calendarioTeste(2028, '2027-01-04', '2027-12-18'));
+  await criarAnoLetivoService({ ano: 2027, data_inicio: '2027-01-04', data_fim: '2027-12-18' });
+  assert.equal(banco.ano_letivo.length, 3);
+});
+
+test('ano de calendário com turma excluída continua bloqueado e calendário duplicado não grava', async (t) => {
+  const banco = simularBanco(t, { ano_letivo: [calendarioTeste(2027, '2027-02-08', '2027-12-18')],
+    turma: [{ ...turma(20, 'REGULAR'), ano_letivo_id: 2027, deleted_at: new Date() }] });
+  await assert.rejects(() => editarAnoLetivoService(2027, { ano: 2028 }), { statusCode: 409 });
+  await assert.rejects(() => criarAnoLetivoService({ ano: 2027, data_inicio: '2027-02-08', data_fim: '2027-12-18' }), { statusCode: 409 });
+  assert.equal(banco.ano_letivo.length, 1);
+});
+
+test('rascunho ativa regular futuro no início do calendário e preserva unicidade entre anos', async (t) => {
+  const banco = simularBanco(t, { pessoa: [pessoaEdicao], turma: [{ ...turma(20, 'REGULAR', 10), ano_letivo_id: 2027 }, turma(21, 'REGULAR', 10)],
+    matricula_turma: [{ id: 1, aluno_id: 1, turma_id: 20, status: 'PROVISORIO', data_inicio: null, data_fim: null }] });
+  await editarAlunoService(1, { status: 'ATIVO' });
+  assert.deepEqual(banco.matricula_turma[0].data_inicio, data('2027-02-08'));
+  assert.equal(banco.matricula_turma[0].status, 'ATIVO');
+  await assert.rejects(() => matricularTurmaRegularService({ aluno_id: 1, turma_id: 21 }), (erro) => erro.isConflict && erro.detalhes.some((d) => d.codigo === 'MATRICULA_DUPLICADA'));
+});
+
+for (const rascunho of [false, true]) {
+  test(`ano encerrado ${rascunho ? 'encerra planejamento antes de ativar rascunho' : 'bloqueia nova matrícula mesmo com turma ativa'}`, async (t) => {
+    const banco = simularBanco(t, { pessoa: [pessoaEdicao], aluno: [aluno(1, rascunho ? 'RASCUNHO' : 'ATIVO')],
+      ano_letivo: [calendarioTeste(2026, '2026-02-03', '2026-10-31')], turma: [turma(20, 'REGULAR', 10)],
+      matricula_turma: rascunho ? [{ id: 1, aluno_id: 1, turma_id: 20, status: 'PROVISORIO', data_inicio: null, data_fim: null }] : [] });
+    const antes = structuredClone(banco);
+    if (rascunho) {
+      await editarAlunoService(1, { status: 'ATIVO' });
+      assert.equal(banco.aluno[0].status, 'ATIVO');
+      assert.equal(banco.matricula_turma[0].status, 'PROVISORIO');
+      assert.deepEqual(banco.matricula_turma[0].data_fim, data('2026-10-31'));
+    } else {
+      await assert.rejects(() => matricularTurmaRegularService({ aluno_id: 1, turma_id: 20 }), { statusCode: 409 });
+      assert.deepEqual(banco, antes);
+    }
+  });
+}
+
+test('atendimento pode ser criado nas férias e alteração do calendário futuro é bloqueada se revelar choque', async (t) => {
+  const banco = simularBanco(t, { pessoa: [{ id: 1, nome: 'Aluno' }], aluno: [aluno(1, 'ATIVO')], turma: [turma(10)],
+    ano_letivo: [calendarioTeste(2027, '2027-02-08', '2027-12-18')],
+    matricula_turma: [{ id: 1, aluno_id: 1, turma_id: 10, status: 'ATIVO', data_inicio: data('2026-01-01'), data_fim: null }] });
+  await agendarAtendimentoService({ ...pedidoClinico, data_inicio: '2027-01-04' });
+  const sessoes = structuredClone(banco.atendimento_sessao);
+  await assert.rejects(() => editarAnoLetivoService(2027, { data_inicio: '2027-01-04' }), (erro) => erro.conflitos?.length === 1);
+  assert.deepEqual(banco.atendimento_sessao, sessoes);
+  assert.deepEqual(banco.ano_letivo[0].data_inicio, data('2027-02-08'));
+});
+
+test('ativação verifica oficinas sobrepostas mesmo quando o próximo período letivo está distante', async (t) => {
+  const banco = simularBanco(t, { pessoa: [pessoaEdicao], turma: [turma(10), turma(11)],
+    ano_letivo: [calendarioTeste(2027, '2027-02-08', '2027-12-18')],
+    matricula_turma: [10,11].map((turma_id) => ({ id: turma_id, aluno_id: 1, turma_id, status: 'PROVISORIO', data_inicio: null, data_fim: null })) });
+  const antes = structuredClone(banco);
+  await assert.rejects(() => editarAlunoService(1, { status: 'ATIVO' }), (e) => e.isConflict && e.detalhes.some((d) => d.mensagem.includes('Conflito entre as oficinas')));
+  assert.deepEqual(banco, antes);
+});
 const aluno = (id, status = 'RASCUNHO') => ({ id, pessoa_id: id, status, turno: 'MANHA', dias_frequencia: [1, 2, 3, 4, 5] });
 const turma = (id, tipo = 'OFICINA', capacidade_maxima = 1) => ({
+  ano_letivo_id: tipo === 'REGULAR' ? 2026 : null,
   id, tipo, capacidade_maxima, status: 'ATIVO', nome: `Turma ${id}`, turno: 'MANHA', profissional_id: 1,
   horarios: (tipo === 'REGULAR' ? [1, 2, 3, 4, 5] : [1]).map((dia_semana) => ({
     id: dia_semana, dia_semana, hora_inicio: hora(tipo === 'REGULAR' ? '08:00' : '09:00'),
@@ -346,6 +670,7 @@ function corresponde(registro, filtro = {}) {
     if ('lt' in esperado) return atual != null && atual < esperado.lt;
     if ('lte' in esperado) return atual != null && atual <= esperado.lte;
     if ('gte' in esperado) return atual != null && atual >= esperado.gte;
+    if ('gt' in esperado) return atual != null && atual > esperado.gt;
     return atual != null && corresponde(atual, esperado);
   });
 }
@@ -571,7 +896,7 @@ test('excluído não pode ser editado ou reativado, receber conta, turma ou aten
   await assert.rejects(() => editarUsuario(7, { status: 'ATIVO' }), { statusCode: 404 });
   await assert.rejects(() => editarUsuario(7, { senha: 'nova-senha-teste' }), { statusCode: 404 });
   await assert.rejects(() => criarUsuario({ modo: 'existente', pessoa_id: 10, email: 'nova@example.invalid', senha: 'senha-de-teste', role: 'professor' }), { statusCode: 409 });
-  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo: 2026, profissional_id: 1, ambiente_id: 2 }), { statusCode: 404 });
+  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026, profissional_id: 1, ambiente_id: 2 }), { statusCode: 404 });
   await assert.rejects(() => editarTurmaService(10, { status: 'ATIVO' }), { statusCode: 404 });
   await assert.rejects(() => agendarAtendimentoService(pedidoClinico), { statusCode: 404 });
   assert.equal(await buscarIdentidadePorId(7), null);
@@ -581,7 +906,7 @@ test('excluído não pode ser editado ou reativado, receber conta, turma ou aten
 test('criar turma e atendimento exige profissional ativo, e reativação do rascunho ignora provisórios cancelados', async (t) => {
   const banco = simularBanco(t, planejamentoProfissional());
   await editarProfissionalService(1, { status_geral: 'INATIVO' });
-  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo: 2026, profissional_id: 1, ambiente_id: 2 }), { statusCode: 400 });
+  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026, profissional_id: 1, ambiente_id: 2 }), { statusCode: 400 });
   await assert.rejects(() => agendarAtendimentoService(pedidoClinico), { statusCode: 400 });
   banco.atendimento_clinico.find((a) => a.id === 61).status = 'INATIVO';
   await editarAlunoService(1, { status: 'ATIVO' });
@@ -663,7 +988,7 @@ test('DELETE de profissional exige administração, retorna conflito e depois oc
 // Transações com gravações pendentes e bloqueios por registro para exercitar os services juntos.
 function simularBanco(t, inicial = {}) {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-02T12:00:00.000Z') });
-  const estado = { aluno: [aluno(1), aluno(2, 'ATIVO'), aluno(3, 'ATIVO')], pessoa: [],
+  const estado = { ano_letivo: [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2026-12-19') }, { id: 2027, ano: 2027, data_inicio: data('2027-02-08'), data_fim: data('2027-12-18') }], aluno: [aluno(1), aluno(2, 'ATIVO'), aluno(3, 'ATIVO')], pessoa: [],
     turma: [turma(10), turma(20, 'REGULAR')], matricula_turma: [], atendimento_clinico: [], atendimento_sessao: [],
     aluno_responsavel: [], aluno_dados_medicos: [], usuario: [], funcionario: [{ id: 1, pessoa_id: 10, nome: 'Ana', cargo: 'Professor' }, { id: 2, pessoa_id: 11, nome: 'Bruno', cargo: 'Professor' }], ...inicial };
   let sequencia = 100;
@@ -676,9 +1001,9 @@ function simularBanco(t, inicial = {}) {
       if (nome === 'usuario') return { ...item, pessoa: hidratar('pessoa', ler('pessoa').find((p) => p.id === item.pessoa_id)) };
       if (nome === 'funcionario') return { ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id) ?? { nome: item.nome, status_geral: 'ATIVO' } };
       if (nome === 'aluno') return { deleted_at: null, ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id),
-        matriculas_turmas: ler('matricula_turma').filter((m) => m.aluno_id === item.id).map((m) => ({ ...m, turma: ler('turma').find((t) => t.id === m.turma_id) })),
+        matriculas_turmas: ler('matricula_turma').filter((m) => m.aluno_id === item.id).map((m) => ({ ...m, turma: hidratar('turma', ler('turma').find((t) => t.id === m.turma_id)) })),
         responsaveis: ler('aluno_responsavel').filter((r) => r.aluno_id === item.id) };
-      if (nome === 'turma' && estado.turma_horario) return { ...item, horarios: ler('turma_horario').filter((h) => h.turma_id === item.id) };
+      if (nome === 'turma') return { ...item, matriculas: ler('matricula_turma').filter((m) => m.turma_id === item.id), ano_letivo: ler('ano_letivo').find((c) => c.id === item.ano_letivo_id) ?? null, ...(estado.turma_horario ? { horarios: ler('turma_horario').filter((h) => h.turma_id === item.id) } : {}) };
       if (nome === 'pessoa') return { ...item,
         aluno: ler('aluno').find((a) => a.pessoa_id === item.id) ?? null,
         funcionario: ler('funcionario').find((f) => f.pessoa_id === item.id) ?? null,
@@ -688,7 +1013,7 @@ function simularBanco(t, inicial = {}) {
         aluno: ler('aluno').find((outro) => outro.id === item.aluno_id),
         turma: hidratar('turma', ler('turma').find((outro) => outro.id === item.turma_id)) };
       if (nome === 'atendimento_clinico') return { ...item,
-        aluno: ler('aluno').find((outro) => outro.id === item.aluno_id), profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { nome: 'Ana' }),
+        aluno: hidratar('aluno', ler('aluno').find((outro) => outro.id === item.aluno_id)), profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { nome: 'Ana' }),
         sessoes: ler('atendimento_sessao').filter((outro) => outro.atendimento_clinico_id === item.id) };
       if (nome === 'atendimento_sessao') return { ...item,
         profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { nome: 'Ana' }),
@@ -791,6 +1116,7 @@ function simularBanco(t, inicial = {}) {
     const tx = cliente(pendentes, removidos, atualizados);
     const adquiridos = new Set(), liberar = [];
     tx.$queryRaw = async (sql, id) => {
+      if (sql.join('?').includes('pg_advisory')) return [];
       const tabela = ['turma', 'pessoa', 'funcionario', 'usuario'].find((nome) => sql.join('?').includes(`FROM "${nome}"`)) ?? 'aluno';
       const chave = `${tabela}:${id}`;
       if (adquiridos.has(chave)) return [];
@@ -1130,6 +1456,7 @@ function prepararTrocaRegular(t, instante = '2026-11-02T23:00:00.000Z') {
     turma: [20, 21, 22].map((id) => turma(id, 'REGULAR', 5)),
     matricula_turma: [{ id: 1, aluno_id: 1, turma_id: 20, status: 'ATIVO', data_inicio: data('2026-10-01'), data_fim: null }],
   });
+  banco.ano_letivo[0].data_fim = data('2027-01-31');
   t.mock.timers.setTime(new Date(instante).getTime());
   return banco;
 }
@@ -1838,7 +2165,7 @@ function planejamentoNovaTurma() {
   alunos[6].deleted_at = data('2026-10-01');
   return {
     aluno: alunos, pessoa: alunos.map((a) => ({ id: a.id, nome: `Aluno ${a.id}`, status_geral: 'ATIVO' })),
-    turma: [{ ...turma(10, 'REGULAR', 3), status: 'INATIVO', ambiente_id: 2, ano_letivo: 2026, descricao: 'Descrição da origem' }, turma(20, 'REGULAR', 20)],
+    turma: [{ ...turma(10, 'REGULAR', 3), status: 'INATIVO', ambiente_id: 2, ano_letivo_id: 2026, descricao: 'Descrição da origem' }, turma(20, 'REGULAR', 20)],
     ambiente: [{ id: 2, nome: 'Sala' }], turma_horario: [],
     matricula_turma: [
       { id: 50, aluno_id: 1, turma_id: 10, status: 'INATIVO', data_inicio: data('2026-01-01'), data_fim: data('2026-11-01') },
@@ -1850,7 +2177,7 @@ function planejamentoNovaTurma() {
   };
 }
 
-const pedidoNovaTurma = { turma: { tipo: 'REGULAR', nome: 'Girassol 2027', turno: 'MANHA', ano_letivo: 2027,
+const pedidoNovaTurma = { turma: { tipo: 'REGULAR', nome: 'Girassol 2027', turno: 'MANHA', ano_letivo_id: 2027,
   ambiente_id: 2, profissional_id: 1, capacidade_maxima: 3, descricao: 'Nova descrição' }, alunos_ids: [1, 3] };
 
 test('preparação não grava, filtra turno/status/vínculo ativo e sinaliza somente antigos alunos efetivados', async (t) => {
@@ -1864,23 +2191,24 @@ test('preparação não grava, filtra turno/status/vínculo ativo e sinaliza som
   assert.deepEqual(banco, antes);
 });
 
-test('nova turma cria cinco horários e matrículas efetivas em primeiro de janeiro sem modificar a origem ou seu histórico', async (t) => {
+test('nova turma cria cinco horários e matrículas efetivas no início do calendário sem modificar a origem ou seu histórico', async (t) => {
   const banco = simularBanco(t, planejamentoNovaTurma());
   const anteriores = structuredClone(banco.matricula_turma), origem = structuredClone(banco.turma[0]);
   const nova = await criarTurmaAPartirService(10, pedidoNovaTurma);
   assert.notEqual(nova.id, 10);
   assert.equal(nova.status, 'ATIVO');
   assert.equal(nova.nome, 'Girassol 2027');
-  assert.equal(nova.ano_letivo, 2027);
+  assert.equal(nova.ano_letivo_id, 2027);
   assert.equal(nova.horarios.length, 5);
   assert.equal(nova.horarios.find((h) => h.dia_semana === 3).hora_inicio.toISOString().slice(11, 16), '12:30');
   const novas = banco.matricula_turma.filter((m) => m.turma_id === nova.id);
   assert.deepEqual(novas.map((m) => m.aluno_id), [1, 3]);
-  assert.ok(novas.every((m) => m.status === 'ATIVO' && m.data_inicio.toISOString() === '2027-01-01T00:00:00.000Z'));
+  assert.ok(novas.every((m) => m.status === 'ATIVO' && m.data_inicio.toISOString() === '2027-02-08T00:00:00.000Z'));
   assert.deepEqual(banco.turma[0], origem);
   assert.deepEqual(banco.matricula_turma.filter((m) => m.turma_id !== nova.id), anteriores);
   assert.equal((await obterAgendaAlunoService(1, '2026-12-28')).eventos.some((e) => e.turma_id === nova.id && e.data < '2027-01-01'), false);
-  assert.ok((await obterAgendaAlunoService(1, '2027-01-04')).eventos.some((e) => e.turma_id === nova.id));
+  assert.equal((await obterAgendaAlunoService(1, '2027-01-04')).eventos.some((e) => e.turma_id === nova.id), false);
+  assert.ok((await obterAgendaAlunoService(1, '2027-02-08')).eventos.some((e) => e.turma_id === nova.id));
 });
 
 test('turno alterado usa somente candidatos compatíveis e gera o cronograma da tarde', async (t) => {
@@ -1987,7 +2315,7 @@ test('endpoints de nova turma exigem administração e validam campos e alunos d
   assert.deepEqual((await consulta.json()).alunos.map((a) => a.id), [4]);
   const post = (body) => fetch(base, { method: 'POST', headers: { 'x-role': 'admin', 'content-type': 'application/json' }, body: JSON.stringify(body) });
   for (const body of [{ ...pedidoNovaTurma, alunos_ids: [1, 1] }, { ...pedidoNovaTurma, alunos_ids: ['1'] },
-    { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, ano_letivo: 10000 } }, { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, ano_letivo: undefined } }]) {
+    { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, ano_letivo_id: 10000 } }, { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, ano_letivo_id: undefined } }]) {
     assert.equal((await post(body)).status, 400);
   }
   assert.equal((await post(pedidoNovaTurma)).status, 201);

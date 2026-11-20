@@ -1,6 +1,10 @@
 import { api } from './api';
 
 export const turmasService = {
+  async listarOficinasAtivas(signal) {
+    const { data } = await api.get('/turmas', { params: { tipo: 'OFICINA', status: 'ATIVO' }, signal });
+    return data;
+  },
   async listarPaginadas(params, signal) {
     const { data } = await api.get('/turmas', { params, signal });
     return data;

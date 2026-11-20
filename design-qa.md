@@ -44,3 +44,19 @@ Playwright com Chrome headless, autorizado pelo usuário:
 A inspeção da implementação foi realizada em navegador, mas não foi possível montar a comparação lado a lado no mesmo artefato exigida pela skill: a imagem original está disponível apenas na conversa. Portanto, este relatório não certifica fidelidade pixel a pixel nem aprovação formal da comparação visual. Falta disponibilizar o arquivo original para essa etapa.
 
 final result: blocked
+
+# Verificação da Home — 20/11/2026
+
+Escopo independente do relatório de login acima. Comparação visual com o protótipo fornecido na conversa e inspeção do navegador em desktop (1366 × 900) e tablet (900 × 1100). Não certifica igualdade pixel a pixel com o arquivo original.
+
+Evidências locais em C:/Users/anafe/AppData/Local/Temp/elo-home-qa: inicio-desktop.png, inicio-tablet.png, inicio-vazio.png e calendario-oficinas-2026-01-03.pdf.
+
+A hierarquia do banner, decoração à direita, calendário à esquerda, cartões de turmas à direita, cores e ícones seguem a referência com os tokens do projeto. A flor é uma adaptação transparente gerada a partir da referência. O layout se empilha no tablet e permite quebra dos cartões sem rolagem horizontal. Datas, nome e salas são dinâmicos; horários simultâneos são ordenados por nome. Nenhuma alteração global de sidebar, fontes ou espaçamentos foi necessária.
+
+Verificação funcional em navegador isolado com API simulada: oficinas ativas nas férias; turmas regulares ativas apenas do ano civil atual; ausência de turmas do ano; navegação para detalhes e abas corretas; carregamento de 20 + 5 turmas; atualização ao retornar à página; estados de erro independentes; PDF completo com quarenta oficinas e download direto. Nenhuma exceção de execução detectada. A simulação não altera registros reais.
+
+Validação complementar: 572 testes de backend aprovados; cinco testes da transformação de calendário/PDF aprovados; consultas reais PostgreSQL verificadas dentro de transação revertida; build e lint dos arquivos da Home aprovados. O lint completo mantém seis erros preexistentes em TurmaDetalhes, fora deste escopo.
+
+Não foram encontrados problemas bloqueantes na Home nos tamanhos inspecionados. A comparação formal com o arquivo original continua limitada à imagem disponível na conversa; isso não modifica a limitação registrada para o login acima.
+
+Resultado da Home: aprovado nas verificações funcionais e visuais descritas.

@@ -3,6 +3,7 @@ import { agruparHorarios } from '../../utils/formatters';
 import { BotaoAcoes } from '../../components/BotaoAcoes';
 import EditIcon from '../../components/icons/EditIcon';
 import { TrashIcon } from '../../components/icons/TrashIcon';
+import { TagExpiradaTurma } from '../../components/TagExpiradaTurma';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600',
@@ -33,6 +34,7 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${estilosStatus[turma.status] ?? 'bg-slate-100 text-slate-500'}`}>
                         {rotulosStatus[turma.status] ?? formatarStatus(turma.status)}
                     </span>
+                    <TagExpiradaTurma expirada={turma.expirada} testId={`turma-${turma.id}-expirada`} />
                 </div>
                 <div className="mt-xs flex flex-wrap items-center gap-x-md gap-y-xs font-mono text-xs text-slate-500">
                     <span className="flex min-w-0 items-start gap-xs">
@@ -60,7 +62,7 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                     aria-label={`Selecionar ${turma.tipo === 'OFICINA' ? 'oficina' : 'turma'} ${nome}`} onClick={() => onSelecionar?.(turma)} />
                 {podeEditar && <div className="absolute right-md top-md z-10"><BotaoAcoes testId={`turma-${turma.id}-acoes`} label={`Ações para ${nome}`} options={[
                     { id: 'editar', label: 'Editar', disabled: !onEditar, onClick: () => onEditar(turma), icon: <EditIcon/> },
-                    { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus, onClick: () => onAlterarStatus(turma) },
+                    { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus || (turma.status === 'INATIVO' && turma.expirada), onClick: () => onAlterarStatus(turma) },
                     ...(turma.tipo === 'REGULAR' && turma.status === 'INATIVO' ? [{ id: 'criar-a-partir', label: 'Criar nova turma a partir desta', disabled: !onCriarAPartir, onClick: () => onCriarAPartir(turma) }] : []),
                     { id: 'excluir', label: 'Excluir', textColor: '#DC2626', disabled: !onExcluir, onClick: () => onExcluir(turma), icon: <TrashIcon /> },
                 ]} /></div>}

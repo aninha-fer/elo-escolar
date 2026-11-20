@@ -26,6 +26,40 @@ test('paginação é opcional e valida parâmetros antes de consultar', () => {
   }
 });
 
+test('Home filtra status e ano antes de contar e paginar turmas, sem reutilizar cursor de outro ano', async (t) => {
+  const registros = Array.from({ length: 21 }, (_, i) => ({ id: i + 1, chave: `Turma ${String(i).padStart(2, '0')}` }));
+  const consultas = simular(t, [registros], 25);
+  const params = lerPaginacao({ paginado: 'true', tipo: 'REGULAR', status: 'ATIVO', ano: '2026' });
+  const pagina = await paginarIds('turmas', params);
+  assert.equal(pagina.ids.length, 20);
+  assert.equal(pagina.total, 25);
+  for (const consulta of consultas) {
+    assert.ok(consulta.texto.includes('t.status::text ='));
+    assert.ok(consulta.texto.includes('al.ano ='));
+    assert.ok(consulta.valores.includes('ATIVO'));
+    assert.ok(consulta.valores.includes(2026));
+  }
+  await assert.rejects(() => paginarIds('turmas', { ...params, ano: 2027, cursor: pagina.proximo_cursor }), { statusCode: 400 });
+});
+
+test('consulta de turmas sem filtros novos preserva o contrato usado por modais e listagens', async (t) => {
+  const consultas = simular(t, [[]], 0);
+  await paginarIds('turmas', lerPaginacao({ paginado: 'true', tipo: 'OFICINA' }));
+  assert.ok(consultas.every((c) => !c.texto.includes('t.status::text =') && !c.texto.includes('ano_letivo al')));
+});
+
+test('calendários carregam vinte por vez, em ordem decrescente de ano e com cursor', async (t) => {
+  const registros = Array.from({ length: 21 }, (_, i) => ({ id: 2100 - i, chave: String(2100 - i) }));
+  const consultas = simular(t, [registros, registros.slice(20)], 21);
+  const params = lerPaginacao({ paginado: 'true' });
+  const primeira = await paginarIds('anos_letivos', params);
+  const segunda = await paginarIds('anos_letivos', { ...params, cursor: primeira.proximo_cursor });
+  assert.equal(primeira.ids.length, 20);
+  assert.deepEqual(segunda.ids, [2080]);
+  assert.equal(segunda.tem_mais, false);
+  assert.ok(consultas.some((c) => c.texto.includes("ORDER BY lpad(a.ano::text, 4, '0') DESC, a.id DESC LIMIT 21")));
+});
+
 test('entrega 20 registros por página e desempata nomes iguais por ID sem repetir', async (t) => {
   const registros = Array.from({ length: 41 }, (_, i) => ({ id: i + 1, chave: 'Mesmo nome' }));
   const consultas = simular(t, [registros.slice(0, 21), registros.slice(20, 41), registros.slice(40)]);

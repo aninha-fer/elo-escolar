@@ -19,7 +19,7 @@ async function requireAuth(req, res, next) {
     ? await buscarIdentidadePorId(usuarioId)
     : null;
 
-  if (!usuario) {
+  if (!usuario || !Number.isInteger(req.session.senha_versao) || req.session.senha_versao !== usuario.senha_versao) {
     await promisify(req.session.destroy).call(req.session);
     res.clearCookie('elo.sid', { path: '/api' });
     return res.status(401).json(SEM_SESSAO);

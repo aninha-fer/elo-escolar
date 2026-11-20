@@ -5,7 +5,7 @@ const { lerPaginacao } = require('../dtos/paginacaoDTO');
 async function listarTurmas(req, res) {
   try {
     const queryValidada = listarTurmasQueryDTO.parse(req.query);
-    const turmas = await listarTurmasService(queryValidada.tipo, lerPaginacao(req.query));
+    const turmas = await listarTurmasService(queryValidada.tipo, lerPaginacao(req.query), queryValidada);
     return res.status(200).json(turmas);
   } catch (error) {
     console.error(error);
@@ -33,7 +33,7 @@ async function criarTurma(req, res) {
     return res.status(201).json(turma);
   } catch (error) {
     if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
-    if ([400, 404].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
     console.error('Erro ao cadastrar turma.', { nome: error.name, codigo: error.code });
     return res.status(500).json({ erro: 'Erro interno ao cadastrar turma.' });
   }

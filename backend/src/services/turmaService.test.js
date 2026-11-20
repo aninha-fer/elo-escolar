@@ -1,10 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../prismaClient');
+test.beforeEach((t) => {
+    const original = prisma.turma.findMany;
+    prisma.turma.findMany = t.mock.fn(async () => []);
+    t.after(() => { prisma.turma.findMany = original; });
+});
 const { criarTurmaService, obterTurmaService } = require('./turmaService');
 const { criarTurma, obterTurma } = require('../controllers/turmaController');
+const { listarTurmasQueryDTO } = require('../dtos/turmaDTO');
 
-const regular = { tipo: 'REGULAR', nome: ' Turma A ', turno: 'MANHA', profissional_id: 1, ambiente_id: 2, ano_letivo: 2026 };
+test('filtros opcionais da Home validam status e ano sem exigir alterações nos consumidores anteriores', () => {
+    assert.deepEqual(listarTurmasQueryDTO.parse({ tipo: 'OFICINA' }), { tipo: 'OFICINA' });
+    assert.deepEqual(listarTurmasQueryDTO.parse({ tipo: 'REGULAR', status: 'ATIVO', ano: '2026' }), { tipo: 'REGULAR', status: 'ATIVO', ano: 2026 });
+    for (const dados of [{ status: 'RASCUNHO' }, { ano: 'abc' }, { ano: '0' }, { ano: '2026.5' }, { ano: '10000' }]) assert.equal(listarTurmasQueryDTO.safeParse(dados).success, false);
+});
+
+const regular = { tipo: 'REGULAR', nome: ' Turma A ', turno: 'MANHA', profissional_id: 1, ambiente_id: 2, ano_letivo_id: 2026 };
 const oficina = { tipo: 'OFICINA', nome: 'Artes', turno: 'MANHA', profissional_id: 1, ambiente_id: 2,
     hora_inicio: '08:15', hora_fim: '09:15', dias_semana: [2, 4] };
 
@@ -18,6 +30,7 @@ function simularTransacao(t, { cargo = 'Professor', profissionalExiste = true, s
         assert.equal(options.isolationLevel, 'ReadCommitted');
         const resultado = await callback({
             $queryRaw: async () => [],
+            ano_letivo: { findUnique: async ({where}) => ({id: where.id, ano: where.id, data_inicio: new Date('2026-02-03T00:00:00Z'), data_fim: new Date('2099-12-19T00:00:00Z')}) },
             funcionario: { findUnique: async () => profissionalExiste ? { cargo, pessoa: { status_geral: 'ATIVO' } } : null },
             ambiente: { findUnique: async () => salaExiste ? { id: 2 } : null },
             turma: {
@@ -59,7 +72,7 @@ for (const [turno, inicio, fim] of [['MANHA', '08:15', '09:15'], ['MANHA', '09:4
         simularTransacao(t, { cargo: 'Oficineiro' });
         const turma = await criarTurmaService({ ...oficina, turno, hora_inicio: inicio, hora_fim: fim,
             dias_semana: [4, 2, 4], ambiente_id: 2, descricao: ' Oficina semanal ' });
-        assert.equal(turma.ano_letivo, null);
+        assert.equal(turma.ano_letivo_id, null);
         assert.equal(turma.ambiente_id, 2);
         assert.equal(turma.descricao, 'Oficina semanal');
         assert.deepEqual(turma.horarios.map((h) => h.dia_semana), [2, 4]);
@@ -76,10 +89,10 @@ test('entradas inválidas são recusadas antes da transação', async (t) => {
     t.after(() => { prisma.$transaction = original; });
     prisma.$transaction = () => assert.fail('Não deve iniciar transação.');
     for (const dados of [
-        { ...regular, ano_letivo: undefined }, { ...regular, nome: ' ' }, { ...regular, tipo: 'INVALIDO' },
+        { ...regular, ano_letivo_id: undefined }, { ...regular, nome: ' ' }, { ...regular, tipo: 'INVALIDO' },
         { ...regular, turno: 'NOITE' }, { ...regular, profissional_id: [1, 2] },
         { ...regular, capacidade_maxima: -1 }, { ...regular, capacidade_maxima: 1.5 },
-        { ...regular, ano_letivo: 2026.5 }, { ...regular, ambiente_id: 0 }, { ...regular, ambiente_id: undefined }, { ...regular, ambiente_id: null },
+        { ...regular, ano_letivo_id: 2026.5 }, { ...regular, ambiente_id: 0 }, { ...regular, ambiente_id: undefined }, { ...regular, ambiente_id: null },
         { ...oficina, dias_semana: [] }, { ...oficina, dias_semana: [0] }, { ...oficina, dias_semana: [8] },
         { ...oficina, dias_semana: [1.5] }, { ...oficina, hora_inicio: undefined },
         { ...oficina, hora_fim: '11:00' }, { ...oficina, turno: 'TARDE' }
@@ -133,7 +146,7 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
         const aluno = { id: 5, dias_frequencia: [2], pessoa: { nome: 'Ana' } };
         const dados = { id: 10, nome: 'Turma A', tipo, capacidade_maxima: 12, turno: 'MANHA',
             ambiente_id: 1, ambiente: { id: 1, nome: 'Sala A' }, descricao: 'Descrição', profissional_id: 2,
-            profissional: { id: 2, cargo: 'Professor', pessoa: { nome: 'Maria' } }, ano_letivo: 2026,
+            profissional: { id: 2, cargo: 'Professor', pessoa: { nome: 'Maria' } }, ano_letivo_id: 2026,
             status: 'ATIVO', created_at: new Date('2026-01-01T00:00:00.000Z'), horarios: [horario] };
         simularConsultaTurma(t, async ({ where, select }) => {
             assert.deepEqual(where, { id: 10, deleted_at: null });
@@ -147,14 +160,14 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
             assert.deepEqual(select.ambiente, { select: { id: true, nome: true } });
             return { ...dados, matriculas: [{ aluno }] };
         });
-        assert.deepEqual(await obterTurmaService(10), { ...dados, possui_matriculas: true, alunos: [aluno],
+        assert.deepEqual(await obterTurmaService(10), { ...dados, expirada: false, possui_matriculas: true, alunos: [aluno],
             matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
     });
 }
 
 test('detalhe preserva turma sem matrículas e sem horários, com opcionais nulos', async (t) => {
     simularConsultaTurma(t, async () => ({ id: 1, status: 'INATIVO', ambiente: null, descricao: null,
-        ano_letivo: null, capacidade_maxima: null, horarios: [], matriculas: [] }));
+        ano_letivo_id: null, capacidade_maxima: null, horarios: [], matriculas: [] }));
     const turma = await obterTurmaService(1);
     assert.deepEqual(turma.alunos, []);
     assert.deepEqual(turma.horarios, []);
@@ -207,7 +220,7 @@ test('controller responde 200 convertendo o ID da URL para número', async (t) =
     const res = resposta();
     await obterTurma({ params: { id: '12' } }, res);
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, { id: 12, horarios: [], possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
+    assert.deepEqual(res.body, { id: 12, horarios: [], expirada: false, possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
 });
 
 test('erro do banco retorna 500 sem expor detalhes internos', async (t) => {
@@ -242,7 +255,7 @@ test('GET /api/turmas/:id respeita permissão de leitura e não captura /turmas/
     for (const [role, codigo] of [[null, 401], ['outro', 403], ['professor', 200], ['admin', 200]]) {
         const response = await fetch(`${base}/1`, { headers: role ? { 'x-test-role': role } : {} });
         assert.equal(response.status, codigo);
-        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
+        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], expirada: false, possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
     }
     assert.equal(consultar.mock.callCount(), 2);
     const regulares = await fetch(`${base}/regulares`, { headers: { 'x-test-role': 'professor' } });
@@ -261,7 +274,7 @@ test('controller retorna 201 com turma e horários', async (t) => {
 
 test('controller diferencia validação, vínculo inexistente e falha interna', async (t) => {
     const res = resposta();
-    await criarTurma({ body: { ...regular, ano_letivo: undefined } }, res);
+    await criarTurma({ body: { ...regular, ano_letivo_id: undefined } }, res);
     assert.equal(res.statusCode, 400);
     assert.ok(res.body.erros.length);
     simularTransacao(t, { profissionalExiste: false });

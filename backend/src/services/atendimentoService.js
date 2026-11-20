@@ -1,3 +1,4 @@
+const { bloquearCalendarios, diaLetivo, fimLetivo } = require('./calendarioLetivo');
 const prisma = require('../prismaClient');
 const { obterStatusVinculo } = require('./matriculaService');
 
@@ -198,6 +199,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
     return { sessao, inicio, fim: inicio + sessao.duracao_minutos * 60000 };
   }).filter(({ inicio, fim }) => inicio < ultimoFim && fim > primeiroInicio);
 
+  const calendarios = await tx.ano_letivo.findMany();
   const matriculas = await tx.matricula_turma.findMany({
     where: {
       aluno_id,
@@ -245,6 +247,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
     }
 
     for (let dia = obterDia(inicio - 86400000); dia.getTime() < fim; dia.setUTCDate(dia.getUTCDate() + 1)) {
+      if (!diaLetivo(calendarios, dia)) continue;
       for (const matricula of matriculas) {
         if ((matricula.data_inicio && dia < matricula.data_inicio) ||
             (matricula.data_fim && dia > matricula.data_fim)) continue;
@@ -254,6 +257,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
           const inicioOficina = obterInicioSessao(dia, horario.hora_inicio);
           let fimOficina = obterInicioSessao(dia, horario.hora_fim);
           if (fimOficina < inicioOficina) fimOficina += 86400000;
+          fimOficina = fimLetivo(calendarios, dia, fimOficina);
           if (matricula.data_fim) fimOficina = Math.min(fimOficina, matricula.data_fim.getTime() + 86400000);
           if (inicio < fimOficina && fim > inicioOficina) {
             conflitos.push({
@@ -324,6 +328,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
   });
 
   return prisma.$transaction(async (tx) => {
+    await bloquearCalendarios(tx);
     const statusVinculo = await validarDisponibilidade(tx, {
       aluno_id, datasSessoes, hora_inicio: horaInicioConvertida, duracao_minutos
     });
@@ -447,6 +452,7 @@ async function cancelarAtendimentoService({ aluno_id, atendimento_id }) {
 async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
   const dados = editarAtendimentoDTO.parse(entrada);
   return prisma.$transaction(async (tx) => {
+    await bloquearCalendarios(tx);
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
     const referencia = await buscarAtendimento(tx, aluno_id, atendimento_id);
     const agora = agoraInstituicao();

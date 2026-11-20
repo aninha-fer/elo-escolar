@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,7 +14,8 @@ import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
 export function Turmas() {
     const navigate = useNavigate();
-    const [tipoTurma, setTipoTurma] = useState('REGULAR');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tipoTurma = searchParams.get('tipo') === 'OFICINA' ? 'OFICINA' : 'REGULAR';
     const [tentativa, setTentativa] = useState(0);
     const [termoBusca, setTermoBusca] = useState('');
     const [aviso, setAviso] = useState('');
@@ -26,6 +27,18 @@ export function Turmas() {
     const [erroStatus, setErroStatus] = useState('');
     const envioStatusEmAndamento = useRef(false);
 
+    useEffect(() => {
+        function atualizarAoRetornar() {
+            if (document.visibilityState === 'visible') setTentativa((atual) => atual + 1);
+        }
+        window.addEventListener('focus', atualizarAoRetornar);
+        document.addEventListener('visibilitychange', atualizarAoRetornar);
+        return () => {
+            window.removeEventListener('focus', atualizarAoRetornar);
+            document.removeEventListener('visibilitychange', atualizarAoRetornar);
+        };
+    }, []);
+
 
     const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca }, tentativa);
     const { carregando, erro } = listagem;
@@ -34,6 +47,14 @@ export function Turmas() {
     function trocarTipo(tipo) {
         setTipoTurma(tipo);
         setAviso('');
+    }
+
+    function setTipoTurma(tipo) {
+        setSearchParams((atuais) => {
+            const novos = new URLSearchParams(atuais);
+            novos.set('tipo', tipo);
+            return novos;
+        });
     }
 
     function tentarNovamente() {

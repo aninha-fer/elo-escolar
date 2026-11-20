@@ -9,6 +9,35 @@ const { obterAgenda } = require('../controllers/agendaController');
 const data = (valor) => new Date(`${valor}T00:00:00.000Z`);
 const hora = (valor) => new Date(`1970-01-01T${valor}:00.000Z`);
 
+test('sem calendário oficinas ficam ocultas, mas sessões clínicas continuam nas férias', async (t) => {
+  simularBanco(t, { calendarios: [], matriculas: [matricula()], sessoes: [sessao()] });
+  const agenda = await obterAgendaAlunoService(1, '2026-11-02');
+  assert.deepEqual(agenda.eventos.map((e) => e.tipo), ['ATENDIMENTO']);
+});
+
+test('regular respeita calendário próprio e frequência individual, oficina usa qualquer calendário sem duplicar', async (t) => {
+  const c = { data_inicio: data('2026-11-03'), data_fim: data('2026-11-05') };
+  const m = matricula();
+  const horarios = [1, 2, 3, 4, 5].map((dia_semana) => ({ id: dia_semana, dia_semana, hora_inicio: hora('10:00'), hora_fim: hora('11:00') }));
+  simularBanco(t, { aluno: { id: 1, dias_frequencia: [2, 4] }, calendarios: [c, c], matriculas: [
+    { ...m, turma: { ...m.turma, horarios, ano_letivo: { data_inicio: data('2020-01-01'), data_fim: data('2020-12-31') } } },
+    { ...m, id: 31, turma: { ...m.turma, id: 41, tipo: 'REGULAR', horarios, ano_letivo: c } },
+  ] });
+  const { eventos } = await obterAgendaAlunoService(1, '2026-11-02');
+  assert.deepEqual(eventos.filter((e) => e.tipo === 'REGULAR').map((e) => e.data), ['2026-11-03', '2026-11-05']);
+  assert.deepEqual(eventos.filter((e) => e.tipo === 'OFICINA').map((e) => e.data), ['2026-11-03', '2026-11-04', '2026-11-05']);
+  assert.equal(new Set(eventos.map((e) => e.id)).size, eventos.length);
+});
+
+test('oficina retorna no próximo período mesmo vinculada a calendário antigo', async (t) => {
+  const c = { data_inicio: data('2027-02-08'), data_fim: data('2027-12-18') };
+  const m = matricula({ data_inicio: data('2026-01-01') });
+  m.turma.ano_letivo = { data_inicio: data('2026-02-03'), data_fim: data('2026-12-19') };
+  simularBanco(t, { calendarios: [m.turma.ano_letivo, c], matriculas: [m] });
+  assert.equal((await obterAgendaAlunoService(1, '2027-02-01')).eventos.length, 0);
+  assert.equal((await obterAgendaAlunoService(1, '2027-02-08')).eventos.length, 1);
+});
+
 function sessao(alteracoes = {}) {
   return {
     id: 10, atendimento_clinico_id: 20, status: 'ATIVO', data_cancelamento: null,
@@ -48,13 +77,15 @@ function corresponde(registro, filtro) {
   });
 }
 
-function simularBanco(t, { aluno = { id: 1 }, sessoes = [], matriculas = [] } = {}) {
+function simularBanco(t, { aluno = { id: 1, dias_frequencia: [1,2,3,4,5] }, sessoes = [], matriculas = [], calendarios = [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2026-12-19') }] } = {}) {
   function substituir(objeto, metodo, implementacao) {
     const original = objeto[metodo];
     t.after(() => { objeto[metodo] = original; });
     objeto[metodo] = t.mock.fn(implementacao);
     return objeto[metodo];
   }
+  substituir(prisma.ano_letivo, 'findMany', async () => calendarios);
+  matriculas = matriculas.map((m) => ({ ...m, turma: { ano_letivo: calendarios[0], ...m.turma } }));
   return {
     aluno: substituir(prisma.aluno, 'findUnique', async () => aluno),
     matriculas: substituir(prisma.matricula_turma, 'findMany', async ({ where }) =>

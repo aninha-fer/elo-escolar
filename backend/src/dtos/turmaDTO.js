@@ -3,7 +3,9 @@ const { z } = require('zod');
 const listarTurmasQueryDTO = z.object({
   tipo: z.enum(['REGULAR', 'OFICINA'], {
     invalid_type_error: "O tipo deve ser REGULAR ou OFICINA."
-  }).optional()
+  }).optional(),
+  status: z.enum(['TODOS', 'ATIVO', 'INATIVO']).optional(),
+  ano: z.coerce.number().int().min(1).max(9999).optional(),
 });
 
 const listarTurmasRegularesQueryDTO = z.object({
@@ -23,7 +25,7 @@ const criarTurmaDTO = z.object({
   turno: z.enum(['MANHA', 'TARDE']),
   ambiente_id: z.number().int().positive(),
   capacidade_maxima: inteiroOpcional(z.number().int().nonnegative()),
-  ano_letivo: inteiroOpcional(z.number().int().positive()),
+  ano_letivo_id: inteiroOpcional(z.number().int().positive()),
   descricao: z.string().trim().nullish(),
   profissional_id: z.number().int().positive(),
   hora_inicio: z.string().optional(),
@@ -32,7 +34,7 @@ const criarTurmaDTO = z.object({
 }).superRefine((dados, contexto) => {
   const erro = (campo, message) => contexto.addIssue({ code: 'custom', path: [campo], message });
   if (dados.tipo === 'REGULAR') {
-    if (dados.ano_letivo === undefined) erro('ano_letivo', 'Informe o ano letivo da turma regular.');
+    if (dados.ano_letivo_id === undefined) erro('ano_letivo_id', 'Informe o ano letivo da turma regular.');
     return;
   }
 
@@ -53,8 +55,7 @@ const detalheTurmaQueryDTO = z.object({ somente_dados: z.enum(['true', 'false'])
 const prepararNovaTurmaQueryDTO = z.object({ turno: z.enum(['MANHA', 'TARDE']).optional() }).strict();
 
 const criarTurmaAPartirDTO = z.object({
-  turma: criarTurmaDTO.refine((dados) => dados.tipo === 'REGULAR', { path: ['tipo'], message: 'A nova turma deve ser regular.' })
-    .refine((dados) => dados.ano_letivo <= 9999, { path: ['ano_letivo'], message: 'Informe um ano letivo entre 1 e 9999.' }),
+  turma: criarTurmaDTO.refine((dados) => dados.tipo === 'REGULAR', { path: ['tipo'], message: 'A nova turma deve ser regular.' }),
   alunos_ids: z.array(z.number().int().positive()).refine((ids) => new Set(ids).size === ids.length, 'Não repita alunos na seleção.'),
 }).strict();
 
@@ -68,7 +69,7 @@ const excluirTurmaDTO = z.object({ confirmar_cancelamentos: confirmacaoCancelame
 const editarTurmaDTO = z.object({
   nome: z.string().trim().min(1, 'Informe o nome da turma.'),
   turno: z.enum(['MANHA', 'TARDE']),
-  ano_letivo: z.number().int().positive(),
+  ano_letivo_id: z.number().int().positive(),
   ambiente_id: z.number().int().positive(),
   capacidade_maxima: z.number().int().nonnegative().nullable(),
   descricao: z.string().trim().nullable(),

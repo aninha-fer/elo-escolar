@@ -10,6 +10,7 @@ import { AlunosVinculados } from './components/AlunosVinculados';
 import { VincularAlunoModal } from './components/VincularAlunoModal';
 import { CampoInformacao } from '../../components/CampoInformacao';
 import { BotaoVoltar } from '../../components/BotaoVoltar';
+import { TagExpiradaTurma } from '../../components/TagExpiradaTurma';
 
 const estilosStatus = { ATIVO: 'bg-emerald-50 text-emerald-600', INATIVO: 'bg-slate-100 text-slate-500', PROVISORIO: 'bg-amber-50 text-amber-700' };
 const rotulosStatus = { ATIVO: 'Ativa', INATIVO: 'Inativa', PROVISORIO: 'Provisória' };
@@ -23,6 +24,18 @@ export function TurmaDetalhes() {
     const [aviso, setAviso] = useState('');
     const listaAlunos = useListagemInfinita(turmasService.listarAlunosPaginados, { id }, tentativa);
     const idValido = /^\d+$/.test(id) && Number(id) > 0 && Number(id) <= 2147483647;
+
+    useEffect(() => {
+        function atualizarAoRetornar() {
+            if (document.visibilityState === 'visible') setTentativa((atual) => atual + 1);
+        }
+        window.addEventListener('focus', atualizarAoRetornar);
+        document.addEventListener('visibilitychange', atualizarAoRetornar);
+        return () => {
+            window.removeEventListener('focus', atualizarAoRetornar);
+            document.removeEventListener('visibilitychange', atualizarAoRetornar);
+        };
+    }, []);
 
     useEffect(() => {
         if (!idValido) return;
@@ -60,12 +73,12 @@ export function TurmaDetalhes() {
     const grupos = agruparHorarios(turma.horarios);
     const dias = [...new Set(grupos.flatMap((grupo) => grupo.dias))].sort((a, b) => a - b);
     const nomeProfissional = turma.profissional?.pessoa?.nome;
-    const podeVincular = usuario?.role === 'admin' && regular && turma.status === 'ATIVO';
+    const podeVincular = usuario?.role === 'admin' && regular && turma.status === 'ATIVO' && !turma.expirada;
     const campos = [
         ['Período', formatarTurno(turma.turno)],
         ['Dias da semana', dias.length ? formatarFrequencia(dias) : 'Não informados'],
         ...(!regular ? [['Horário', grupos.length ? grupos.map((grupo) => `${grupo.inicio}–${grupo.fim}`).join(' · ') : 'Não informado']] : []),
-        ...(regular ? [['Ano letivo', turma.ano_letivo ?? 'Não informado']] : []),
+        ...(regular ? [['Ano letivo', turma.ano_letivo?.ano ?? 'Não informado']] : []),
         ['Vagas', turma.capacidade_maxima ?? 'Sem limite de vagas'],
     ];
 
@@ -83,6 +96,7 @@ export function TurmaDetalhes() {
                 <BotaoVoltar data-testid="turma-voltar" to='/turmas' />
                 <div className="min-w-0 flex-1"><h1 id="turma-detalhes-titulo" className="break-words text-xl font-bold text-text-main">{turma.nome}</h1><p className="mt-xs text-sm text-slate-500">{tipo}</p></div>
                 <span className={`rounded-full px-md py-sm text-sm font-semibold ${estilosStatus[turma.status] ?? 'bg-slate-100 text-slate-500'}`}>{rotulosStatus[turma.status] ?? 'Não definido'}</span>
+                <TagExpiradaTurma expirada={turma.expirada} testId="turma-detalhes-expirada" />
             </header>
             {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
             <div className="grid min-w-0 grid-cols-1 gap-lg xl:grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)]">

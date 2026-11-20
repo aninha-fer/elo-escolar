@@ -117,6 +117,7 @@ async function criarAdministrador() {
       pessoa_id: pessoaId,
       email,
       senha_hash: senhaHash,
+      deve_trocar_senha: true,
       role: 'admin',
     },
     select: { id: true, email: true },

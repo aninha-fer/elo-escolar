@@ -125,6 +125,8 @@ model usuario {
   pessoa     pessoa @relation(fields: [pessoa_id], references: [id])
   email      String? @unique
   senha_hash String?
+  deve_trocar_senha Boolean @default(true)
+  senha_versao Int @default(1)
   role       String
   status     status_simples @default(ATIVO)
   deleted_at DateTime? @db.Timestamptz(3)
@@ -153,6 +155,16 @@ model ambiente {
   turmas turma[]
 }
 
+model ano_letivo {
+  id          Int      @id @default(autoincrement())
+  ano         Int      @unique
+  data_inicio DateTime @db.Date
+  data_fim    DateTime @db.Date
+  created_at  DateTime @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  turmas      turma[]
+}
+
 model turma {
   id                Int          @id @default(autoincrement())
   nome              String
@@ -164,7 +176,8 @@ model turma {
   descricao         String?
   profissional_id   Int
   profissional      funcionario  @relation(fields: [profissional_id], references: [id])
-  ano_letivo        Int?
+  ano_letivo_id     Int?
+  ano_letivo        ano_letivo? @relation(fields: [ano_letivo_id], references: [id], onDelete: Restrict)
   status            status_simples       @default(ATIVO)
   deleted_at        DateTime?    @db.Timestamptz(3)
   created_at        DateTime     @default(now()) @db.Timestamptz(3)
@@ -174,6 +187,7 @@ model turma {
 
   @@index([ambiente_id])
   @@index([profissional_id])
+  @@index([ano_letivo_id])
 }
 
 model turma_horario {

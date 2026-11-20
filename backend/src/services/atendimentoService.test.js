@@ -153,7 +153,9 @@ function simularBanco(t, {
   t.mock.timers.enable({ apis: ['Date'], now: new Date(agora) });
   const eventos = [];
   const tx = {
+    ano_letivo: { findMany: async () => [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2027-12-19') }] },
     $queryRaw: t.mock.fn(async (sql, id) => {
+      if (sql.join('?').includes('pg_advisory')) return [];
       eventos.push('bloqueio');
       assert.match(sql.join('?'), /SELECT "id" FROM "(aluno|funcionario)" WHERE "id" = \? FOR UPDATE/);
       assert.equal(id, sql.join('?').includes('FROM "funcionario"') ? dadosBase.profissional_id : dadosBase.aluno_id);
@@ -427,6 +429,7 @@ test('duas criações simultâneas consultam a agenda após adquirir o bloqueio'
     const txConcorrente = {
       ...tx,
       async $queryRaw(...args) {
+        if (args[0].join('?').includes('pg_advisory')) return [];
         if (args[0].join('?').includes('FROM "funcionario"')) return tx.$queryRaw(...args);
         const anterior = fila;
         fila = new Promise((resolve) => { liberar = resolve; });

@@ -28,10 +28,16 @@ function configurarConsulta(recurso, parametros, alunoId, turmaId) {
       else if (recurso === 'usuarios') filtros.push(Prisma.sql`(${nome} OR ${contem(Prisma.sql`coalesce(a.email, '')`, busca)})`);
       else filtros.push(nome);
     }
+  } else if (recurso === 'anos_letivos') {
+    origem = Prisma.sql`ano_letivo a`; chave = Prisma.sql`lpad(a.ano::text, 4, '0')`; id = Prisma.sql`a.id`;
+    decrescente = true;
+    filtros.push(Prisma.sql`TRUE`);
   } else if (recurso === 'turmas') {
     origem = Prisma.sql`turma t`; chave = Prisma.sql`t.nome`; id = Prisma.sql`t.id`;
     filtros.push(Prisma.sql`t.deleted_at IS NULL`);
     if (parametros.tipo) filtros.push(Prisma.sql`t.tipo::text = ${parametros.tipo}`);
+    if (parametros.status && parametros.status !== 'TODOS') filtros.push(Prisma.sql`t.status::text = ${parametros.status}`);
+    if (parametros.ano) filtros.push(Prisma.sql`EXISTS (SELECT 1 FROM ano_letivo al WHERE al.id = t.ano_letivo_id AND al.ano = ${parametros.ano})`);
     if (busca) filtros.push(contem(chave, busca));
   } else if (['oficinas_aluno', 'alunos_turma'].includes(recurso)) {
     origem = Prisma.sql`matricula_turma m JOIN turma t ON t.id = m.turma_id JOIN aluno a ON a.id = m.aluno_id JOIN pessoa p ON p.id = a.pessoa_id`;
@@ -65,7 +71,8 @@ function configurarConsulta(recurso, parametros, alunoId, turmaId) {
 
 async function paginarIds(recurso, parametros, contexto = {}) {
   const { origem, chave, id, decrescente, filtro } = configurarConsulta(recurso, parametros, contexto.alunoId, contexto.turmaId);
-  const assinatura = createHash('sha256').update(JSON.stringify([recurso, normalizarBusca(parametros.busca), parametros.status, parametros.tipo, contexto])).digest('hex');
+  const assinatura = createHash('sha256').update(JSON.stringify([recurso, normalizarBusca(parametros.busca), parametros.status, parametros.tipo, contexto,
+    ...(parametros.ano ? [parametros.ano] : [])])).digest('hex');
   let depois = Prisma.sql`TRUE`;
   if (parametros.cursor) {
     let cursor;

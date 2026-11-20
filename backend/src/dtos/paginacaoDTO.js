@@ -6,6 +6,7 @@ const paginacaoDTO = z.object({
   busca: z.string().trim().max(200).default(''),
   status: z.enum(['TODOS', 'ATIVO', 'INATIVO', 'RASCUNHO']).default('TODOS'),
   tipo: z.enum(['REGULAR', 'OFICINA']).optional(),
+  ano: z.coerce.number().int().min(1).max(9999).optional(),
 });
 
 const cursorDTO = z.object({ chave: z.string().max(1000), id: z.number().int().positive().max(2147483647), assinatura: z.string() }).strict();
