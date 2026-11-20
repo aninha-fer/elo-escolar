@@ -1,6 +1,14 @@
 import { api } from './api';
 
 export const turmasService = {
+  async prepararNovaTurma(id, turno, signal) {
+    const { data } = await api.get(`/turmas/${id}/nova-turma`, { params: { turno }, signal });
+    return data;
+  },
+  async criarAPartir(id, dados) {
+    const { data } = await api.post(`/turmas/${id}/nova-turma`, dados);
+    return data;
+  },
   async excluir(id, dados) {
     await api.delete(`/turmas/${id}`, { data: dados });
   },

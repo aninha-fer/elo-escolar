@@ -76,7 +76,7 @@ export function Turmas() {
         setAviso('');
         setErroStatus('');
         setOperacao({ tipo, turma });
-        if (tipo === 'editar' || (tipo === 'status' && turma.status === 'INATIVO')) return;
+        if (tipo === 'editar' || tipo === 'nova-a-partir' || (tipo === 'status' && turma.status === 'INATIVO')) return;
         envioStatusEmAndamento.current = true;
         setAlterandoStatus(true);
         try {
@@ -181,10 +181,13 @@ export function Turmas() {
                     {filtrados.map((turma) => <TurmaItem key={turma.id} turma={turma} profissionais={turma.profissionais} podeEditar={podeEditar}
                         onEditar={(selecionada) => abrirOperacao('editar', selecionada)} onAlterarStatus={(selecionada) => abrirOperacao('status', selecionada)}
                         onExcluir={(selecionada) => abrirOperacao('excluir', selecionada)}
+                        onCriarAPartir={(selecionada) => abrirOperacao('nova-a-partir', selecionada)}
                         onSelecionar={(selecionada) => navigate(`/turmas/${selecionada.id}`)} />)}
                 </ul>
             )}
             {modalAberto && podeEditar && <FormularioTurma tipoInicial={tipoTurma} onClose={() => setModalAberto(false)} onCriado={turmaCriada} />}
+            {operacao?.tipo === 'nova-a-partir' && podeEditar && <FormularioTurma key={operacao.turma.id} turmaOrigem={operacao.turma}
+                onClose={() => setOperacao(null)} onCriado={(turma) => turmaAtualizada(turma, 'Nova turma criada com sucesso.')} />}
             {operacao?.tipo === 'editar' && podeEditar && <FormularioTurma key={operacao.turma.id} turma={operacao.turma}
                 onClose={() => setOperacao(null)} onSalvo={(turma) => turmaAtualizada(turma, 'Turma atualizada com sucesso.')} />}
             {operacao?.tipo === 'status' && podeEditar && <ModalConfirmacao testId="turma-alterar-status" isOpen onClose={fecharConfirmacao} showCancel

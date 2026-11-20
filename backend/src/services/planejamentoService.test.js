@@ -13,6 +13,7 @@ const { editarProfissionalService, excluirProfissionalService, listarProfissiona
 const { criarTurmaService } = require('./turmaService');
 const { criarUsuario, editarUsuario, listarUsuarios, excluirUsuario } = require('./usuarioService');
 const { buscarIdentidadePorId } = require('./authService');
+const { prepararNovaTurmaService, criarTurmaAPartirService } = require('./turmaService');
 
 const data = (valor) => new Date(`${valor}T00:00:00.000Z`);
 const hora = (valor) => new Date(`1970-01-01T${valor}:00.000Z`);
@@ -674,7 +675,10 @@ function simularBanco(t, inicial = {}) {
     function hidratar(nome, item) {
       if (nome === 'usuario') return { ...item, pessoa: hidratar('pessoa', ler('pessoa').find((p) => p.id === item.pessoa_id)) };
       if (nome === 'funcionario') return { ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id) ?? { nome: item.nome, status_geral: 'ATIVO' } };
-      if (nome === 'aluno') return { deleted_at: null, ...item, responsaveis: ler('aluno_responsavel').filter((r) => r.aluno_id === item.id) };
+      if (nome === 'aluno') return { deleted_at: null, ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id),
+        matriculas_turmas: ler('matricula_turma').filter((m) => m.aluno_id === item.id).map((m) => ({ ...m, turma: ler('turma').find((t) => t.id === m.turma_id) })),
+        responsaveis: ler('aluno_responsavel').filter((r) => r.aluno_id === item.id) };
+      if (nome === 'turma' && estado.turma_horario) return { ...item, horarios: ler('turma_horario').filter((h) => h.turma_id === item.id) };
       if (nome === 'pessoa') return { ...item,
         aluno: ler('aluno').find((a) => a.pessoa_id === item.id) ?? null,
         funcionario: ler('funcionario').find((f) => f.pessoa_id === item.id) ?? null,
@@ -682,7 +686,7 @@ function simularBanco(t, inicial = {}) {
         alunos_responsavel: ler('aluno_responsavel').filter((r) => r.pessoa_id === item.id) };
       if (nome === 'matricula_turma') return { ...item,
         aluno: ler('aluno').find((outro) => outro.id === item.aluno_id),
-        turma: ler('turma').find((outro) => outro.id === item.turma_id) };
+        turma: hidratar('turma', ler('turma').find((outro) => outro.id === item.turma_id)) };
       if (nome === 'atendimento_clinico') return { ...item,
         aluno: ler('aluno').find((outro) => outro.id === item.aluno_id), profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { nome: 'Ana' }),
         sessoes: ler('atendimento_sessao').filter((outro) => outro.atendimento_clinico_id === item.id) };
@@ -1825,3 +1829,166 @@ for (const primeiro of ['inativar', 'matricular']) {
     }
   });
 }
+
+function planejamentoNovaTurma() {
+  const alunos = Array.from({ length: 9 }, (_, indice) => ({ ...aluno(indice + 1, 'ATIVO'), participa_procan: indice === 0 }));
+  alunos[3].turno = 'TARDE';
+  alunos[4].status = 'INATIVO';
+  alunos[5].status = 'RASCUNHO';
+  alunos[6].deleted_at = data('2026-10-01');
+  return {
+    aluno: alunos, pessoa: alunos.map((a) => ({ id: a.id, nome: `Aluno ${a.id}`, status_geral: 'ATIVO' })),
+    turma: [{ ...turma(10, 'REGULAR', 3), status: 'INATIVO', ambiente_id: 2, ano_letivo: 2026, descricao: 'Descrição da origem' }, turma(20, 'REGULAR', 20)],
+    ambiente: [{ id: 2, nome: 'Sala' }], turma_horario: [],
+    matricula_turma: [
+      { id: 50, aluno_id: 1, turma_id: 10, status: 'INATIVO', data_inicio: data('2026-01-01'), data_fim: data('2026-11-01') },
+      { id: 51, aluno_id: 2, turma_id: 10, status: 'PROVISORIO', data_inicio: data('2026-01-01'), data_fim: data('2026-11-01') },
+      { id: 52, aluno_id: 8, turma_id: 20, status: 'ATIVO', data_inicio: data('2026-01-01'), data_fim: null },
+      { id: 53, aluno_id: 9, turma_id: 20, status: 'ATIVO', data_inicio: data('2026-01-01'), data_fim: null },
+      { id: 54, aluno_id: 9, turma_id: 10, status: 'INATIVO', data_inicio: data('2026-01-01'), data_fim: data('2026-10-01') },
+    ],
+  };
+}
+
+const pedidoNovaTurma = { turma: { tipo: 'REGULAR', nome: 'Girassol 2027', turno: 'MANHA', ano_letivo: 2027,
+  ambiente_id: 2, profissional_id: 1, capacidade_maxima: 3, descricao: 'Nova descrição' }, alunos_ids: [1, 3] };
+
+test('preparação não grava, filtra turno/status/vínculo ativo e sinaliza somente antigos alunos efetivados', async (t) => {
+  const banco = simularBanco(t, planejamentoNovaTurma());
+  const antes = structuredClone(banco);
+  const manha = await prepararNovaTurmaService(10);
+  assert.deepEqual(manha.alunos.map((a) => a.id), [1, 2, 3]);
+  assert.deepEqual(manha.alunos[0], { id: 1, nome: 'Aluno 1', participa_procan: true, ano_anterior: true });
+  assert.equal(manha.alunos[1].ano_anterior, false);
+  assert.deepEqual((await prepararNovaTurmaService(10, 'TARDE')).alunos.map((a) => a.id), [4]);
+  assert.deepEqual(banco, antes);
+});
+
+test('nova turma cria cinco horários e matrículas efetivas em primeiro de janeiro sem modificar a origem ou seu histórico', async (t) => {
+  const banco = simularBanco(t, planejamentoNovaTurma());
+  const anteriores = structuredClone(banco.matricula_turma), origem = structuredClone(banco.turma[0]);
+  const nova = await criarTurmaAPartirService(10, pedidoNovaTurma);
+  assert.notEqual(nova.id, 10);
+  assert.equal(nova.status, 'ATIVO');
+  assert.equal(nova.nome, 'Girassol 2027');
+  assert.equal(nova.ano_letivo, 2027);
+  assert.equal(nova.horarios.length, 5);
+  assert.equal(nova.horarios.find((h) => h.dia_semana === 3).hora_inicio.toISOString().slice(11, 16), '12:30');
+  const novas = banco.matricula_turma.filter((m) => m.turma_id === nova.id);
+  assert.deepEqual(novas.map((m) => m.aluno_id), [1, 3]);
+  assert.ok(novas.every((m) => m.status === 'ATIVO' && m.data_inicio.toISOString() === '2027-01-01T00:00:00.000Z'));
+  assert.deepEqual(banco.turma[0], origem);
+  assert.deepEqual(banco.matricula_turma.filter((m) => m.turma_id !== nova.id), anteriores);
+  assert.equal((await obterAgendaAlunoService(1, '2026-12-28')).eventos.some((e) => e.turma_id === nova.id && e.data < '2027-01-01'), false);
+  assert.ok((await obterAgendaAlunoService(1, '2027-01-04')).eventos.some((e) => e.turma_id === nova.id));
+});
+
+test('turno alterado usa somente candidatos compatíveis e gera o cronograma da tarde', async (t) => {
+  simularBanco(t, planejamentoNovaTurma());
+  const nova = await criarTurmaAPartirService(10, { turma: { ...pedidoNovaTurma.turma, turno: 'TARDE' }, alunos_ids: [4] });
+  assert.ok(nova.horarios.every((h) => h.hora_inicio.toISOString().slice(11, 16) === '12:30'));
+});
+
+for (const caso of ['ATIVA', 'OFICINA', 'EXCLUIDA', 'INEXISTENTE']) {
+  test(`nova turma rejeita origem ${caso} tanto na preparação quanto na criação`, async (t) => {
+    const inicial = planejamentoNovaTurma();
+    if (caso === 'ATIVA') inicial.turma[0].status = 'ATIVO';
+    if (caso === 'OFICINA') inicial.turma[0].tipo = 'OFICINA';
+    if (caso === 'EXCLUIDA') inicial.turma[0].deleted_at = data('2026-11-01');
+    if (caso === 'INEXISTENTE') inicial.turma = [];
+    const banco = simularBanco(t, inicial);
+    const antes = structuredClone(banco);
+    const statusCode = ['EXCLUIDA', 'INEXISTENTE'].includes(caso) ? 404 : 409;
+    await assert.rejects(() => prepararNovaTurmaService(10), { statusCode });
+    await assert.rejects(() => criarTurmaAPartirService(10, pedidoNovaTurma), { statusCode });
+    assert.deepEqual(banco, antes);
+  });
+}
+
+for (const id of [4, 5, 6, 7, 8, 999]) {
+  test(`aluno indisponível ${id} impede criação sem gravação parcial`, async (t) => {
+    const banco = simularBanco(t, planejamentoNovaTurma());
+    const antes = structuredClone(banco);
+    await assert.rejects(() => criarTurmaAPartirService(10, { ...pedidoNovaTurma, alunos_ids: [1, id] }), { statusCode: 409 });
+    assert.deepEqual(banco, antes);
+  });
+}
+
+test('capacidade insuficiente bloqueia e ausência de limite ou de alunos permite criar', async (t) => {
+  const banco = simularBanco(t, planejamentoNovaTurma());
+  await assert.rejects(() => criarTurmaAPartirService(10, { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, capacidade_maxima: 1 } }), { statusCode: 409 });
+  const { capacidade_maxima, ...semLimite } = pedidoNovaTurma.turma;
+  assert.equal(capacidade_maxima, 3);
+  const nova = await criarTurmaAPartirService(10, { turma: semLimite, alunos_ids: [1, 2, 3] });
+  assert.equal(banco.matricula_turma.filter((m) => m.turma_id === nova.id).length, 3);
+  const vazia = await criarTurmaAPartirService(10, { ...pedidoNovaTurma, alunos_ids: [] });
+  assert.equal(banco.matricula_turma.some((m) => m.turma_id === vazia.id), false);
+});
+
+test('falha ao matricular após criar turma e horários reverte toda a operação', async (t) => {
+  const banco = simularBanco(t, planejamentoNovaTurma());
+  const antes = structuredClone(banco), transacao = prisma.$transaction;
+  prisma.$transaction = (operacao, opcoes) => transacao((tx) => {
+    const criar = tx.matricula_turma.create;
+    tx.matricula_turma.create = (args) => {
+      if (args.data.aluno_id === 3) throw new Error('Falha na segunda matrícula');
+      return criar(args);
+    };
+    return operacao(tx);
+  }, opcoes);
+  await assert.rejects(() => criarTurmaAPartirService(10, pedidoNovaTurma), /Falha na segunda matrícula/);
+  assert.deepEqual(banco, antes);
+});
+
+test('profissional inativo ou sala inexistente impede criar a nova turma', async (t) => {
+  const inicial = planejamentoNovaTurma();
+  inicial.pessoa.push({ id: 10, nome: 'Profissional inativo', status_geral: 'INATIVO' });
+  const banco = simularBanco(t, inicial), antes = structuredClone(banco);
+  await assert.rejects(() => criarTurmaAPartirService(10, pedidoNovaTurma), { statusCode: 400 });
+  assert.deepEqual(banco, antes);
+  banco.pessoa.find((p) => p.id === 10).status_geral = 'ATIVO';
+  await assert.rejects(() => criarTurmaAPartirService(10, { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, ambiente_id: 999 } }), { statusCode: 404 });
+  assert.equal(banco.turma.length, 2);
+});
+
+test('validação de frequência da matrícula regular reverte turma, horários e matrículas já criadas', async (t) => {
+  const inicial = planejamentoNovaTurma();
+  inicial.aluno[2].dias_frequencia = [6];
+  const banco = simularBanco(t, inicial), antes = structuredClone(banco);
+  await assert.rejects(() => criarTurmaAPartirService(10, pedidoNovaTurma), { isConflict: true });
+  assert.deepEqual(banco, antes);
+});
+
+test('duas criações concorrentes não matriculam o mesmo aluno em duas turmas regulares', async (t) => {
+  const banco = simularBanco(t, planejamentoNovaTurma());
+  const resultados = await Promise.allSettled([criarTurmaAPartirService(10, pedidoNovaTurma), criarTurmaAPartirService(10, pedidoNovaTurma)]);
+  assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
+  assert.equal(resultados.find((r) => r.status === 'rejected').reason.statusCode, 409);
+  assert.equal(banco.turma.length, 3);
+  assert.equal(banco.matricula_turma.filter((m) => m.aluno_id === 1 && m.status === 'ATIVO').length, 1);
+});
+
+test('endpoints de nova turma exigem administração e validam campos e alunos duplicados', async (t) => {
+  simularBanco(t, planejamentoNovaTurma());
+  const express = require('express'), { createServer } = require('node:http');
+  const { turmaAdminRoutes } = require('../routes/turmaRoutes');
+  const app = express(); app.use(express.json());
+  app.use('/api', (req, res, next) => { if (req.get('x-role')) req.usuario = { role: req.get('x-role') }; next(); }, turmaAdminRoutes);
+  const server = createServer(app);
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/turmas/10/nova-turma`;
+  for (const method of ['GET', 'POST']) for (const [role, esperado] of [['', 401], ['professor', 403]]) {
+    assert.equal((await fetch(base, { method, headers: role ? { 'x-role': role } : {} })).status, esperado);
+  }
+  assert.equal((await fetch(`${base}?turno=INVALIDO`, { headers: { 'x-role': 'admin' } })).status, 400);
+  const consulta = await fetch(`${base}?turno=TARDE`, { headers: { 'x-role': 'admin' } });
+  assert.equal(consulta.status, 200);
+  assert.deepEqual((await consulta.json()).alunos.map((a) => a.id), [4]);
+  const post = (body) => fetch(base, { method: 'POST', headers: { 'x-role': 'admin', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  for (const body of [{ ...pedidoNovaTurma, alunos_ids: [1, 1] }, { ...pedidoNovaTurma, alunos_ids: ['1'] },
+    { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, ano_letivo: 10000 } }, { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, ano_letivo: undefined } }]) {
+    assert.equal((await post(body)).status, 400);
+  }
+  assert.equal((await post(pedidoNovaTurma)).status, 201);
+});

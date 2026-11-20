@@ -49,6 +49,14 @@ const getTurmaDTO = z.object({
   id: z.coerce.number().int().positive('O ID da turma deve ser um número positivo.').max(2147483647)
 });
 
+const prepararNovaTurmaQueryDTO = z.object({ turno: z.enum(['MANHA', 'TARDE']).optional() }).strict();
+
+const criarTurmaAPartirDTO = z.object({
+  turma: criarTurmaDTO.refine((dados) => dados.tipo === 'REGULAR', { path: ['tipo'], message: 'A nova turma deve ser regular.' })
+    .refine((dados) => dados.ano_letivo <= 9999, { path: ['ano_letivo'], message: 'Informe um ano letivo entre 1 e 9999.' }),
+  alunos_ids: z.array(z.number().int().positive()).refine((ids) => new Set(ids).size === ids.length, 'Não repita alunos na seleção.'),
+}).strict();
+
 const confirmacaoCancelamentosDTO = z.object({
   matriculas: z.array(z.number().int().positive()).transform((ids) => [...new Set(ids)].sort((a, b) => a - b)),
   matriculas_ativas: z.number().int().nonnegative(),
@@ -74,4 +82,4 @@ const editarTurmaDTO = z.object({
   if (!campos.length) contexto.addIssue({ code: 'custom', message: 'Informe ao menos um campo para atualizar.' });
 });
 
-module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO };
+module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO, prepararNovaTurmaQueryDTO, criarTurmaAPartirDTO };

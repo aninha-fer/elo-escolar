@@ -18,7 +18,7 @@ function formatarDias(dias) {
         : formatarFrequencia(dias).replaceAll(', ', '/');
 }
 
-export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar = false, onEditar, onAlterarStatus, onExcluir }) {
+export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar = false, onEditar, onAlterarStatus, onExcluir, onCriarAPartir }) {
     const grupos = agruparHorarios(turma.horarios);
     const nome = turma.nome || 'Turma sem nome';
     const horarios = grupos.map((grupo) => `${formatarDias(grupo.dias)} ${grupo.inicio}–${grupo.fim}`).join(' · ');
@@ -60,8 +60,8 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                     aria-label={`Selecionar ${turma.tipo === 'OFICINA' ? 'oficina' : 'turma'} ${nome}`} onClick={() => onSelecionar?.(turma)} />
                 {podeEditar && <div className="absolute right-md top-md z-10"><BotaoAcoes testId={`turma-${turma.id}-acoes`} label={`Ações para ${nome}`} options={[
                     { id: 'editar', label: 'Editar', disabled: !onEditar, onClick: () => onEditar(turma), icon: <EditIcon/> },
-                    { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus,
-                        textColor: turma.status === 'INATIVO' ? '#059669' : '#DC2626', onClick: () => onAlterarStatus(turma) },
+                    { id: 'status', label: turma.status === 'INATIVO' ? 'Ativar turma' : 'Inativar turma', disabled: !onAlterarStatus, onClick: () => onAlterarStatus(turma) },
+                    ...(turma.tipo === 'REGULAR' && turma.status === 'INATIVO' ? [{ id: 'criar-a-partir', label: 'Criar nova turma a partir desta', disabled: !onCriarAPartir, onClick: () => onCriarAPartir(turma) }] : []),
                     { id: 'excluir', label: 'Excluir', textColor: '#DC2626', disabled: !onExcluir, onClick: () => onExcluir(turma), icon: <TrashIcon /> },
                 ]} /></div>}
             </article>
