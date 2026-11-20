@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Input } from '../../../components/Input';
@@ -15,6 +15,7 @@ export function LoginForm() {
     const [aviso, setAviso] = useState(location.state?.aviso || avisoSessao || '');
     const navigate = useNavigate();
     const [enviando, setEnviando] = useState(false);
+    const envio = useRef(false);
 
     function alterarCampo(campo, valor) {
         if (campo === 'email') setEmail(valor);
@@ -25,6 +26,7 @@ export function LoginForm() {
 
     async function enviar(event) {
         event.preventDefault();
+        if (envio.current) return;
         const campos = event.currentTarget.elements;
         const novosErros = {};
 
@@ -41,6 +43,7 @@ export function LoginForm() {
             return;
         }
 
+        envio.current = true;
         setEnviando(true);
 
         try {
@@ -49,7 +52,10 @@ export function LoginForm() {
         } catch (error) {
             const codigo = error.response?.status;
 
-            if (codigo === 401) {
+            if (error.code === 'ERR_CANCELED') return;
+            if (['RESULTADO_NAO_CONFIRMADO', 'CONEXAO_INDISPONIVEL', 'RESPOSTA_INVALIDA'].includes(error.code)) {
+                setAviso(error.response.data.erro);
+            } else if (codigo === 401) {
                 setAviso('E-mail ou senha inválidos.');
             } else if (codigo === 403) {
                 setAviso('Acesso negado.');
@@ -59,6 +65,7 @@ export function LoginForm() {
                 setAviso('Não foi possível entrar. Tente novamente.');
             }
         } finally {
+            envio.current = false;
             setEnviando(false);
         }
     }
