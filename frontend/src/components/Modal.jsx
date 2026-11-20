@@ -19,6 +19,7 @@ export function Modal({
   ariaLabelledBy,
   ariaDescribedBy,
   testId,
+  dismissible = true,
 }) {
   const titleId = useId();
   if (!isOpen) return null;
@@ -28,10 +29,18 @@ export function Modal({
       <div 
         data-testid={testId ? `${testId}-fundo` : undefined}
         className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs" 
-        onClick={onClose} 
+        onClick={dismissible ? onClose : undefined}
       />
 
       <div data-testid={testId} role="dialog" aria-modal="true" aria-labelledby={ariaLabelledBy ?? (showHeader ? titleId : undefined)} aria-describedby={ariaDescribedBy}
+        onKeyDown={!dismissible ? (event) => {
+          if (event.key === 'Escape') event.preventDefault();
+          if (event.key !== 'Tab') return;
+          const campos = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')];
+          const primeiro = campos[0], ultimo = campos.at(-1);
+          if (event.shiftKey && document.activeElement === primeiro) { event.preventDefault(); ultimo?.focus(); }
+          else if (!event.shiftKey && document.activeElement === ultimo) { event.preventDefault(); primeiro?.focus(); }
+        } : undefined}
         className="relative flex flex-col w-full max-w-2xl max-h-[90vh] bg-white rounded-lg shadow-2xl z-10 overflow-clip">
         
         <div className={showHeader ? 'flex items-start justify-between p-5 border-b border-slate-100 shrink-0 bg-bg-main' : 'absolute right-5 top-5 z-10'}>
@@ -39,7 +48,7 @@ export function Modal({
             <h2 id={titleId} className="text-lg font-bold text-text-main">{title}</h2>
             {subtitle && <p className="text-xs text-text-muted mt-1">{subtitle}</p>}
           </div>}
-          <button 
+          {dismissible && <button
             data-testid={testId ? `${testId}-fechar` : undefined}
             type="button" 
             onClick={onClose}
@@ -47,7 +56,7 @@ export function Modal({
             className={`p-1 text-text-main rounded-sm ${showHeader ? 'bg-bg-main hover:bg-bg-surface' : 'bg-bg-surface hover:bg-bg-main'}`}
           >
             ✕
-          </button>
+          </button>}
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-5">
@@ -56,14 +65,14 @@ export function Modal({
 
         {showFooter && (
           <div className="flex items-center justify-end gap-3 p-4 bg-bg-main border-t border-slate-100 shrink-0">
-            <button
+            {dismissible && <button
               data-testid={testId ? `${testId}-cancelar` : undefined}
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-semibold text-text-main bg-bg-surface border border-slate-300 rounded-md hover:bg-bg-main"
             >
               {cancelText}
-            </button>
+            </button>}
 
             {onSecondaryAction && (
               <button

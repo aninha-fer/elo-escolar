@@ -1,5 +1,7 @@
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
+import { useListagemInfinita } from '../../hooks/useListagemInfinita';
+import { CarregarMais } from '../../components/CarregarMais';
 import { alunoService } from '../../services/alunoService';
 import { turmasService } from '../../services/turmasService';
 import { VisaoGeral } from './components/VisaoGeral';
@@ -18,16 +20,15 @@ const estilosStatus = {
     RASCUNHO: 'bg-amber-50 text-amber-600 before:bg-amber-500',
 };
 
+const carregarOficinas = ({ id, ...params }, signal) => alunoService.buscarOficinasPorId(id, signal, params);
+const carregarAtendimentos = ({ id, ...params }, signal) => alunoService.buscarAtendimentosPorId(id, signal, params);
+const carregarOcorrencias = ({ id, ...params }, signal) => ocorrenciasService.listar(id, signal, params);
+
 export function AlunoDetalhes() {
     const { id } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const [aluno, setAluno] = useState(null);
     const [agenda, setAgenda] = useState(null);
-    const [oficinas, setOficinas] = useState([]);
-    const [atendimentos, setAtendimentos] = useState([]);
-    const [ocorrencias, setOcorrencias] = useState([]);
-    const [carregandoOcorrencias, setCarregandoOcorrencias] = useState(true);
-    const [erroOcorrencias, setErroOcorrencias] = useState('');
     const [versaoOcorrencias, setVersaoOcorrencias] = useState(0);
     const [carregandoAgenda, setCarregandoAgenda] = useState(true);
     const [erroAgenda, setErroAgenda] = useState(null);
@@ -45,22 +46,9 @@ export function AlunoDetalhes() {
 
     useEffect(() => () => edicaoController.current?.abort(), [id]);
 
-    useEffect(() => {
-        const controller = new AbortController();
-        async function carregarOcorrencias() {
-            setCarregandoOcorrencias(true);
-            setErroOcorrencias('');
-            setOcorrencias([]);
-            try {
-                const dados = await ocorrenciasService.listar(id, controller.signal);
-                if (!controller.signal.aborted) setOcorrencias(dados);
-            } catch (error) {
-                if (!controller.signal.aborted) setErroOcorrencias(error.response?.data?.erro || 'Não foi possível carregar as ocorrências.');
-            } finally { if (!controller.signal.aborted) setCarregandoOcorrencias(false); }
-        }
-        carregarOcorrencias();
-        return () => controller.abort();
-    }, [id, versaoOcorrencias]);
+    const listaOficinas = useListagemInfinita(carregarOficinas, { id }, refreshToken);
+    const listaAtendimentos = useListagemInfinita(carregarAtendimentos, { id }, refreshToken);
+    const listaOcorrencias = useListagemInfinita(carregarOcorrencias, { id }, `${refreshToken}:${versaoOcorrencias}`);
 
     useEffect(() => {
         let diaConsultado = formatarDataHoraInstituicao().slice(0, 10);
@@ -95,17 +83,13 @@ export function AlunoDetalhes() {
             try {
                 setLoading(true);
                 setError(null);
-                const [dados, inscricoes, disponiveis, atendimentosAluno] = await Promise.all([
+                const [dados, disponiveis] = await Promise.all([
                     alunoService.buscarPorId(id, controller.signal),
-                    alunoService.buscarOficinasPorId(id, controller.signal),
                     turmasService.listarOficinasDisponiveis(controller.signal),
-                    alunoService.buscarAtendimentosPorId(id, controller.signal),
                 ]);
                 if (controller.signal.aborted) return;
                 setAluno(dados);
-                setOficinas(inscricoes);
                 setOficinasDisponiveis(disponiveis);
-                setAtendimentos(atendimentosAluno);
             } catch (err) {
                 if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
 
@@ -148,14 +132,13 @@ export function AlunoDetalhes() {
     if (error) return <div className="p-4 text-red-600 bg-red-50 rounded">{error}</div>;
 
     const turmaRegular = aluno?.turma_regular;
-    const quantidadeOficinas = new Set(oficinas.map((oficina) => oficina.turma_id)).size;
     const abaAtiva = searchParams.get('aba') || 'visao-geral';
 
     const TABS = [
         { id: 'visao-geral', label: 'Visão Geral', count: null },
-        { id: 'oficinas', label: 'Oficinas', count: quantidadeOficinas },
-        { id: 'atendimentos', label: 'Atendimentos', count: atendimentos.length },
-        { id: 'ocorrencias', label: 'Ocorrências', count: carregandoOcorrencias || erroOcorrencias ? null : ocorrencias.length },
+        { id: 'oficinas', label: 'Oficinas', count: listaOficinas.carregando || listaOficinas.erro ? null : listaOficinas.total },
+        { id: 'atendimentos', label: 'Atendimentos', count: listaAtendimentos.carregando || listaAtendimentos.erro ? null : listaAtendimentos.total },
+        { id: 'ocorrencias', label: 'Ocorrências', count: listaOcorrencias.carregando || listaOcorrencias.erro ? null : listaOcorrencias.total },
         // { id: 'historico', label: 'Histórico', count: null },
     ];
 
@@ -258,23 +241,30 @@ export function AlunoDetalhes() {
                     />
                 )}
                 {abaAtiva === 'oficinas' && (
-                    <Oficinas
-                        oficinas={oficinas}
+                    <>
+                    {!listaOficinas.carregando && !listaOficinas.erro && <Oficinas
+                        oficinas={listaOficinas.itens} totalAtivas={listaOficinas.totalAtivas}
                         oficinasDisponiveis={oficinasDisponiveis}
                         turno={aluno?.turno}
                         idAluno={id}
                         statusAluno={aluno?.status}
                         onSuccess={atualizarDados}
                         permissao={podeEditar}
-                    />
+                    />}
+                    <CarregarMais testId="aluno-oficinas-paginacao" listagem={listaOficinas} />
+                    </>
                 )}
                 {abaAtiva === 'atendimentos' && (
-                    <Atendimentos atendimentos={atendimentos} idAluno={id} statusAluno={aluno?.status} onSuccess={atualizarDados} permissao={podeEditar}/>
+                    <>
+                    {!listaAtendimentos.carregando && !listaAtendimentos.erro && <Atendimentos atendimentos={listaAtendimentos.itens} total={listaAtendimentos.total} idAluno={id} statusAluno={aluno?.status} onSuccess={atualizarDados} permissao={podeEditar}/>}
+                    <CarregarMais testId="aluno-atendimentos-paginacao" listagem={listaAtendimentos} />
+                    </>
                 )}
-                {abaAtiva === 'ocorrencias' && <Ocorrencias key={id} ocorrencias={ocorrencias} idAluno={id} statusAluno={aluno?.status}
-                    carregando={carregandoOcorrencias} erro={erroOcorrencias}
+                {abaAtiva === 'ocorrencias' && <><Ocorrencias key={id} ocorrencias={listaOcorrencias.itens} idAluno={id} statusAluno={aluno?.status}
+                    carregando={listaOcorrencias.carregando} erro={listaOcorrencias.erro}
                     onSuccess={() => setVersaoOcorrencias((versao) => versao + 1)}
-                    onTentarNovamente={() => setVersaoOcorrencias((versao) => versao + 1)} />}
+                    onTentarNovamente={() => setVersaoOcorrencias((versao) => versao + 1)} />
+                    {!listaOcorrencias.carregando && !listaOcorrencias.erro && <CarregarMais testId="aluno-ocorrencias-paginacao" listagem={listaOcorrencias} />}</>}
                 {/* {abaAtiva === 'historico' && <AbaHistorico alunoId={id} />} */}
             </div>
             {podeEditar && alunoEdicao && Number(alunoEdicao.id) === Number(id) && <FormularioAluno key={alunoEdicao.id}

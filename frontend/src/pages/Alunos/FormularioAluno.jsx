@@ -410,8 +410,8 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             placeholder="Sem turma regular"
                             disabled={!formulario.turno || aluno?.status === 'INATIVO'}
                             options={[
-                                ...(turmaAtual?.status === 'INATIVO' && turmaAtual.turno === formulario.turno
-                                    ? [{ value: turmaAtual.id, label: `${turmaAtual.nome} — Inativa`, disabled: true }] : []),
+                                ...(turmaAtual && turmaAtual.turno === formulario.turno && !turmas.some((turma) => turma.id === turmaAtual.id)
+                                    ? [{ value: turmaAtual.id, label: `${turmaAtual.nome} — ${turmaAtual.status === 'INATIVO' ? 'Inativa' : 'Vínculo atual'}`, disabled: true }] : []),
                                 ...turmas
                                 .filter((turma) => turma.turno === formulario.turno)
                                 .map((turma) => ({

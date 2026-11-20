@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthContext } from './AuthContext';
 import { api } from '../services/api';
 import { authService } from '../services/authService';
@@ -9,15 +9,20 @@ const sessaoAnonima = { status: 'anonimo', usuario: null };
 export function AuthProvider({ children }) {
   const [sessao, setSessao] = useState(sessaoCarregando);
   const [tentativa, setTentativa] = useState(0);
+  const versaoSessao = useRef(0);
 
   useEffect(() => {
     const interceptor = api.interceptors.response.use(
       (response) => response,
       (error) => {
+        if (error.response?.status === 403 && error.response?.data?.codigo === 'TROCA_SENHA_OBRIGATORIA') {
+          setTentativa((atual) => atual + 1);
+        }
         if (
           error.response?.status === 401 &&
           !error.config?.tratarSessaoLocalmente
         ) {
+          versaoSessao.current++;
           setSessao(sessaoAnonima);
         }
 
@@ -30,16 +35,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const controller = new AbortController();
+    const versao = versaoSessao.current;
 
     async function verificarSessao() {
       try {
         const usuario = await authService.obterSessao(controller.signal);
 
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && versao === versaoSessao.current) {
           setSessao({ status: 'autenticado', usuario });
         }
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || versao !== versaoSessao.current) return;
 
         const codigo = error.response?.status;
 
@@ -65,6 +71,7 @@ export function AuthProvider({ children }) {
 
   async function entrar(credenciais) {
     const usuario = await authService.login(credenciais);
+    versaoSessao.current++;
     setSessao({ status: 'autenticado', usuario });
   }
 
@@ -75,12 +82,27 @@ export function AuthProvider({ children }) {
       if (error.response?.status !== 401) throw error;
     }
 
+    versaoSessao.current++;
     setSessao(sessaoAnonima);
+  }
+
+  async function trocarSenhaInicial(dados) {
+    try {
+      const usuario = await authService.trocarSenhaInicial(dados);
+      versaoSessao.current++;
+      setSessao({ status: 'autenticado', usuario });
+    } catch (error) {
+      if (error.response?.status === 401) {
+        versaoSessao.current++;
+        setSessao({ ...sessaoAnonima, avisoSessao: error.response?.data?.erro || 'Sessão inválida ou expirada.' });
+      }
+      throw error;
+    }
   }
 
   return (
     <AuthContext.Provider
-      value={{ ...sessao, entrar, sair, recarregarSessao }}
+      value={{ ...sessao, entrar, sair, recarregarSessao, trocarSenhaInicial }}
     >
       {children}
     </AuthContext.Provider>

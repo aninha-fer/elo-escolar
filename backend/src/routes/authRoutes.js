@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { loginDTO } = require('../dtos/authDTO');
-const { login, me, logout } = require('../controllers/authController');
+const { login, me, logout, alterarSenhaInicial } = require('../controllers/authController');
 const { exigirOrigemPermitida } = require('../middlewares/exigirOrigemPermitida');
 
 const { exigirPermissao } = require('../middlewares/exigirPermissao');
@@ -39,5 +39,9 @@ const limitarPorEmail = rateLimit({
 authPublicas.post('/login', exigirOrigemPermitida, limitarPorIp, validarLogin, limitarPorEmail, login);
 authProtegidas.get('/me', exigirPermissao('sessao:gerenciar'), me);
 authProtegidas.post('/logout', exigirPermissao('sessao:gerenciar'), logout);
+
+authProtegidas.post('/primeiro-acesso/senha', exigirPermissao('sessao:gerenciar'), limitarPorIp, rateLimit({
+  windowMs: janelaMs, limit: 10, keyGenerator: (req) => String(req.usuario.id), message: mensagemLimite,
+}), alterarSenhaInicial);
 
 module.exports = { authPublicas, authProtegidas };

@@ -2,13 +2,13 @@ import { Link } from 'react-router-dom';
 import { Button } from '../../../components/Button';
 import { formatarFrequencia, obterIniciais } from '../../../utils/formatters';
 
-export function AlunosVinculados({ alunos = [], capacidade, podeVincular, onVincular }) {
+export function AlunosVinculados({ alunos = [], total = alunos.length, capacidade, podeVincular, onVincular }) {
     return (
         <section className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-bg-surface" aria-labelledby="alunos-vinculados-titulo">
             <div className="flex flex-wrap items-center justify-between gap-md border-b border-slate-200 p-lg">
                 <h2 id="alunos-vinculados-titulo" className="text-base font-bold text-text-main">
                     Alunos Vinculados <span className="ml-xs text-sm font-normal text-slate-500">
-                        ({capacidade == null ? `${alunos.length} alunos · sem limite de vagas` : `${alunos.length} / ${capacidade} vagas`})
+                        ({capacidade == null ? `${total} alunos · sem limite de vagas` : `${total} / ${capacidade} vagas`})
                     </span>
                 </h2>
                 {/* {podeVincular && <Button type="button" onClick={onVincular}>

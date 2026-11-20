@@ -1,6 +1,26 @@
 import { api } from './api';
 
 export const turmasService = {
+  async listarOficinasAtivas(signal) {
+    const { data } = await api.get('/turmas', { params: { tipo: 'OFICINA', status: 'ATIVO' }, signal });
+    return data;
+  },
+  async listarPaginadas(params, signal) {
+    const { data } = await api.get('/turmas', { params, signal });
+    return data;
+  },
+  async listarAlunosPaginados({ id, ...params }, signal) {
+    const { data } = await api.get(`/turmas/${id}/alunos`, { params, signal });
+    return data;
+  },
+  async prepararNovaTurma(id, turno, signal) {
+    const { data } = await api.get(`/turmas/${id}/nova-turma`, { params: { turno }, signal });
+    return data;
+  },
+  async criarAPartir(id, dados) {
+    const { data } = await api.post(`/turmas/${id}/nova-turma`, dados);
+    return data;
+  },
   async excluir(id, dados) {
     await api.delete(`/turmas/${id}`, { data: dados });
   },
@@ -8,8 +28,8 @@ export const turmasService = {
     const { data } = await api.patch(`/turmas/${id}`, dadosTurma);
     return data;
   },
-  async buscarPorId(id, signal) {
-    const { data } = await api.get(`/turmas/${id}`, { signal });
+  async buscarPorId(id, signal, params) {
+    const { data } = await api.get(`/turmas/${id}`, { signal, params });
     return data;
   },
 

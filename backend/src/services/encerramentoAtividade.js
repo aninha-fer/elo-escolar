@@ -20,14 +20,14 @@ function dataEncerramento(ocorrencias, agora = agoraInstituicao()) {
   return new Date(hoje.getTime() - (ocorreu ? 0 : DIA_MS));
 }
 
-function fimMatricula(matricula, agora = agoraInstituicao()) {
+function fimMatricula(matricula, agora = agoraInstituicao(), limite) {
   const hoje = new Date(agora);
   hoje.setUTCHours(0, 0, 0, 0);
   const ocorrencias = (!matricula.data_inicio || matricula.data_inicio <= hoje)
     ? matricula.turma.horarios.filter((h) => h.dia_semana === (hoje.getUTCDay() || 7))
       .map((h) => ({ data: hoje, hora: h.hora_inicio })) : [];
   const fim = dataEncerramento(ocorrencias, agora);
-  return matricula.data_fim && matricula.data_fim < fim ? matricula.data_fim : fim;
+  return new Date(Math.min(fim.getTime(), matricula.data_fim?.getTime() ?? Infinity, limite?.getTime() ?? Infinity));
 }
 
 module.exports = { agoraInstituicao, inicioOcorrencia, dataEncerramento, fimMatricula, DIA_MS };

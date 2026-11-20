@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
+import { useListagemInfinita } from '../../hooks/useListagemInfinita';
+import { CarregarMais } from '../../components/CarregarMais';
 import { FiltroEstado } from "../../components/FiltroEstado";
 import { Button } from "../../components/Button";
 import { TabelaAlunos } from "./TabelaAlunos";
@@ -8,17 +10,7 @@ import { FormularioAluno } from './FormularioAluno';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
-function normalizarTexto(valor = '') {
-    return String(valor)
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLocaleLowerCase('pt-BR')
-        .trim();
-}
-
-
 export function Alunos() {
-    const [alunos, setAlunos] = useState([]);
     const [alunoEdicao, setAlunoEdicao] = useState(null);
     const [erroEdicao, setErroEdicao] = useState('');
     const [carregandoEdicao, setCarregandoEdicao] = useState(false);
@@ -33,8 +25,6 @@ export function Alunos() {
     const [erroExclusao, setErroExclusao] = useState('');
     const envioExclusao = useRef(false);
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
 
@@ -45,55 +35,8 @@ export function Alunos() {
     const { usuario } = useAuth();
     const podeEditar = usuario?.role === 'admin';
 
-    useEffect(() => {
-        const controller = new AbortController();
-
-        async function carregarAlunos() {
-            try {
-                setLoading(true);
-                setError(null);
-
-                const dados = await alunoService.listarTodos({}, controller.signal);
-                setAlunos(dados);
-            } catch (err) {
-                if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-
-                const mensagemErro = err.response?.data?.erro || 'Não foi possível carregar a lista de alunos.';
-                setError(mensagemErro);
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        carregarAlunos();
-
-        return () => controller.abort();
-    }, [tentativa]);
-
-    const contagemStatus = alunos.reduce((contagem, aluno) => {
-        const status = aluno.status ?? 'RASCUNHO';
-        contagem.TODOS += 1;
-
-        if (Object.hasOwn(contagem, status)) {
-            contagem[status] += 1;
-        }
-
-        return contagem;
-    }, { TODOS: 0, ATIVO: 0, INATIVO: 0, RASCUNHO: 0 });
-
-    const termoNormalizado = normalizarTexto(termoBusca);
-    const alunosFiltrados = alunos.filter((aluno) => {
-        const statusCorresponde = statusSelecionado === 'TODOS'
-            || (aluno.status ?? 'RASCUNHO') === statusSelecionado;
-        const nomeCorresponde = !termoNormalizado
-            || normalizarTexto(aluno.nome).includes(termoNormalizado)
-            || (aluno.responsaveis ?? []).some((responsavel) => normalizarTexto(responsavel.nome).includes(termoNormalizado));
-
-        return statusCorresponde && nomeCorresponde;
-    });
-
-    if (loading) return <div className="p-4">Carregando alunos...</div>;
-    if (error) return <div className="p-4 text-red-600 bg-red-50 rounded">{error}</div>;
+    const listagem = useListagemInfinita(alunoService.listarTodos, { busca: termoBusca, status: statusSelecionado }, tentativa);
+    const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0, RASCUNHO: 0 };
 
     async function abrirEdicao(aluno) {
         try {
@@ -217,9 +160,10 @@ export function Alunos() {
             {carregandoEdicao && <p role="status">Carregando dados para edição...</p>}
             {erroEdicao && <p role="alert" className="text-sm text-red-700">{erroEdicao}</p>}
             {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
-            <TabelaAlunos alunos={alunosFiltrados} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
+            {!listagem.carregando && !listagem.erro && <TabelaAlunos alunos={listagem.itens} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
                 onAlterarStatus={podeEditar && !carregandoEdicao ? abrirStatus : undefined}
-                onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />
+                onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />}
+            <CarregarMais testId="alunos-paginacao" listagem={listagem} />
             {podeEditar && alunoExclusao && <ModalConfirmacao testId="aluno-excluir" isOpen estado="atencao" showCancel
                 title="Excluir aluno?" confirmText="Confirmar exclusão" isConfirmLoading={excluindo} onConfirm={confirmarExclusao}
                 onClose={() => { if (!envioExclusao.current) setAlunoExclusao(null); }}

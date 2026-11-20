@@ -1,5 +1,6 @@
 const { promisify } = require('node:util');
-const { verificarCredenciais } = require('../services/authService');
+const { verificarCredenciais, removerVersao, trocarSenhaInicial } = require('../services/authService');
+const { trocarSenhaInicialDTO } = require('../dtos/authDTO');
 
 async function login(req, res) {
   if (!req.session) {
@@ -16,14 +17,15 @@ async function login(req, res) {
 
   req.session.usuarioId = usuario.id;
   req.session.autenticadoEm = Date.now();
+  req.session.senha_versao = usuario.senha_versao;
 
   await promisify(req.session.save).call(req.session);
 
-  return res.status(200).json(usuario);
+  return res.status(200).json(removerVersao(usuario));
 }
 
 function me(req, res) {
-  return res.status(200).json(req.usuario);
+  return res.status(200).json(removerVersao(req.usuario));
 }
 
 async function logout(req, res) {
@@ -33,4 +35,28 @@ async function logout(req, res) {
   return res.status(204).end();
 }
 
-module.exports = { login, me, logout };
+async function alterarSenhaInicial(req, res) {
+  const validado = trocarSenhaInicialDTO.safeParse(req.body);
+  if (!validado.success) return res.status(400).json({ erros: validado.error.issues.map((item) => ({ campo: item.path[0], mensagem: item.message })) });
+  let usuario;
+  try {
+    usuario = await trocarSenhaInicial(req.usuario.id, req.session.senha_versao, validado.data.nova_senha);
+  } catch (erro) {
+    if (erro.statusCode) return res.status(erro.statusCode).json({ erro: erro.message });
+    return res.status(500).json({ erro: 'Não foi possível alterar a senha. Tente novamente.' });
+  }
+  try {
+    await promisify(req.session.regenerate).call(req.session);
+    req.session.usuarioId = usuario.id;
+    req.session.autenticadoEm = Date.now();
+    req.session.senha_versao = usuario.senha_versao;
+    await promisify(req.session.save).call(req.session);
+  } catch {
+    if (req.session) await promisify(req.session.destroy).call(req.session).catch(() => {});
+    res.clearCookie('elo.sid', { path: '/api' });
+    return res.status(401).json({ codigo: 'SENHA_ALTERADA_NOVO_LOGIN', erro: 'Senha alterada. Entre novamente com sua nova senha.' });
+  }
+  return res.status(200).json(removerVersao(usuario));
+}
+
+module.exports = { login, me, logout, alterarSenhaInicial };

@@ -1,3 +1,4 @@
+const { diaLetivo, contemData, fimLetivo } = require('./calendarioLetivo');
 const prisma = require('../prismaClient');
 
 const DIA_MS = 86400000;
@@ -34,7 +35,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
     throw erro;
   }
 
-  const [matriculas, sessoes] = await Promise.all([
+  const [matriculas, sessoes, calendarios] = await Promise.all([
     prisma.matricula_turma.findMany({
       where: {
         aluno_id,
@@ -49,7 +50,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
         ]
       },
       include: {
-        turma: { include: { horarios: true, ambiente: true, profissional: { include: { pessoa: true } } } }
+        turma: { include: { ano_letivo: true, horarios: true, ambiente: true, profissional: { include: { pessoa: true } } } }
       }
     }),
     prisma.atendimento_sessao.findMany({
@@ -65,7 +66,8 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
         data_sessao: { lt: fimSemana }
       },
       include: { profissional: { select: { pessoa: { select: { nome: true } } } }, atendimento_clinico: { include: { profissional: { include: { pessoa: true } } } } }
-    })
+    }),
+    prisma.ano_letivo.findMany({ where: { data_inicio: { lt: fimSemana }, data_fim: { gte: diaAnterior } } })
   ]);
 
   const eventos = [];
@@ -96,11 +98,16 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
     for (let dia = new Date(diaAnterior); dia < fimSemana; dia.setUTCDate(dia.getUTCDate() + 1)) {
       if ((matricula.data_inicio && dia < matricula.data_inicio) ||
           (matricula.data_fim && dia > matricula.data_fim)) continue;
+      if (turma.tipo === 'REGULAR'
+        ? !contemData(turma.ano_letivo, dia) || !aluno.dias_frequencia.includes(dia.getUTCDay() || 7)
+        : !diaLetivo(calendarios, dia)) continue;
       for (const horario of turma.horarios) {
         if (horario.dia_semana !== (dia.getUTCDay() || 7)) continue;
         const inicio = obterInicio(dia, horario.hora_inicio);
         let fim = obterInicio(dia, horario.hora_fim);
         if (fim < inicio) fim += DIA_MS;
+        if (turma.tipo === 'REGULAR') fim = Math.min(fim, +turma.ano_letivo.data_fim + DIA_MS);
+        else fim = fimLetivo(calendarios, dia, fim);
         if (matricula.data_fim) fim = Math.min(fim, matricula.data_fim.getTime() + DIA_MS);
         adicionarEvento({
           id: `turma-${matricula.id}-${horario.id}-${dia.toISOString().slice(0, 10)}`,

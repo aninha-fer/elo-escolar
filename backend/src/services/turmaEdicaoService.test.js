@@ -1,13 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../prismaClient');
+test.beforeEach((t) => {
+    const original = prisma.turma.findMany;
+    prisma.turma.findMany = t.mock.fn(async () => []);
+    t.after(() => { prisma.turma.findMany = original; });
+});
 const { editarTurma } = require('../controllers/turmaController');
 const { obterTurmaService } = require('./turmaService');
 const hora = (valor) => new Date(`1970-01-01T${valor}:00.000Z`);
 
 function simular(t, opcoes = {}) {
     let estado = {
-        turma: { id: 10, nome: 'Turma A', tipo: opcoes.tipo ?? 'REGULAR', turno: 'MANHA', ano_letivo: 2026,
+        turma: { id: 10, nome: 'Turma A', tipo: opcoes.tipo ?? 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026,
             ambiente_id: 2, capacidade_maxima: 10, descricao: null, profissional_id: 1, status: 'ATIVO' },
         horarios: (opcoes.tipo === 'OFICINA' ? [2, 4] : [1, 2, 3, 4, 5]).map((dia_semana) => ({
             id: dia_semana, turma_id: 10, dia_semana,
@@ -23,7 +28,8 @@ function simular(t, opcoes = {}) {
         assert.equal(options.isolationLevel, 'ReadCommitted');
         const pendente = structuredClone(estado);
         const resultado = await callback({
-            $queryRaw: async (sql, id) => { if (sql.join('?').includes('FROM "funcionario"')) assert.ok(Number.isInteger(id)); else assert.equal(id, 10); assert.ok(sql.join('?').includes('FOR UPDATE')); chamadas.push('bloqueio'); },
+            $queryRaw: async (sql, id) => { if (sql.join('?').includes('pg_advisory')) return [];  if (sql.join('?').includes('FROM "funcionario"')) assert.ok(Number.isInteger(id)); else assert.equal(id, 10); assert.ok(sql.join('?').includes('FOR UPDATE')); chamadas.push('bloqueio'); },
+            ano_letivo: { findUnique: async ({where}) => ({id: where.id, ano: where.id, data_inicio: new Date('2027-02-08T00:00:00Z'), data_fim: new Date('2099-12-18T00:00:00Z')}) },
             turma: {
                 findUnique: async ({ where }) => { assert.equal(chamadas[0], 'bloqueio'); assert.deepEqual(where, { id: 10 });
                     return pendente.turma ? { ...pendente.turma, horarios: pendente.horarios } : null; },
@@ -69,9 +75,9 @@ async function editar(body, id = '10') {
 
 test('regular sem matrículas atualiza turno, ano e os cinco horários persistidos', async (t) => {
     const banco = simular(t);
-    const res = await editar({ ambiente_id: 2, turno: 'TARDE', ano_letivo: 2027 });
+    const res = await editar({ ambiente_id: 2, turno: 'TARDE', ano_letivo_id: 2027 });
     assert.equal(res.code, 200);
-    assert.equal(banco.estado.turma.ano_letivo, 2027);
+    assert.equal(banco.estado.turma.ano_letivo_id, 2027);
     assert.equal(banco.estado.horarios.length, 5);
     for (const h of banco.estado.horarios) {
         assert.equal(h.turma_id, 10); assert.equal(h.hora_inicio.toISOString().slice(11, 16), '12:30');
@@ -97,7 +103,7 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
         test(`${tipo} com vínculo ${status} bloqueia alterações de agenda e permite campos comuns`, async (t) => {
             const banco = simular(t, { tipo, estado: { matriculas: [status] } });
             const horarios = structuredClone(banco.estado.horarios);
-            const alteracoes = tipo === 'REGULAR' ? [{ turno: 'TARDE' }, { ano_letivo: 2027 }]
+            const alteracoes = tipo === 'REGULAR' ? [{ turno: 'TARDE' }, { ano_letivo_id: 2027 }]
                 : [{ turno: 'TARDE' }, { hora_inicio: '09:45' }, { hora_fim: '11:00' }, { dias_semana: [1] }];
             for (const agenda of alteracoes) assert.equal((await editar({ ...agenda, ambiente_id: 2, nome: 'Não deve gravar' })).code, 409);
             assert.equal(banco.estado.turma.nome, 'Turma A');
@@ -178,7 +184,7 @@ test('alteração de cronograma sem enviar sala utiliza o ambiente já cadastrad
 test('horários fora das faixas e campos específicos do tipo errado são recusados', async (t) => {
     simular(t, { tipo: 'OFICINA' });
     assert.equal((await editar({ ambiente_id: 2, hora_inicio: '10:00' })).code, 400);
-    assert.equal((await editar({ ambiente_id: 2, ano_letivo: 2027 })).code, 400);
+    assert.equal((await editar({ ambiente_id: 2, ano_letivo_id: 2027 })).code, 400);
 });
 
 for (const [opcoes, body, esperado] of [
@@ -204,7 +210,7 @@ test('detalhe sinaliza histórico mesmo sem alunos com matrícula ativa', async 
         assert.deepEqual(select._count, { select: { matriculas: true } });
         return { id: 10, horarios: [], matriculas: [], _count: { matriculas: 1 } };
     };
-    assert.deepEqual(await obterTurmaService(10), { id: 10, horarios: [], alunos: [], possui_matriculas: true,
+    assert.deepEqual(await obterTurmaService(10), { id: 10, horarios: [], expirada: false, alunos: [], possui_matriculas: true,
         matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
 });
 

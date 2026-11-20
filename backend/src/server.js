@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const sessionMiddleware = require('./config/session');
 const { requireAuth } = require('./middlewares/requireAuth');
+const { exigirSenhaDefinitiva } = require('./middlewares/exigirSenhaDefinitiva');
 const { exigirPermissao } = require('./middlewares/exigirPermissao');
 const { exigirOrigemPermitida } = require('./middlewares/exigirOrigemPermitida');
 
@@ -64,6 +65,7 @@ api.use((req, res, next) => {
 
 // Rotas com permissão de leitura
 api.use('/auth', authProtegidas);
+api.use(exigirSenhaDefinitiva);
 api.use(alunoLeituraRoutes);
 api.use(turmaLeituraRoutes);
 api.use(ocorrenciaRoutes);
@@ -77,6 +79,7 @@ api.use(turmaAdminRoutes);
 api.use(usuarioRoutes);
 api.use(profissionalRoutes);
 api.use(ambienteRoutes);
+api.use(require('./routes/anoLetivoRoutes'));
 
 api.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'API Elo Escolar operando.' });

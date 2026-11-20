@@ -110,7 +110,7 @@ test('busca por nome removida não permanece disponível na API de usuários', a
 
 function simularEdicao(t, { existe = true, emailDuplicado = false, falha, status = 'ATIVO', statusPessoa = 'ATIVO' } = {}) {
     simularTransacao(t);
-    const salvo = { id: 7, pessoa_id: 50, email: conta.email, role: 'professor', status, pessoa: { nome: 'Maria', status_geral: statusPessoa } };
+    const salvo = { id: 7, pessoa_id: 50, email: conta.email, role: 'professor', status, deve_trocar_senha: false, senha_versao: 1, pessoa: { nome: 'Maria', status_geral: statusPessoa } };
     for (const [metodo, fn] of [
         ['findUnique', async ({ where }) => { assert.deepEqual(where, { id: 7 }); return existe ? salvo : null; }],
         ['findFirst', async ({ where }) => {
@@ -138,7 +138,7 @@ function simularEdicao(t, { existe = true, emailDuplicado = false, falha, status
 for (const [body, esperado] of [
     [{ role: 'admin' }, { role: 'admin' }],
     [{ email: ' CONTA@example.com ' }, { email: 'conta@example.com' }],
-    [{ senha: 'nova-senha-teste' }, { senha_hash: 'novo-hash' }],
+    [{ senha: 'nova-senha-teste' }, { senha_hash: 'novo-hash', deve_trocar_senha: true, senha_versao: { increment: 1 } }],
     [{ pessoa: { nome: ' Maria Silva ' } }, { pessoa: { update: { nome: 'Maria Silva' } } }],
     [{ status: 'INATIVO' }, { status: 'INATIVO' }],
     [{ status: 'ATIVO' }, { status: 'ATIVO', pessoa: { update: { status_geral: 'ATIVO' } } }],
@@ -212,7 +212,7 @@ test('ativar conta com pessoa inativa também ativa a pessoa e libera a identida
     assert.deepEqual(prisma.usuario.update.mock.calls[0].arguments[0].data, {
         status: 'ATIVO', pessoa: { update: { status_geral: 'ATIVO' } },
     });
-    assert.deepEqual(await buscarIdentidadePorId(7), { id: 7, nome: 'Maria', email: conta.email, role: 'professor' });
+    assert.deepEqual(await buscarIdentidadePorId(7), { id: 7, nome: 'Maria', email: conta.email, role: 'professor', deve_trocar_senha: false, senha_versao: 1 });
 });
 
 test('ativação junto com nome mantém os dois campos na atualização da pessoa', async (t) => {

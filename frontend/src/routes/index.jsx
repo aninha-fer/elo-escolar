@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { DefaultLayout } from '../layouts/DefaultLayout';
-import { Home } from '../pages/Home';
+import { Home } from '../pages/Home/Home';
 import { Alunos } from '../pages/Alunos/Alunos';
 import { Usuarios } from '../pages/Usuarios/Usuarios';
 import { AlunoDetalhes } from '../pages/AlunoDetalhes';
@@ -9,6 +9,8 @@ import { Login } from '../pages/Login';
 import { Profissionais } from '../pages/Profissionais/Profissionais';
 import { Turmas } from '../pages/Turmas/Turmas';
 import { TurmaDetalhes } from '../pages/TurmaDetalhes';
+import { Configuracoes } from '../pages/Configuracoes';
+import { PrimeiroAcesso } from '../pages/PrimeiroAcesso';
 
 function ExigirSessao() {
   const { status, recarregarSessao } = useAuth();
@@ -44,6 +46,11 @@ function ExigirAdmin() {
     : <p role="alert">Você não tem permissão para acessar esta página.</p>;
 }
 
+function ExigirSenhaDefinitiva() {
+  const { usuario } = useAuth();
+  return usuario?.deve_trocar_senha ? <Navigate to="/primeiro-acesso" replace /> : <Outlet />;
+}
+
 export function AppRoutes() {
   return (
     <BrowserRouter>
@@ -51,16 +58,20 @@ export function AppRoutes() {
         <Route path="/login" element={<Login />} />
 
         <Route element={<ExigirSessao />}>
-          <Route path="/" element={<DefaultLayout />}>
-            <Route index element={<Home />} />
-            <Route path="alunos" element={<Alunos />} />
-            <Route path="alunos/:id" element={<AlunoDetalhes />} />
-            <Route path="turmas" element={<Turmas />} />
-            <Route path="turmas/:id" element={<TurmaDetalhes />} />
+          <Route path="/primeiro-acesso" element={<PrimeiroAcesso />} />
+          <Route element={<ExigirSenhaDefinitiva />}>
+            <Route path="/" element={<DefaultLayout />}>
+              <Route index element={<Home />} />
+              <Route path="alunos" element={<Alunos />} />
+              <Route path="alunos/:id" element={<AlunoDetalhes />} />
+              <Route path="turmas" element={<Turmas />} />
+              <Route path="turmas/:id" element={<TurmaDetalhes />} />
 
-            <Route element={<ExigirAdmin />}>
-              <Route path="usuarios" element={<Usuarios />} />
-              <Route path="profissionais" element={<Profissionais />} />
+              <Route element={<ExigirAdmin />}>
+                <Route path="configuracoes" element={<Configuracoes />} />
+                <Route path="usuarios" element={<Usuarios />} />
+                <Route path="profissionais" element={<Profissionais />} />
+              </Route>
             </Route>
           </Route>
         </Route>

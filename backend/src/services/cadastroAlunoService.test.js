@@ -14,7 +14,7 @@ function simularCadastro(t, { falharResponsavel = false, falharMedicos = false }
   t.after(() => { prisma.$transaction = original; });
   prisma.$transaction = t.mock.fn(async (operacao) => {
     const pendentes = structuredClone(banco);
-    const tx = {};
+    const tx = { $queryRaw: async () => [] };
     for (const nome of Object.keys(banco)) tx[nome] = { create: async ({ data, select }) => {
       if (nome === 'aluno_responsavel' && falharResponsavel) throw new Error('Falha no responsável');
       if (nome === 'aluno_dados_medicos' && falharMedicos) throw new Error('Falha nos dados médicos');

@@ -1,6 +1,10 @@
 import { api } from './api';
 
 export const usuariosService = {
+    async listarPaginados(params, signal) {
+        const { data } = await api.get('/usuarios', { params, signal });
+        return data;
+    },
     async listarTodos(signal) {
         const { data } = await api.get('/usuarios', { signal });
         return data;

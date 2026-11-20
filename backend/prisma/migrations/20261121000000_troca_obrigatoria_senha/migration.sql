@@ -1,0 +1,3 @@
+ALTER TABLE "usuario"
+ADD COLUMN "deve_trocar_senha" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "senha_versao" INTEGER NOT NULL DEFAULT 1;

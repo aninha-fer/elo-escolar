@@ -67,7 +67,9 @@ function simularBanco(t, {
         const atualizacoes = new Map();
         let liberar;
         const tx = {
+            ano_letivo: { findMany: async () => [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2027-12-19') }] },
             $queryRaw: t.mock.fn(async (sql, id) => {
+                if (sql.join('?').includes('pg_advisory')) return [];
                 if (sql.join('?').includes('FROM "funcionario"')) return [];
                 if (sql.join('?').includes('FROM "turma"')) {
                     assert.ok(oficinas.some((item) => item.id === id));
@@ -354,7 +356,7 @@ for (const primeiro of ['atendimento', 'oficina']) {
         const matricular = () => matricularOficinasService(pedido);
         const operacoes = primeiro === 'atendimento' ? [criarAtendimento, matricular] : [matricular, criarAtendimento];
         const resultados = await Promise.allSettled(operacoes.map((operacao) => operacao()));
-        assert.equal(resultados[0].status, 'fulfilled');
+        assert.equal(resultados[0].status, 'fulfilled', resultados[0].reason?.stack);
         assert.equal(resultados[1].status, 'rejected');
         assert.equal(resultados[1].reason.isConflict, true);
         assert.equal(banco.matriculas.length + banco.atendimentos.length, 1);

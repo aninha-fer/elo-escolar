@@ -18,6 +18,7 @@ function simular(t, usuario, senhaCorreta = true) {
 }
 
 const ativo = { id: 1, email: 'conta@example.com', role: 'admin', status: 'ATIVO', senha_hash: 'hash-de-teste',
+    deve_trocar_senha: true, senha_versao: 1,
     pessoa: { nome: 'Maria', status_geral: 'ATIVO' } };
 
 for (const [descricao, usuario, permitido] of [
@@ -31,7 +32,7 @@ for (const [descricao, usuario, permitido] of [
 ]) {
     test(`autenticação e identidade respeitam ${descricao}`, async (t) => {
         simular(t, usuario);
-        const identidade = permitido ? { id: 1, email: ativo.email, role: 'admin', nome: 'Maria' } : null;
+        const identidade = permitido ? { id: 1, email: ativo.email, role: 'admin', nome: 'Maria', deve_trocar_senha: true, senha_versao: 1 } : null;
         assert.deepEqual(await verificarCredenciais({ email: ativo.email, senha: 'senha-de-teste' }), identidade);
         assert.deepEqual(await buscarIdentidadePorId(1), identidade);
     });
@@ -56,7 +57,7 @@ test('inativação invalida a sessão na próxima requisição e reativação pe
     const usuario = { ...ativo };
     simular(t, usuario);
     let destruicoes = 0, acessos = 0;
-    const req = { session: { usuarioId: 1, autenticadoEm: Date.now(), destroy(callback) { destruicoes++; callback(); } } };
+    const req = { session: { usuarioId: 1, autenticadoEm: Date.now(), senha_versao: 1, destroy(callback) { destruicoes++; callback(); } } };
     const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; },
         clearCookie(nome, options) { this.cookie = { nome, options }; } };
     await requireAuth(req, res, () => acessos++);

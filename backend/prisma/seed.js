@@ -11,10 +11,14 @@ async function main() {
   await prisma.aluno_dados_medicos.deleteMany();
   await prisma.aluno.deleteMany(); 
   await prisma.turma.deleteMany();
+  await prisma.ano_letivo.deleteMany();
   await prisma.ambiente.deleteMany();
   await prisma.funcionario.deleteMany();
   await prisma.pessoa.deleteMany();
 
+  const calendario = await prisma.ano_letivo.create({ data: {
+    ano: 2026, data_inicio: new Date('2026-02-03T00:00:00Z'), data_fim: new Date('2026-12-19T00:00:00Z'),
+  } });
   console.log('Populando Ambientes...');
   const ambientesNomes = [
     'Ginásio', 'Piscina', 'Ao ar livre', 'Salão', 'Sala de artesanato', 
@@ -63,7 +67,7 @@ async function main() {
   for (const t of turmasRegulares) {
     const turmaCriada = await prisma.turma.create({
       data: {
-        nome: t.nome, tipo: 'REGULAR', turno: t.turno, ano_letivo: 2026,
+        nome: t.nome, tipo: 'REGULAR', turno: t.turno, ano_letivo_id: calendario.id,
         capacidade_maxima: 15, profissional_id: profMap[t.prof].id,
         ambiente_id: ambientesMap[t.amb].id
       }
@@ -97,7 +101,7 @@ async function main() {
   for (const o of oficinas) {
     const oficinaManha = await prisma.turma.create({
       data: {
-        nome: o.nome, tipo: 'OFICINA', turno: 'MANHA', ano_letivo: 2026,
+        nome: o.nome, tipo: 'OFICINA', turno: 'MANHA', ano_letivo_id: calendario.id,
         capacidade_maxima: 10, profissional_id: profMap[o.prof].id,
         ambiente_id: ambientesMap[o.amb].id
       }
@@ -114,7 +118,7 @@ async function main() {
 
     const oficinaTarde = await prisma.turma.create({
       data: {
-        nome: o.nome, tipo: 'OFICINA', turno: 'TARDE', ano_letivo: 2026,
+        nome: o.nome, tipo: 'OFICINA', turno: 'TARDE', ano_letivo_id: calendario.id,
         capacidade_maxima: 10, profissional_id: profMap[o.prof].id,
         ambiente_id: ambientesMap[o.amb].id
       }

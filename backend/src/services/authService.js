@@ -7,6 +7,8 @@ const camposPublicos = {
     role: true,
     status: true,
     deleted_at: true,
+    deve_trocar_senha: true,
+    senha_versao: true,
     pessoa: {
         select: {
             nome: true,
@@ -22,6 +24,8 @@ function identidadePublica(usuario) {
         nome: usuario.pessoa.nome,
         email: usuario.email,
         role: usuario.role,
+        deve_trocar_senha: usuario.deve_trocar_senha,
+        senha_versao: usuario.senha_versao,
     };
 }
 
@@ -62,4 +66,30 @@ async function buscarIdentidadePorId(id) {
     return usuario ? identidadePublica(usuario) : null;
 }
 
-module.exports = { verificarCredenciais, buscarIdentidadePorId };
+function removerVersao({ senha_versao, ...usuario }) {
+    return usuario;
+}
+
+function erroTroca(statusCode, mensagem) {
+    return Object.assign(new Error(mensagem), { statusCode });
+}
+
+async function trocarSenhaInicial(id, versao, novaSenha) {
+    const usuario = await prisma.usuario.findUnique({ where: { id }, select: { ...camposPublicos, senha_hash: true } });
+    if (!usuario || usuario.deleted_at || usuario.status !== 'ATIVO' || usuario.pessoa.status_geral !== 'ATIVO'
+        || usuario.pessoa.funcionario?.deleted_at || usuario.senha_versao !== versao) {
+        throw erroTroca(401, 'Sessão inválida ou expirada.');
+    }
+    if (!usuario.deve_trocar_senha) throw erroTroca(409, 'A troca inicial de senha já foi concluída.');
+    if (await argon2.verify(usuario.senha_hash, novaSenha)) throw erroTroca(400, 'A nova senha deve ser diferente da senha temporária.');
+    const hash = await argon2.hash(novaSenha, { type: argon2.argon2id });
+    const resultado = await prisma.usuario.updateMany({
+        where: { id, senha_versao: versao, deve_trocar_senha: true, deleted_at: null, status: 'ATIVO',
+            pessoa: { is: { status_geral: 'ATIVO', OR: [{ funcionario: { is: null } }, { funcionario: { is: { deleted_at: null } } }] } } },
+        data: { senha_hash: hash, deve_trocar_senha: false, senha_versao: { increment: 1 } },
+    });
+    if (!resultado.count) throw erroTroca(401, 'Sessão inválida ou expirada.');
+    return { ...identidadePublica(usuario), deve_trocar_senha: false, senha_versao: versao + 1 };
+}
+
+module.exports = { verificarCredenciais, buscarIdentidadePorId, removerVersao, trocarSenhaInicial };

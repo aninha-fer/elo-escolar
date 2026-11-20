@@ -1,3 +1,6 @@
+import { Link } from 'react-router-dom';
+import { anosLetivosService } from '../../services/anosLetivosService';
+import { hojeInstituicao, periodoLetivo } from '../../utils/anoLetivo';
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
@@ -10,6 +13,7 @@ import { turmasService } from '../../services/turmasService';
 import { SeletorProfissional } from './SeletorProfissional';
 import { agruparHorarios } from '../../utils/formatters';
 import { SaveIcon } from '../../components/icons/SaveIcon';
+import { RevisaoAlunosTurma } from './RevisaoAlunosTurma';
 
 const faixasOficina = [
     { value: '08:15', label: 'Manhã: 08:15 – 09:15', turno: 'MANHA', fim: '09:15' },
@@ -19,27 +23,68 @@ const faixasOficina = [
 ];
 const diasSemana = [1, 2, 3, 4, 5].map((value, indice) => ({ value, label: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][indice] }));
 
-export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCriado, onSalvo }) {
+export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, onClose, onCriado, onSalvo }) {
     const editando = Boolean(turma);
+    const criandoAPartir = Boolean(turmaOrigem);
+    const base = turma ?? turmaOrigem;
+    const origemId = turmaOrigem?.id;
     const idTurma = turma?.id;
-    const gruposIniciais = agruparHorarios(turma?.horarios);
+    const gruposIniciais = agruparHorarios(base?.horarios);
     const diasIniciais = [...new Set(gruposIniciais.flatMap((grupo) => grupo.dias))].sort((a, b) => a - b);
-    const profissionalInicial = turma?.profissional_id ?? turma?.profissional?.id;
-    const salaInicial = turma?.ambiente_id ?? turma?.ambiente?.id;
+    const profissionalInicial = base?.profissional_id ?? base?.profissional?.id;
+    const salaInicial = base?.ambiente_id ?? base?.ambiente?.id;
     const envioEmAndamento = useRef(false);
     const [enviando, setEnviando] = useState(false);
     const [formulario, setFormulario] = useState(() => ({
-        tipo: turma?.tipo ?? tipoInicial, nome: turma?.nome ?? '', turno: turma?.turno ?? 'MANHA',
+        tipo: base?.tipo ?? tipoInicial, nome: base?.nome ?? '', turno: base?.turno ?? 'MANHA',
         horario: gruposIniciais[0]?.inicio ?? '', dias_semana: diasIniciais, ambiente_id: String(salaInicial ?? ''),
-        capacidade_maxima: turma?.capacidade_maxima ?? '', descricao: turma?.descricao ?? '', profissional_id: String(profissionalInicial ?? ''),
-        ano_letivo: turma?.ano_letivo ?? (editando ? '' : new Intl.DateTimeFormat('pt-BR', { year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date())),
+        capacidade_maxima: base?.capacidade_maxima ?? '', descricao: base?.descricao ?? '', profissional_id: String(profissionalInicial ?? ''),
+        ano_letivo_id: criandoAPartir ? '' : String(turma?.ano_letivo_id ?? ''),
     }));
     const [erros, setErros] = useState({});
     const [erroEnvio, setErroEnvio] = useState('');
     const [profissionais, setProfissionais] = useState({ status: 'carregando', dados: [] });
+    const [calendarios, setCalendarios] = useState({ status: 'carregando', dados: [] });
     const [salas, setSalas] = useState({ status: 'carregando', dados: [] });
     const [tentativa, setTentativa] = useState(0);
     const [infoEdicao, setInfoEdicao] = useState(null);
+    const [aba, setAba] = useState('dados');
+    const [candidatos, setCandidatos] = useState(null);
+    const [origemCarregada, setOrigemCarregada] = useState(null);
+    const [selecionados, setSelecionados] = useState([]);
+    const [bloqueados, setBloqueados] = useState([]);
+    const turnosPreparados = useRef(new Set());
+    const origemAplicada = useRef(false);
+
+    useEffect(() => {
+        if (!origemId) return;
+        const controller = new AbortController();
+        const turno = formulario.turno;
+        async function carregarAlunos() {
+            try {
+                const dados = await turmasService.prepararNovaTurma(origemId, turno, controller.signal);
+                if (controller.signal.aborted) return;
+                if (!origemAplicada.current) {
+                    origemAplicada.current = true;
+                    setOrigemCarregada(dados.origem);
+                    setFormulario((atual) => ({ ...atual, nome: dados.origem.nome, turno: dados.origem.turno,
+                        ambiente_id: String(dados.origem.ambiente_id ?? dados.origem.ambiente?.id ?? ''),
+                        capacidade_maxima: dados.origem.capacidade_maxima ?? '', descricao: dados.origem.descricao ?? '',
+                        profissional_id: String(dados.origem.profissional_id ?? dados.origem.profissional?.id ?? ''), ano_letivo_id: '' }));
+                }
+                const ids = new Set(dados.alunos.map((aluno) => aluno.id));
+                const anteriores = !turnosPreparados.current.has(turno) ? dados.alunos.filter((aluno) => aluno.ano_anterior).map((aluno) => aluno.id) : [];
+                turnosPreparados.current.add(turno);
+                setSelecionados((atuais) => [...new Set([...atuais.filter((id) => ids.has(id)), ...anteriores])]);
+                setBloqueados((atuais) => atuais.filter((id) => ids.has(id)));
+                setCandidatos({ turno, tentativa, status: 'sucesso', dados: dados.alunos });
+            } catch (error) {
+                if (!controller.signal.aborted) setCandidatos({ turno, tentativa, status: 'erro', dados: [], erro: error.response?.data?.erro || 'Não foi possível carregar os alunos. Tente novamente.' });
+            }
+        }
+        carregarAlunos();
+        return () => controller.abort();
+    }, [origemId, formulario.turno, tentativa]);
 
     useEffect(() => {
         if (!idTurma) return;
@@ -62,19 +107,25 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
             const resultados = await Promise.allSettled([
                 profissionaisService.listarTodos(controller.signal),
                 ambientesService.listarTodos(controller.signal),
+                anosLetivosService.listarTodos(controller.signal),
             ]);
             if (controller.signal.aborted) return;
             resultados.forEach((resultado, indice) => {
-                const definir = indice === 0 ? setProfissionais : setSalas;
+                const definir = [setProfissionais, setSalas, setCalendarios][indice];
                 definir(resultado.status === 'fulfilled' ? { status: 'sucesso', dados: resultado.value }
-                    : { status: 'erro', dados: [], erro: indice === 0 ? 'Não foi possível carregar os profissionais.' : 'Não foi possível carregar as salas.' });
+                    : { status: 'erro', dados: [], erro: ['Não foi possível carregar os profissionais.', 'Não foi possível carregar as salas.', 'Não foi possível carregar os calendários.'][indice] });
             });
         }
         carregarOpcoes();
         return () => controller.abort();
     }, [tentativa]);
 
+    const opcoesCalendario = calendarios.dados.filter((c) => c.data_fim.slice(0, 10) >= hojeInstituicao() || (editando && c.id === turma.ano_letivo_id))
+        .map((c) => ({ value: c.id, label: `${c.ano} · ${periodoLetivo(c)}` }));
+    const calendarioSelecionado = calendarios.dados.find((c) => c.id === Number(formulario.ano_letivo_id));
     const regular = formulario.tipo === 'REGULAR';
+    const carregandoAlunos = !candidatos || candidatos.turno !== formulario.turno || candidatos.tentativa !== tentativa;
+    const excedeuVagas = formulario.capacidade_maxima !== '' && selecionados.length > Number(formulario.capacidade_maxima);
     const cargosPermitidos = regular ? ['professor', 'auxiliar'] : ['professor', 'oficineiro'];
     const elegiveis = profissionais.dados.filter((profissional) => (editando && profissional.id === profissionalInicial)
         || (profissional.status_geral === 'ATIVO' && cargosPermitidos.includes(profissional.funcao?.trim().toLocaleLowerCase('pt-BR'))));
@@ -86,17 +137,18 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
         nome: formulario.nome.trim(), ambiente_id: Number(formulario.ambiente_id),
         capacidade_maxima: formulario.capacidade_maxima === '' ? null : Number(formulario.capacidade_maxima),
         descricao: formulario.descricao.trim() || null, profissional_id: Number(formulario.profissional_id),
-        ...(!agendaBloqueada ? (regular ? { turno: formulario.turno, ano_letivo: Number(formulario.ano_letivo) }
+        ...(!agendaBloqueada ? (regular ? { turno: formulario.turno, ano_letivo_id: Number(formulario.ano_letivo_id) }
             : { turno: faixa?.turno ?? turma?.turno, hora_inicio: formulario.horario,
                 hora_fim: faixa?.fim ?? gruposIniciais[0]?.fim, dias_semana: [...formulario.dias_semana].sort((a, b) => a - b) }) : {}),
     };
     const originais = editando ? { ...turma, ambiente_id: salaInicial, profissional_id: profissionalInicial,
         hora_inicio: gruposIniciais[0]?.inicio, hora_fim: gruposIniciais[0]?.fim, dias_semana: diasIniciais } : {};
     const alterados = Object.fromEntries(Object.entries(valores).filter(([campo, valor]) => JSON.stringify(valor) !== JSON.stringify(originais[campo])));
-    const mudouAgenda = ['turno', 'ano_letivo', 'hora_inicio', 'hora_fim', 'dias_semana'].some((campo) => campo in alterados);
-    const incompleto = !formulario.nome.trim() || !profissionalValido || profissionais.status !== 'sucesso'
+    const mudouAgenda = ['turno', 'ano_letivo_id', 'hora_inicio', 'hora_fim', 'dias_semana'].some((campo) => campo in alterados);
+    const incompleto = (regular && calendarios.status !== 'sucesso') || !formulario.nome.trim() || !profissionalValido || profissionais.status !== 'sucesso'
+        || (criandoAPartir && !origemCarregada)
         || !formulario.ambiente_id || salas.status !== 'sucesso' || (editando && (infoEdicao?.status !== 'sucesso' || !Object.keys(alterados).length))
-        || (!editando && (regular ? !formulario.ano_letivo : !faixa || formulario.dias_semana.length === 0));
+        || (!editando && (regular ? !formulario.ano_letivo_id : !faixa || formulario.dias_semana.length === 0));
     const opcoesHorario = editando && gruposIniciais.length && !faixasOficina.some((opcao) => opcao.value === gruposIniciais[0].inicio && opcao.fim === gruposIniciais[0].fim)
         ? [...faixasOficina, { value: gruposIniciais[0].inicio, label: `${gruposIniciais[0].inicio} – ${gruposIniciais[0].fim} (atual)` }] : faixasOficina;
 
@@ -116,6 +168,21 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
         setFormulario((atual) => ({ ...atual, [campo]: valor, ...(campo === 'tipo' ? { profissional_id: '' } : {}) }));
         setErros((atuais) => campo === 'tipo' ? {} : { ...atuais, [campo]: undefined });
         setErroEnvio('');
+        if (criandoAPartir && campo === 'turno' && valor !== formulario.turno) {
+            setSelecionados([]);
+            setBloqueados([]);
+        }
+    }
+
+    function alternarAluno(id) {
+        setSelecionados((atuais) => atuais.includes(id) ? atuais.filter((atual) => atual !== id) : [...atuais, id]);
+        setBloqueados((atuais) => atuais.filter((atual) => atual !== id));
+        setErroEnvio('');
+    }
+
+    function alternarBloqueio(id) {
+        if (!selecionados.includes(id)) return;
+        setBloqueados((atuais) => atuais.includes(id) ? atuais.filter((atual) => atual !== id) : [...atuais, id]);
     }
 
     async function enviar(event) {
@@ -125,9 +192,10 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
         const novosErros = {};
         if (!formulario.nome.trim()) novosErros.nome = 'Informe o nome da turma ou oficina.';
         if (regular && !agendaBloqueada && !['MANHA', 'TARDE'].includes(formulario.turno)) novosErros.turno = 'Selecione um período.';
-        if (regular && !agendaBloqueada && (!formulario.ano_letivo || !Number.isInteger(Number(formulario.ano_letivo)) || Number(formulario.ano_letivo) < 1)) {
-            novosErros.ano_letivo = 'Informe um ano letivo inteiro e positivo.';
+        if (regular && !agendaBloqueada && (!formulario.ano_letivo_id || !Number.isInteger(Number(formulario.ano_letivo_id)) || Number(formulario.ano_letivo_id) < 1)) {
+            novosErros.ano_letivo_id = 'Selecione um calendário letivo.';
         }
+
         if (!regular && !agendaBloqueada && (!editando || mudouAgenda) && !faixa) novosErros.horario = 'Selecione um horário para a oficina.';
         if (!regular && !agendaBloqueada && (!editando || mudouAgenda) && (!formulario.dias_semana.length || formulario.dias_semana.some((dia) => ![1, 2, 3, 4, 5].includes(dia)))) {
             novosErros.dias_semana = 'Selecione ao menos um dia de segunda a sexta.';
@@ -147,9 +215,12 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
         setErroEnvio('');
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
+            if (criandoAPartir) setAba('dados');
             (form.querySelector(`[name="${primeiroErro}"]`) || form.querySelector('#turma-busca-profissional'))?.focus();
             return;
         }
+        if (criandoAPartir && aba === 'dados') { setAba('alunos'); return; }
+        if (criandoAPartir && (carregandoAlunos || candidatos.status !== 'sucesso' || excedeuVagas)) return;
 
         if (editando && !Object.keys(alterados).length) return;
         const dados = editando ? { ...alterados, ambiente_id: Number(formulario.ambiente_id) } : {
@@ -157,13 +228,16 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
             profissional_id: Number(formulario.profissional_id), descricao: formulario.descricao.trim() || null,
             ...(formulario.ambiente_id ? { ambiente_id: Number(formulario.ambiente_id) } : {}),
             ...(formulario.capacidade_maxima !== '' ? { capacidade_maxima: Number(formulario.capacidade_maxima) } : {}),
-            ...(regular ? { ano_letivo: Number(formulario.ano_letivo) }
+            ...(regular ? { ano_letivo_id: Number(formulario.ano_letivo_id) }
                 : { hora_inicio: faixa.value, hora_fim: faixa.fim, dias_semana: [...formulario.dias_semana].sort((a, b) => a - b) }),
         };
         envioEmAndamento.current = true;
         setEnviando(true);
         try {
-            if (editando) {
+            if (criandoAPartir) {
+                const criada = await turmasService.criarAPartir(origemId, { turma: dados, alunos_ids: selecionados });
+                onCriado(criada);
+            } else if (editando) {
                 const atualizada = await turmasService.editar(turma.id, dados);
                 onSalvo(atualizada);
             } else {
@@ -173,10 +247,12 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
         } catch (error) {
             const errosCampos = {};
             for (const item of error.response?.data?.erros ?? []) {
-                const campo = item.path?.[0];
+                const campo = item.path?.[0] === 'turma' ? item.path[1] : item.path?.[0];
                 if (campo) errosCampos[['hora_inicio', 'hora_fim'].includes(campo) ? 'horario' : campo] = item.message;
             }
             setErros(errosCampos);
+            if (criandoAPartir && Object.keys(errosCampos).some((campo) => campo !== 'alunos_ids')) setAba('dados');
+            if (criandoAPartir && error.response?.status === 409) setTentativa((atual) => atual + 1);
             setErroEnvio(error.response?.data?.erro || `Não foi possível ${editando ? 'editar' : 'cadastrar'}. Verifique os dados e tente novamente.`);
         } finally {
             envioEmAndamento.current = false;
@@ -193,21 +269,35 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
     }
 
     return (
-        <Modal testId="turma-formulario" isOpen onClose={fecharModal} title={editando ? (regular ? 'Editar Turma' : 'Editar Oficina') : 'Nova Turma / Oficina'}
-            subtitle={<>Campos marcados com <span className="text-danger">*</span> são obrigatórios</>}
+        <Modal testId="turma-formulario" isOpen onClose={fecharModal} title={criandoAPartir ? 'Criar turma para novo ano letivo' : editando ? (regular ? 'Editar Turma' : 'Editar Oficina') : 'Nova Turma / Oficina'}
+            subtitle={criandoAPartir ? <>Baseada em {(origemCarregada ?? turmaOrigem).nome} · {(origemCarregada ?? turmaOrigem).ano_letivo?.ano}</> : <>Campos marcados com <span className="text-danger">*</span> são obrigatórios</>}
             confirmText={<span className="inline-flex items-center gap-sm">
                 <SaveIcon />
-                {editando ? 'Salvar alterações' : regular ? 'Salvar Turma' : 'Salvar Oficina'}
+                {criandoAPartir ? (aba === 'dados' ? 'Revisar alunos →' : `Criar turma de ${calendarioSelecionado?.ano ?? ''}`) : editando ? 'Salvar alterações' : regular ? 'Salvar Turma' : 'Salvar Oficina'}
             </span>}
-            confirmFormId="form-cadastro-turma" onConfirm={enviar} isConfirmLoading={enviando} isConfirmDisabled={incompleto}>
+            secondaryText="Voltar aos dados" onSecondaryAction={criandoAPartir && aba === 'alunos' ? () => setAba('dados') : undefined}
+            confirmFormId="form-cadastro-turma" onConfirm={enviar} isConfirmLoading={enviando}
+            isConfirmDisabled={incompleto || (criandoAPartir && aba === 'alunos' && (carregandoAlunos || candidatos.status !== 'sucesso' || excedeuVagas))}>
+            {criandoAPartir && <div role="tablist" aria-label="Etapas da nova turma" className="mb-lg grid grid-cols-2 border-b border-slate-200">
+                <button data-testid="turma-nova-aba-dados" id="turma-nova-aba-dados" type="button" role="tab" aria-selected={aba === 'dados'} aria-controls="turma-nova-dados" disabled={enviando} onClick={() => setAba('dados')}
+                    className={`border-b-2 p-sm text-sm font-semibold ${aba === 'dados' ? 'border-secondary bg-blue-50 text-secondary' : 'border-transparent text-slate-500'}`}>1. Dados da turma</button>
+                <button data-testid="turma-nova-aba-alunos" id="turma-nova-aba-alunos" type="button" role="tab" aria-selected={aba === 'alunos'} aria-controls="turma-nova-alunos" disabled={enviando}
+                    onClick={() => { if (aba === 'dados') document.getElementById('form-cadastro-turma')?.requestSubmit(); }}
+                    className={`border-b-2 p-sm text-sm font-semibold ${aba === 'alunos' ? 'border-secondary bg-blue-50 text-secondary' : 'border-transparent text-slate-500'}`}>2. Revisar alunos</button>
+            </div>}
+            {criandoAPartir && !origemCarregada && (candidatos?.status === 'erro' ? <div className="mb-md rounded-sm bg-red-50 p-sm text-sm text-red-700">
+                <p role="alert">{candidatos.erro}</p><button data-testid="turma-nova-origem-tentar-novamente" type="button" onClick={() => setTentativa((atual) => atual + 1)} className="mt-sm underline">Tentar novamente</button>
+            </div> : <p role="status" className="mb-md text-sm text-text-muted">Carregando dados da turma anterior...</p>)}
             <form id="form-cadastro-turma" onSubmit={enviar} noValidate>
-                <fieldset disabled={enviando} className="min-w-0">
-                    <SelecaoOpcao testId="turma-formulario-tipo" label="Tipo de turma" labelClassName="font-mono" name="tipo" required value={formulario.tipo} disabled={editando}
+                <fieldset disabled={enviando || (criandoAPartir && !origemCarregada)} className="min-w-0">
+                    <div id="turma-nova-dados" data-testid={criandoAPartir ? 'turma-nova-dados' : undefined} role={criandoAPartir ? 'tabpanel' : undefined} aria-labelledby={criandoAPartir ? 'turma-nova-aba-dados' : undefined} hidden={criandoAPartir && aba !== 'dados'}>
+                    {criandoAPartir && <p className="mb-md rounded-sm border border-amber-200 bg-amber-50 p-sm text-sm text-amber-800">Os dados da turma anterior foram copiados. Revise as informações e os alunos antes de criar a nova turma.</p>}
+                    {!criandoAPartir && <SelecaoOpcao testId="turma-formulario-tipo" label="Tipo de turma" labelClassName="font-mono" name="tipo" required value={formulario.tipo} disabled={editando}
                         className="[&>div]:flex-col sm:[&>div]:flex-row" optionClassName="min-w-0"
                         onChange={(valor) => atualizarCampo('tipo', valor)} options={[
                             { value: 'REGULAR', title: 'Turma Regular', subtitle: 'Aulas diárias com cronograma fixo' },
                             { value: 'OFICINA', title: 'Oficina', subtitle: 'Aulas semanais' },
-                        ]} />
+                        ]} />}
                     {editando && !infoEdicao && <p role="status" className="mb-md text-sm text-slate-500">Consultando matrículas e histórico...</p>}
                     {editando && infoEdicao?.status === 'erro' && <div className="mb-md text-sm text-red-700"><p role="alert">Não foi possível consultar as restrições da turma.</p><button data-testid="turma-formulario-restricoes-tentar-novamente" type="button" className="underline" onClick={tentarNovamente}>Tentar novamente</button></div>}
                     {infoEdicao?.bloqueada && <p className="mb-md rounded-sm bg-tertiary/20 p-sm text-sm text-amber-800 border border-amber-800">Esta turma possui matrículas ativas ou histórico de matrículas. Alguns dados não podem ser alterados.</p>}
@@ -223,9 +313,11 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
                                 {erroCampo('turno')}
                             </div>
                             <div>
-                                <Input data-testid="turma-formulario-ano-letivo" id="turma-ano" label="Ano letivo" labelClassName="font-mono" name="ano_letivo" type="number" min="1" step="1" required disabled={agendaBloqueada}
-                                    value={formulario.ano_letivo} onChange={(event) => atualizarCampo('ano_letivo', event.target.value)} {...acessibilidadeCampo('ano_letivo')} />
-                                {erroCampo('ano_letivo')}
+                                <Select data-testid="turma-formulario-ano-letivo" id="turma-ano" label="Ano letivo" labelClassName="font-mono" name="ano_letivo_id" required disabled={agendaBloqueada || calendarios.status !== 'sucesso'}
+                                    options={opcoesCalendario} value={formulario.ano_letivo_id} onChange={(event) => atualizarCampo('ano_letivo_id', event.target.value)} {...acessibilidadeCampo('ano_letivo_id')} />
+                                {calendarios.status === 'erro' && <p role="alert" className="text-sm text-danger">Não foi possível carregar os calendários. <button data-testid="turma-calendarios-tentar" type="button" onClick={tentarNovamente} className="underline">Tentar novamente</button></p>}
+                                {calendarios.status === 'sucesso' && !opcoesCalendario.length && <p className="text-sm text-text-muted">Cadastre um calendário em <Link to="/configuracoes" className="text-tertiary underline">Configurações</Link>.</p>}
+                                {erroCampo('ano_letivo_id')}
                             </div>
                         </div>
                         <div className="mb-lg rounded-sm border border-blue-100 bg-blue-50 p-md">
@@ -268,6 +360,13 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, onClose, onCri
                     <SeletorProfissional key={formulario.tipo} tipo={formulario.tipo} profissionais={elegiveis} value={formulario.profissional_id}
                         onChange={(valor) => atualizarCampo('profissional_id', valor)} carregando={profissionais.status === 'carregando'}
                         erroCarga={profissionais.erro} onTentarNovamente={tentarNovamente} error={erros.profissional_id} />
+                    {criandoAPartir && profissionais.status === 'sucesso' && !profissionalValido && <p role="alert" className="mb-md text-sm text-amber-800">O profissional da turma anterior não está disponível. Selecione um profissional ativo com função compatível.</p>}
+                    </div>
+                    {criandoAPartir && <div id="turma-nova-alunos" data-testid="turma-nova-alunos" role="tabpanel" aria-labelledby="turma-nova-aba-alunos" hidden={aba !== 'alunos'}>
+                        <RevisaoAlunosTurma alunos={carregandoAlunos ? [] : candidatos.dados} selecionados={selecionados} bloqueados={bloqueados} capacidade={formulario.capacidade_maxima}
+                            onSelecionar={alternarAluno} onBloquear={alternarBloqueio} onSortear={(ids) => { setSelecionados(ids); setErroEnvio(''); }} disabled={enviando}
+                            carregando={carregandoAlunos} erro={!carregandoAlunos && candidatos.erro} onTentarNovamente={() => setTentativa((atual) => atual + 1)} />
+                    </div>}
                     {erroEnvio && <p role="alert" className="mt-md rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}
                 </fieldset>
             </form>
