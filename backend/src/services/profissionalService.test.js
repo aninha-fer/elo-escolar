@@ -255,7 +255,7 @@ test('sem conta vinculada, alteração de status não cria usuário', async (t) 
 
 for (const inicial of [
     { turmas: [{ id: 10, nome: 'Turma A', status: 'ATIVO' }] },
-    { atendimentos: [{ id: 20, modalidade: 'Psicologia', status: 'ATIVO' }] },
+    { atendimentos: [{ id: 20, modalidade_cadastrada: { nome: 'Psicologia' }, status: 'ATIVO' }] },
 ]) {
     test(`vínculo ${JSON.stringify(inicial)} impede inativação sem alterações parciais`, async (t) => {
         const banco = simularEdicao(t, inicial);

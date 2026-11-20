@@ -28,6 +28,10 @@ function configurarConsulta(recurso, parametros, alunoId, turmaId) {
       else if (recurso === 'usuarios') filtros.push(Prisma.sql`(${nome} OR ${contem(Prisma.sql`coalesce(a.email, '')`, busca)})`);
       else filtros.push(nome);
     }
+  } else if (recurso === 'modalidades') {
+    origem = Prisma.sql`modalidade m`; chave = Prisma.sql`m.nome`; id = Prisma.sql`m.id`;
+    filtros.push(Prisma.sql`TRUE`);
+    if (busca) filtros.push(contem(chave, busca));
   } else if (recurso === 'anos_letivos') {
     origem = Prisma.sql`ano_letivo a`; chave = Prisma.sql`lpad(a.ano::text, 4, '0')`; id = Prisma.sql`a.id`;
     decrescente = true;
@@ -108,4 +112,9 @@ function formatarPagina(itens, pagina) {
   return { itens: ids.map((id) => porId.get(id)).filter(Boolean), ...metadados };
 }
 
-module.exports = { paginarIds, formatarPagina };
+async function selecionarAlunosFiltrados(parametros) {
+  const { origem, chave, id, filtro } = configurarConsulta('alunos', parametros);
+  return prisma.$queryRaw(Prisma.sql`SELECT ${id} AS id, ${chave} AS nome FROM ${origem} WHERE ${filtro} ORDER BY ${chave} ASC, ${id} ASC`);
+}
+
+module.exports = { paginarIds, formatarPagina, selecionarAlunosFiltrados };

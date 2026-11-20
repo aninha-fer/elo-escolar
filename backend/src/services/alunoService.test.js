@@ -8,7 +8,7 @@ const data = (valor) => new Date(`${valor}T00:00:00.000Z`);
 
 function atendimento(alteracoes = {}) {
   return {
-    id: 1, aluno_id: 1, status: 'ATIVO', modalidade: 'Psicologia',
+    id: 1, aluno_id: 1, status: 'ATIVO', modalidade_id: 1, modalidade: 'Psicologia',
     tipo_recorrencia: 'EVENTUAL', data_inicio: data('2026-10-26'),
     hora_inicio: new Date('1970-01-01T08:00:00.000Z'), duracao_minutos: 30,
     data_cancelamento: null, data_termino: null, profissional: { pessoa: { nome: 'Ana' } },
@@ -44,7 +44,7 @@ function simularBanco(t, registros, agora = '2026-10-26T20:30:00.000Z') {
         if (a[campo] > b[campo]) return 1;
       }
       return 0;
-    }));
+    }).map(({ modalidade, ...registro }) => ({ ...registro, modalidade_cadastrada: { nome: modalidade } })));
   prisma.atendimento_clinico.findMany = consulta;
   return consulta;
 }
@@ -132,7 +132,8 @@ test('preserva os dados do profissional, a ordenação e os registros encerrados
   assert.deepEqual(resultado.map((item) => item.id), [4, 1, 2, 3]);
   assert.equal(resultado[0].profissional.pessoa.nome, 'Ana');
   assert.deepEqual(consulta.mock.calls[0].arguments[0].include, {
-    profissional: { select: { pessoa: { select: { nome: true } } } }
+    profissional: { select: { pessoa: { select: { nome: true } } } },
+    modalidade_cadastrada: { select: { nome: true } },
   });
   assert.deepEqual(registros, originais);
 });

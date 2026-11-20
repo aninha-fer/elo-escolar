@@ -6,7 +6,7 @@ import { SaveIcon } from '../../components/icons/SaveIcon';
 
 const funcoes = ['Professor', 'Terapeuta', 'Auxiliar'];
 
-export function FormularioProfissional({ profissional, onClose, onCriado, onSalvo }) {
+export function FormularioProfissional({ profissional, onClose, onCriado, onSalvo, trapFocus = false }) {
     const editando = Boolean(profissional);
     const [formulario, setFormulario] = useState(() => ({ nome: profissional?.nome ?? '', telefone: profissional?.telefone ?? '', cargo: profissional?.funcao ?? '' }));
     const [erros, setErros] = useState({});
@@ -80,7 +80,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
 
     return (
         <div className="profissional-modal">
-            <Modal testId="profissional-formulario" isOpen onClose={fecharModal} title={editando ? 'Editar Profissional' : 'Cadastrar Profissional'} subtitle={<>Campos com <span className="text-danger">*</span> são obrigatórios</>}
+            <Modal testId="profissional-formulario" isOpen trapFocus={trapFocus} onClose={fecharModal} title={editando ? 'Editar Profissional' : 'Cadastrar Profissional'} subtitle={<>Campos com <span className="text-danger">*</span> são obrigatórios</>}
                 confirmText={
                     <span className="inline-flex items-center gap-sm">
                         <SaveIcon />
@@ -90,7 +90,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
                 isConfirmLoading={enviando} isConfirmDisabled={!formulario.nome.trim() || !formulario.cargo || (editando && !Object.keys(dadosAlterados).length)}>
                 <form id="form-cadastro-profissional" onSubmit={enviar} noValidate>
                     <fieldset disabled={enviando} className="min-w-0">
-                        <Input data-testid="profissional-formulario-nome" id="profissional-nome" name="nome" label="Nome completo" placeholder="Ex: João Silva" autoComplete="name" required
+                        <Input data-testid="profissional-formulario-nome" id="profissional-nome" name="nome" label="Nome completo" placeholder="Ex: João Silva" autoComplete="name" autoFocus={trapFocus} required
                             labelClassName="font-mono" value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />
                         {erros.nome && <p id="profissional-nome-erro" className="mb-md text-sm text-red-700">{erros.nome}</p>}
                         <Input data-testid="profissional-formulario-telefone" id="profissional-telefone" name="telefone" label="Telefone" type="tel" placeholder="(11) 99999-9999" autoComplete="tel-national" maxLength={20}

@@ -19,7 +19,7 @@ async function validarEncerramentoProfissional(tx, id, acao) {
             status: 'ATIVO', data_cancelamento: null,
             atendimento_clinico: { status: 'ATIVO', data_cancelamento: null },
             OR: [{ profissional_id: id }, { atendimento_clinico: { profissional_id: id } }],
-        }, include: { atendimento_clinico: { select: { id: true, modalidade: true } } } }),
+        }, include: { atendimento_clinico: { select: { id: true, modalidade_cadastrada: { select: { nome: true } } } } } }),
     ]);
     const vigentes = sessoes.filter((s) => inicioOcorrencia(s.data_sessao, s.hora_inicio) + s.duracao_minutos * 60000 > agora.getTime());
     const atendimentos = [...new Map(vigentes.map((s) => [s.atendimento_clinico.id, s.atendimento_clinico])).values()];
@@ -28,7 +28,7 @@ async function validarEncerramentoProfissional(tx, id, acao) {
             isConflict: true,
             detalhes: [
                 ...turmas.map((turma) => ({ codigo: 'TURMA_VINCULADA', turma_id: turma.id, mensagem: `Responsável pela turma ${turma.nome}.` })),
-                ...atendimentos.map((a) => ({ codigo: 'ATENDIMENTO_VINCULADO', atendimento_id: a.id, mensagem: `Responsável pelo atendimento ${a.modalidade} (código ${a.id}).` })),
+                ...atendimentos.map((a) => ({ codigo: 'ATENDIMENTO_VINCULADO', atendimento_id: a.id, mensagem: `Responsável pelo atendimento ${a.modalidade_cadastrada.nome} (código ${a.id}).` })),
             ],
         });
     }

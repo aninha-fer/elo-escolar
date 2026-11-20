@@ -18,6 +18,7 @@ const rotulosStatus = { ATIVO: 'Ativa', INATIVO: 'Inativa', PROVISORIO: 'Provis�
 export function TurmaDetalhes() {
     const { id } = useParams();
     const { usuario } = useAuth();
+    const podeEditar = usuario?.role === 'admin';
     const [resultado, setResultado] = useState(null);
     const [tentativa, setTentativa] = useState(0);
     const [modalAberto, setModalAberto] = useState(false);
@@ -73,7 +74,6 @@ export function TurmaDetalhes() {
     const grupos = agruparHorarios(turma.horarios);
     const dias = [...new Set(grupos.flatMap((grupo) => grupo.dias))].sort((a, b) => a - b);
     const nomeProfissional = turma.profissional?.pessoa?.nome;
-    const podeVincular = usuario?.role === 'admin' && regular && turma.status === 'ATIVO' && !turma.expirada;
     const campos = [
         ['Período', formatarTurno(turma.turno)],
         ['Dias da semana', dias.length ? formatarFrequencia(dias) : 'Não informados'],
@@ -118,11 +118,11 @@ export function TurmaDetalhes() {
                     </div>
                 </DivInformacoes>
                 <div className="min-w-0">
-                    {!listaAlunos.carregando && !listaAlunos.erro && <AlunosVinculados alunos={listaAlunos.itens} total={listaAlunos.total} capacidade={turma.capacidade_maxima} podeVincular={podeVincular} onVincular={() => { setAviso(''); setModalAberto(true); }} />}
+                    {!listaAlunos.carregando && !listaAlunos.erro && <AlunosVinculados alunos={listaAlunos.itens} total={listaAlunos.total} capacidade={turma.capacidade_maxima} podeVincular={podeEditar} onVincular={() => { setAviso(''); setModalAberto(true); }} />}
                     <CarregarMais testId="turma-alunos-paginacao" listagem={listaAlunos} />
                 </div>
             </div>
-            {/* {modalAberto && podeVincular && <VincularAlunoModal key={id} turma={turma} onClose={() => setModalAberto(false)} onVinculado={alunoVinculado} />} */}
+            {modalAberto && podeEditar && <VincularAlunoModal key={id} turma={turma} onClose={() => setModalAberto(false)} onVinculado={alunoVinculado} />}
         </section>
     );
 }

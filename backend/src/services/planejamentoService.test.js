@@ -349,7 +349,7 @@ const turma = (id, tipo = 'OFICINA', capacidade_maxima = 1) => ({
     hora_fim: hora(tipo === 'REGULAR' ? '12:00' : '10:00')
   }))
 });
-const pedidoClinico = { aluno_id: 1, profissional_id: 1, modalidade: 'Psicologia', tipo_recorrencia: 'EVENTUAL',
+const pedidoClinico = { aluno_id: 1, profissional_id: 1, modalidade_id: 1, tipo_recorrencia: 'EVENTUAL',
   data_inicio: '2026-11-02', hora_inicio: '09:30', duracao_minutos: 30 };
 
 const pessoaEdicao = { id: 1, nome: 'Aluno Teste', telefone: null, status_geral: 'INATIVO' };
@@ -444,7 +444,7 @@ test('aluno excluído não pode ser lido, editado, reativado ou receber operaç�
     () => removerMatriculaProvisoriaService({ aluno_id: 1, matricula_id: 1 }),
     () => agendarAtendimentoService(pedidoClinico),
     () => obterAtendimentoService({ aluno_id: 1, atendimento_id: 60 }),
-    () => editarAtendimentoService({ aluno_id: 1, atendimento_id: 60 }, { modalidade: 'Tentativa' }),
+    () => editarAtendimentoService({ aluno_id: 1, atendimento_id: 60 }, { modalidade_id: 2 }),
     () => cancelarAtendimentoService({ aluno_id: 1, atendimento_id: 60 }),
     () => removerAtendimentoProvisorioService({ aluno_id: 1, atendimento_id: 60 }),
     () => listarOcorrenciasService(1),
@@ -747,9 +747,10 @@ for (const vinculo of ['funcionario', 'aluno ativo', 'aluno inativo', 'aluno ras
 test('exclusão de usuário preserva profissional, agenda e autoria de ocorrências, sem cancelar provisórios', async (t) => {
   const inicial = planejamentoProfissional();
   const banco = simularBanco(t, inicial);
+  const antes = structuredClone(banco);
   await excluirUsuario(7);
   for (const tabela of ['pessoa', 'funcionario', 'turma', 'atendimento_clinico', 'atendimento_sessao', 'ocorrencia_aluno']) {
-    assert.deepEqual(banco[tabela], inicial[tabela]);
+    assert.deepEqual(banco[tabela], antes[tabela]);
   }
   assert.equal(banco.usuario[1].status, 'ATIVO');
   await editarProfissionalService(1, { status_geral: 'ATIVO' });
@@ -991,6 +992,13 @@ function simularBanco(t, inicial = {}) {
   const estado = { ano_letivo: [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2026-12-19') }, { id: 2027, ano: 2027, data_inicio: data('2027-02-08'), data_fim: data('2027-12-18') }], aluno: [aluno(1), aluno(2, 'ATIVO'), aluno(3, 'ATIVO')], pessoa: [],
     turma: [turma(10), turma(20, 'REGULAR')], matricula_turma: [], atendimento_clinico: [], atendimento_sessao: [],
     aluno_responsavel: [], aluno_dados_medicos: [], usuario: [], funcionario: [{ id: 1, pessoa_id: 10, nome: 'Ana', cargo: 'Professor' }, { id: 2, pessoa_id: 11, nome: 'Bruno', cargo: 'Professor' }], ...inicial };
+  estado.modalidade = [{ id: 1, nome: 'Psicologia' }, { id: 2, nome: 'Outra' }];
+  estado.atendimento_clinico = estado.atendimento_clinico.map(({ modalidade, ...registro }) => {
+    if (!modalidade) return registro;
+    let cadastrada = estado.modalidade.find((m) => m.nome === modalidade);
+    if (!cadastrada) { cadastrada = { id: estado.modalidade.length + 1, nome: modalidade }; estado.modalidade.push(cadastrada); }
+    return { ...registro, modalidade_id: cadastrada.id };
+  });
   let sequencia = 100;
   const filas = new Map();
 
@@ -1013,6 +1021,7 @@ function simularBanco(t, inicial = {}) {
         aluno: ler('aluno').find((outro) => outro.id === item.aluno_id),
         turma: hidratar('turma', ler('turma').find((outro) => outro.id === item.turma_id)) };
       if (nome === 'atendimento_clinico') return { ...item,
+        modalidade_cadastrada: ler('modalidade').find((m) => m.id === item.modalidade_id),
         aluno: hidratar('aluno', ler('aluno').find((outro) => outro.id === item.aluno_id)), profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { nome: 'Ana' }),
         sessoes: ler('atendimento_sessao').filter((outro) => outro.atendimento_clinico_id === item.id) };
       if (nome === 'atendimento_sessao') return { ...item,
@@ -1791,7 +1800,7 @@ for (const [antes, depois] of [['SEMANAL', 'MENSAL'], ['MENSAL', 'SEMANAL']]) {
     assert.ok(banco.atendimento_sessao.every((s) => s.status === 'PROVISORIO'));
     t.mock.timers.setTime(new Date('2026-11-02T12:45:00.000Z').getTime());
     await assert.rejects(() => editarAtendimentoService(params, { tipo_recorrencia: antes }), { statusCode: 409 });
-    await assert.rejects(() => editarAtendimentoService(params, { modalidade: 'Outra' }), { statusCode: 409 });
+    await assert.rejects(() => editarAtendimentoService(params, { modalidade_id: 2 }), { statusCode: 409 });
     await assert.rejects(() => editarAtendimentoService(params, { data_inicio: '2026-11-03' }), { statusCode: 409 });
   });
 }

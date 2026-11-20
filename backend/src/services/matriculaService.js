@@ -80,7 +80,7 @@ async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, st
         select: {
             id: true, atendimento_clinico_id: true, data_sessao: true,
             hora_inicio: true, duracao_minutos: true,
-            atendimento_clinico: { select: { modalidade: true } }
+            atendimento_clinico: { select: { modalidade_cadastrada: { select: { nome: true } } } }
         }
     });
     const calendarios = await tx.ano_letivo.findMany();
@@ -114,7 +114,7 @@ async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, st
                                 hora_fim_oficina: new Date(fimOficina).toISOString().slice(11, 16),
                                 sessao_id: sessao.id,
                                 atendimento_id: sessao.atendimento_clinico_id,
-                                modalidade: sessao.atendimento_clinico.modalidade,
+                                modalidade: sessao.atendimento_clinico.modalidade_cadastrada.nome,
                                 data_sessao: sessao.data_sessao.toISOString().slice(0, 10),
                                 hora_inicio: sessao.hora_inicio.toISOString().slice(11, 16),
                                 data_fim: new Date(fimSessao).toISOString().slice(0, 10),

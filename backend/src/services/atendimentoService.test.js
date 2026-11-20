@@ -121,7 +121,7 @@ test('rejeita uma recorrência semanal sem sessões no período', () => {
 const data = (valor) => new Date(`${valor}T00:00:00.000Z`);
 const hora = (valor) => new Date(`1970-01-01T${valor}:00.000Z`);
 const dadosBase = {
-  aluno_id: 1, profissional_id: 2, modalidade: 'Fisioterapia',
+  aluno_id: 1, profissional_id: 2, modalidade_id: 1,
   tipo_recorrencia: 'EVENTUAL', data_inicio: '2026-10-26',
   hora_inicio: '09:00', duracao_minutos: 60
 };
@@ -130,7 +130,7 @@ function sessaoExistente(alteracoes = {}) {
   return {
     id: 10, atendimento_clinico_id: 20, data_sessao: data('2026-10-26'),
     hora_inicio: hora('09:30'), duracao_minutos: 60,
-    atendimento_clinico: { modalidade: 'Psicologia' },
+    atendimento_clinico: { modalidade_cadastrada: { nome: 'Psicologia' } },
     ...alteracoes
   };
 }
@@ -153,6 +153,7 @@ function simularBanco(t, {
   t.mock.timers.enable({ apis: ['Date'], now: new Date(agora) });
   const eventos = [];
   const tx = {
+    modalidade: { findUnique: async () => ({ id: 1, nome: 'Fisioterapia' }) },
     ano_letivo: { findMany: async () => [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2027-12-19') }] },
     $queryRaw: t.mock.fn(async (sql, id) => {
       if (sql.join('?').includes('pg_advisory')) return [];
@@ -173,7 +174,7 @@ function simularBanco(t, {
     matricula_turma: { findMany: t.mock.fn(async () => matriculas) },
     atendimento_clinico: {
       create: t.mock.fn(async ({ data: registro }) => ({ id: 99, ...registro })),
-      findUnique: t.mock.fn(async () => ({ id: 99, sessoes: [] }))
+      findUnique: t.mock.fn(async () => ({ id: 99, modalidade_id: 1, modalidade_cadastrada: { nome: 'Fisioterapia' }, sessoes: [] }))
     }
   };
   const transacaoOriginal = prisma.$transaction;

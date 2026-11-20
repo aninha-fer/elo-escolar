@@ -43,7 +43,7 @@ function sessao(alteracoes = {}) {
     id: 10, atendimento_clinico_id: 20, status: 'ATIVO', data_cancelamento: null,
     data_sessao: data('2026-11-02'), hora_inicio: hora('09:00'), duracao_minutos: 45,
     atendimento_clinico: {
-      aluno_id: 1, status: 'ATIVO', modalidade: 'Fisioterapia',
+      aluno_id: 1, status: 'ATIVO', modalidade_id: 1, modalidade_cadastrada: { nome: 'Fisioterapia' },
       profissional: { pessoa: { nome: 'Ana' } }
     },
     ...alteracoes

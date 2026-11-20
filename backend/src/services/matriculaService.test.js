@@ -43,7 +43,7 @@ function sessao(alteracoes = {}) {
     return {
         id: 20, atendimento_clinico_id: 30, status: 'ATIVO', data_cancelamento: null, data_sessao: data('2026-11-02'),
         hora_inicio: hora('09:30'), duracao_minutos: 60,
-        atendimento_clinico: { aluno_id: 1, status: 'ATIVO', data_cancelamento: null, modalidade: 'Fisioterapia' },
+        atendimento_clinico: { aluno_id: 1, status: 'ATIVO', data_cancelamento: null, modalidade_cadastrada: { nome: 'Fisioterapia' } },
         ...alteracoes
     };
 }
@@ -67,6 +67,7 @@ function simularBanco(t, {
         const atualizacoes = new Map();
         let liberar;
         const tx = {
+            modalidade: { findUnique: async () => ({ id: 1, nome: 'Fisioterapia' }) },
             ano_letivo: { findMany: async () => [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2027-12-19') }] },
             $queryRaw: t.mock.fn(async (sql, id) => {
                 if (sql.join('?').includes('pg_advisory')) return [];
@@ -121,7 +122,7 @@ function simularBanco(t, {
                 createMany: t.mock.fn(async ({ data: registros }) => {
                     pendentes.sessoes.push(...registros.map((registro, indice) => ({
                         id: 200 + indice, data_cancelamento: null, ...registro,
-                        atendimento_clinico: pendentes.atendimentos.find((item) => item.id === registro.atendimento_clinico_id)
+                        atendimento_clinico: { ...pendentes.atendimentos.find((item) => item.id === registro.atendimento_clinico_id), modalidade_cadastrada: { nome: 'Fisioterapia' } }
                     })));
                     return { count: registros.length };
                 })
@@ -133,7 +134,7 @@ function simularBanco(t, {
                     return novo;
                 }),
                 findUnique: t.mock.fn(async ({ where }) => ({
-                    ...pendentes.atendimentos.find((item) => item.id === where.id), sessoes: pendentes.sessoes
+                    ...pendentes.atendimentos.find((item) => item.id === where.id), modalidade_cadastrada: { nome: 'Fisioterapia' }, sessoes: pendentes.sessoes
                 }))
             }
         };
@@ -198,7 +199,7 @@ for (const [dia_semana, impede] of [[5, true], [6, false]]) {
             horarios: [{ dia_semana, hora_inicio: hora('09:00'), hora_fim: hora('10:00') }]
         })] });
         await agendarAtendimentoService({
-            aluno_id: 1, profissional_id: 2, modalidade: 'Fisioterapia',
+            aluno_id: 1, profissional_id: 2, modalidade_id: 1,
             tipo_recorrencia: 'MENSAL', data_inicio: '2026-11-30', data_termino: '2027-01-30',
             hora_inicio: '09:30', duracao_minutos: 60, frequencia: 1
         });
@@ -350,7 +351,7 @@ for (const primeiro of ['atendimento', 'oficina']) {
     test(`serializa matrícula e atendimento simultâneos, com ${primeiro} primeiro`, async (t) => {
         const banco = simularBanco(t);
         const criarAtendimento = () => agendarAtendimentoService({
-            aluno_id: 1, profissional_id: 2, modalidade: 'Fisioterapia', tipo_recorrencia: 'EVENTUAL',
+            aluno_id: 1, profissional_id: 2, modalidade_id: 1, tipo_recorrencia: 'EVENTUAL',
             data_inicio: '2026-11-02', hora_inicio: '09:30', duracao_minutos: 60
         });
         const matricular = () => matricularOficinasService(pedido);
@@ -511,7 +512,7 @@ test('cancelar antes de criar atendimento libera apenas o período posterior', a
     simularBanco(t, { matriculas: [inscricao()] });
     const resultados = await Promise.all([
         cancelarOficinaService(cancelamento),
-        agendarAtendimentoService({ aluno_id: 1, profissional_id: 2, modalidade: 'Fisioterapia',
+        agendarAtendimentoService({ aluno_id: 1, profissional_id: 2, modalidade_id: 1,
             tipo_recorrencia: 'EVENTUAL', data_inicio: '2026-11-02', hora_inicio: '09:30', duracao_minutos: 60 })
     ]);
     assert.equal(resultados[0].matricula.status, 'INATIVO');

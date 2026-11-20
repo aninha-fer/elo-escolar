@@ -4,7 +4,7 @@ import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/f
 import EditIcon from '../../components/icons/EditIcon';
 import { TrashIcon } from '../../components/icons/TrashIcon';
 
-export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, alterandoStatus = false }) {
+export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, alterandoStatus = false, semBorda = false }) {
     const navigate = useNavigate();
 
     const estilosStatus = {
@@ -37,7 +37,7 @@ export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, 
     }
 
     return (
-        <div className="w-full overflow-x-auto rounded-md border border-slate-200 bg-bg-surface shadow-sm">
+        <div className={`w-full overflow-x-auto bg-bg-surface ${semBorda ? '' : 'rounded-md border border-slate-200 shadow-sm'}`}>
             <table className="w-max min-w-full table-auto border-collapse text-left">
                 <thead className="bg-bg-main text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <tr>

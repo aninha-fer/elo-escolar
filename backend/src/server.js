@@ -80,6 +80,7 @@ api.use(usuarioRoutes);
 api.use(profissionalRoutes);
 api.use(ambienteRoutes);
 api.use(require('./routes/anoLetivoRoutes'));
+api.use(require('./routes/modalidadeRoutes'));
 
 api.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'API Elo Escolar operando.' });

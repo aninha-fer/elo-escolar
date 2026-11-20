@@ -1,10 +1,10 @@
 const DIA_MS = 86400000;
 
-function agoraInstituicao() {
+function agoraInstituicao(instante = new Date()) {
   const partes = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
-  }).formatToParts(new Date());
+  }).formatToParts(instante);
   const valor = (tipo) => partes.find((parte) => parte.type === tipo).value;
   return new Date(`${valor('year')}-${valor('month')}-${valor('day')}T${valor('hour')}:${valor('minute')}:${valor('second')}.000Z`);
 }

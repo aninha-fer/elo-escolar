@@ -69,8 +69,6 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
         limparErros(campo, ...(campo === 'turno' ? ['turma_id'] : []));
     }
 
-
-
     function adicionarResponsavel() {
         const chave = sequenciaResponsavel.current--;
         setFormulario((atual) => ({ ...atual, responsaveis: [...atual.responsaveis, { chave, nome: '', parentesco: '', telefone: '' }] }));

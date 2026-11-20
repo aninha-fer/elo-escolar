@@ -9,6 +9,7 @@ import { Input } from "../../components/Input";
 import { FormularioAluno } from './FormularioAluno';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
+import { BotaoExportarCalendario } from '../../components/BotaoExportarCalendario';
 
 export function Alunos() {
     const [alunoEdicao, setAlunoEdicao] = useState(null);
@@ -24,17 +25,11 @@ export function Alunos() {
     const [excluindo, setExcluindo] = useState(false);
     const [erroExclusao, setErroExclusao] = useState('');
     const envioExclusao = useRef(false);
-
     const [isModalOpen, setIsModalOpen] = useState(false);
-
-
     const [statusSelecionado, setStatusSelecionado] = useState('TODOS');
     const [termoBusca, setTermoBusca] = useState('');
-
-
     const { usuario } = useAuth();
     const podeEditar = usuario?.role === 'admin';
-
     const listagem = useListagemInfinita(alunoService.listarTodos, { busca: termoBusca, status: statusSelecionado }, tentativa);
     const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0, RASCUNHO: 0 };
 
@@ -160,9 +155,15 @@ export function Alunos() {
             {carregandoEdicao && <p role="status">Carregando dados para edição...</p>}
             {erroEdicao && <p role="alert" className="text-sm text-red-700">{erroEdicao}</p>}
             {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
-            {!listagem.carregando && !listagem.erro && <TabelaAlunos alunos={listagem.itens} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
+            <div className="overflow-hidden rounded-md border border-slate-200 bg-bg-surface shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-md border-b border-slate-200 px-lg py-md">
+                    <p className="text-sm text-text-muted">{listagem.total} alunos na seleção atual</p>
+                    <BotaoExportarCalendario testId="alunos-exportar-calendarios" total={listagem.total} disabled={listagem.carregando || Boolean(listagem.erro)} filtros={{ busca: termoBusca, status: statusSelecionado }} />
+                </div>
+                {!listagem.carregando && !listagem.erro && <TabelaAlunos semBorda alunos={listagem.itens} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
                 onAlterarStatus={podeEditar && !carregandoEdicao ? abrirStatus : undefined}
                 onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />}
+            </div>
             <CarregarMais testId="alunos-paginacao" listagem={listagem} />
             {podeEditar && alunoExclusao && <ModalConfirmacao testId="aluno-excluir" isOpen estado="atencao" showCancel
                 title="Excluir aluno?" confirmText="Confirmar exclusão" isConfirmLoading={excluindo} onConfirm={confirmarExclusao}

@@ -13,6 +13,7 @@ import { BotaoVoltar } from '../../components/BotaoVoltar';
 import { FormularioAluno } from '../Alunos/FormularioAluno';
 import { Ocorrencias } from './components/Ocorrencias';
 import { ocorrenciasService } from '../../services/ocorrenciasService';
+import { BotaoExportarCalendario } from '../../components/BotaoExportarCalendario';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600 before:bg-emerald-600',
@@ -187,7 +188,7 @@ export function AlunoDetalhes() {
 
     return (
         <div className="space-y-lg">
-            <div className="flex items-center gap-md">
+            <div className="flex flex-wrap items-center gap-md">
                 <BotaoVoltar data-testid="aluno-voltar" to='/alunos' />
                 <div>
                     <h1 className="text-xl font-bold text-text-main">
@@ -203,6 +204,7 @@ export function AlunoDetalhes() {
                         </p>
                     </div>
                 </div>
+                <BotaoExportarCalendario alunoId={id} disabled={!aluno} className="ml-auto" testId="aluno-exportar-calendario" />
             </div>
 
             {carregandoEdicao && <p role="status" className="text-sm text-text-muted">Carregando dados para edição...</p>}

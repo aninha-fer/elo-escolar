@@ -65,7 +65,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
         // Sessões anteriores podem atravessar o início da semana; o intervalo é filtrado abaixo.
         data_sessao: { lt: fimSemana }
       },
-      include: { profissional: { select: { pessoa: { select: { nome: true } } } }, atendimento_clinico: { include: { profissional: { include: { pessoa: true } } } } }
+      include: { profissional: { select: { pessoa: { select: { nome: true } } } }, atendimento_clinico: { include: { modalidade_cadastrada: { select: { nome: true } }, profissional: { include: { pessoa: true } } } } }
     }),
     prisma.ano_letivo.findMany({ where: { data_inicio: { lt: fimSemana }, data_fim: { gte: diaAnterior } } })
   ]);
@@ -128,7 +128,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
     adicionarEvento({
       id: `atendimento-${sessao.id}`,
       sessao_id: sessao.id, atendimento_id: sessao.atendimento_clinico_id,
-      titulo: atendimento.modalidade, modalidade: atendimento.modalidade, tipo: 'ATENDIMENTO',
+      titulo: atendimento.modalidade_cadastrada.nome, modalidade: atendimento.modalidade_cadastrada.nome, tipo: 'ATENDIMENTO',
       status: sessao.status,
       ambiente: null, profissional: sessao.profissional?.pessoa?.nome || atendimento.profissional?.pessoa?.nome || 'Não definido'
     }, inicio, fim);

@@ -1,6 +1,7 @@
 const { sincronizarTurmasExpiradas } = require('./encerramentoTurmaService');
 const { bloquearCalendarios, inicioMatriculaRegular, diaLetivo, fimLetivo, hojeInstituicao } = require('./calendarioLetivo');
 const prisma = require('../prismaClient');
+const { comNomeModalidade } = require('./modalidadeService');
 const { paginarIds, formatarPagina } = require('./paginacaoService');
 const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
 const { editarAlunoDTO, alterarStatusAlunoDTO } = require('../dtos/alunoDTO');
@@ -215,11 +216,12 @@ async function obterAtendimentosService(aluno_id, paginacao) {
       ]
     },
     include: {
-      profissional: { select: { pessoa: { select: { nome: true } } } }
+      profissional: { select: { pessoa: { select: { nome: true } } } },
+      modalidade_cadastrada: { select: { nome: true } },
     },
     orderBy: [{ data_inicio: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]
   });
-  return formatarPagina(atendimentos, pagina);
+  return formatarPagina(atendimentos.map(comNomeModalidade), pagina);
 }
 
 function conflitoEdicao(mensagem, detalhes) {
@@ -232,9 +234,9 @@ async function lerPlanejamento(tx, aluno_id) {
       { status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null }
     ] }, include: { turma: { include: { ano_letivo: true, horarios: true } } } }),
     tx.atendimento_clinico.findMany({ where: { aluno_id, status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null },
-      include: { sessoes: { where: { status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null } } } })
+      include: { modalidade_cadastrada: { select: { nome: true } }, sessoes: { where: { status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null } } } })
   ]);
-  return { matriculas, atendimentos };
+  return { matriculas, atendimentos: atendimentos.map(comNomeModalidade) };
 }
 
 function intervalosOficina(matricula, inicio, fim, calendarios) {

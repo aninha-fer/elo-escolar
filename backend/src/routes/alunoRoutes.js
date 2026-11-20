@@ -6,6 +6,11 @@ const { exigirPermissao } = require('../middlewares/exigirPermissao');
 const alunoLeituraRoutes = Router();
 const alunoAdminRoutes = Router();
 const lerAlunos = exigirPermissao('alunos:ler');
+const exportacaoCalendario = require('../controllers/exportacaoCalendarioController');
+
+alunoLeituraRoutes.get('/alunos/exportacao/selecionados', lerAlunos, exportacaoCalendario.selecionar);
+alunoLeituraRoutes.get('/alunos/exportacao/calendarios', lerAlunos, exportacaoCalendario.lote);
+alunoLeituraRoutes.get('/alunos/:id/calendario-exportacao', lerAlunos, exportacaoCalendario.individual);
 
 alunoAdminRoutes.post('/alunos', criarAluno);
 alunoAdminRoutes.patch('/alunos/:id', exigirPermissao('administracao:acessar'), editarAluno);

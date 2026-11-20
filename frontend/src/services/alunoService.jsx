@@ -1,6 +1,15 @@
 import { api } from './api';
 
 export const alunoService = {
+  async selecionarCalendarios(filtros, signal) {
+    return (await api.get('/alunos/exportacao/selecionados', { params: filtros, signal })).data;
+  },
+  async buscarCalendariosLote(ids, referencia, signal) {
+    return (await api.get('/alunos/exportacao/calendarios', { params: { ids: ids.join(','), referencia }, signal })).data;
+  },
+  async buscarCalendarioExportacao(id, signal) {
+    return (await api.get(`/alunos/${id}/calendario-exportacao`, { signal })).data;
+  },
   async excluir(id) {
     await api.delete(`/alunos/${id}`);
   },

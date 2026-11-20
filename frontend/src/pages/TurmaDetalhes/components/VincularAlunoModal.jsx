@@ -4,6 +4,7 @@ import { Input } from '../../../components/Input';
 import { alunoService } from '../../../services/alunoService';
 import { matriculasService } from '../../../services/matriculasService';
 import { formatarFrequencia, formatarTurno, obterIniciais } from '../../../utils/formatters';
+import { SaveIcon } from '../../../components/icons/SaveIcon';
 
 function normalizarTexto(valor) {
     return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
@@ -64,8 +65,12 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
 
     return (
         <Modal testId="turma-vincular-aluno" isOpen title="Vincular Aluno" subtitle={`Selecione um aluno para ${turma.nome}.`}
-            onClose={fecharModal} confirmText="Vincular Aluno" confirmFormId="form-vincular-aluno" onConfirm={enviar}
-            isConfirmDisabled={carregando || !alunoSelecionado} isConfirmLoading={enviando}>
+            onClose={fecharModal} confirmFormId="form-vincular-aluno" onConfirm={enviar}
+            isConfirmDisabled={carregando || !alunoSelecionado} isConfirmLoading={enviando} 
+            confirmText={<span className="inline-flex items-center gap-sm">
+                <SaveIcon />
+                Vincular Aluno
+            </span>}>
             <form id="form-vincular-aluno" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando}>
                     <p className="mb-md text-sm text-slate-500">São exibidos alunos ativos ou em rascunho que ainda não possuem turma regular. O turno, os dias de frequência e as vagas serão validados ao confirmar.</p>
