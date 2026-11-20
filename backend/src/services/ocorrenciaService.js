@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const { paginarIds, formatarPagina } = require('./paginacaoService');
 
 const camposPublicos = {
     id: true, aluno_id: true, usuario_relator_id: true,
@@ -43,10 +44,12 @@ async function verificarAluno(alunoId, tx = prisma) {
     return aluno;
 }
 
-async function listarOcorrenciasService(alunoId) {
+async function listarOcorrenciasService(alunoId, paginacao) {
     await verificarAluno(alunoId);
-    return prisma.ocorrencia_aluno.findMany({ where: { aluno_id: alunoId },
+    const pagina = paginacao ? await paginarIds('ocorrencias_aluno', paginacao, { alunoId }) : null;
+    const itens = await prisma.ocorrencia_aluno.findMany({ where: { aluno_id: alunoId, ...(pagina ? { id: { in: pagina.ids } } : {}) },
         select: camposPublicos, orderBy: [{ ocorrido_em: 'desc' }, { id: 'desc' }] });
+    return formatarPagina(itens, pagina);
 }
 
 async function criarOcorrenciaService(alunoId, usuarioId, dados) {

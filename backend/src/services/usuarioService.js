@@ -1,5 +1,6 @@
 const argon2 = require('argon2');
 const prisma = require('../prismaClient');
+const { paginarIds, formatarPagina } = require('./paginacaoService');
 
 const camposPublicosUsuario = {
   id: true,
@@ -22,14 +23,15 @@ function formatarUsuario({ id, pessoa_id, email, role, status, pessoa }) {
   return { id, pessoa_id, nome: pessoa.nome, email, role, status };
 }
 
-async function listarUsuarios() {
+async function listarUsuarios(paginacao) {
+  const pagina = paginacao ? await paginarIds('usuarios', paginacao) : null;
   const usuarios = await prisma.usuario.findMany({
-    where: { deleted_at: null },
+    where: { deleted_at: null, ...(pagina ? { id: { in: pagina.ids } } : {}) },
     select: camposPublicosUsuario,
     orderBy: [{ pessoa: { nome: 'asc' } }, { id: 'asc' }],
   });
 
-  return usuarios.map(formatarUsuario);
+  return formatarPagina(usuarios.map(formatarUsuario), pagina);
 }
 
 async function vincularPessoa(dados, tx) {

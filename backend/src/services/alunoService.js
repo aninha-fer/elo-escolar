@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const { paginarIds, formatarPagina } = require('./paginacaoService');
 const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
 const { editarAlunoDTO, alterarStatusAlunoDTO } = require('../dtos/alunoDTO');
 const { agoraInstituicao, inicioOcorrencia, dataEncerramento, fimMatricula, DIA_MS } = require('./encerramentoAtividade');
@@ -87,9 +88,10 @@ async function criarAlunoService(dadosAluno) {
   return novoAluno;
 }
 
-async function listarAlunosService() {
+async function listarAlunosService(paginacao) {
+  const pagina = paginacao ? await paginarIds('alunos', paginacao) : null;
   const alunos = await prisma.aluno.findMany({
-    where: { deleted_at: null },
+    where: { deleted_at: null, ...(pagina ? { id: { in: pagina.ids } } : {}) },
     include: {
       pessoa: true,
       responsaveis: {
@@ -120,7 +122,7 @@ async function listarAlunosService() {
     }
   });
 
-  return alunos.map(aluno => {
+  const itens = alunos.map(aluno => {
     const matriculaRegular = aluno.matriculas_turmas[0];
 
     return {
@@ -135,6 +137,7 @@ async function listarAlunosService() {
       matricula_regular: matriculaRegular ? { id: matriculaRegular.id, status: matriculaRegular.status } : null
     };
   });
+  return formatarPagina(itens, pagina);
 }
 
 async function obterAlunoService(aluno_id) {
@@ -160,12 +163,14 @@ async function obterAlunoService(aluno_id) {
     matricula_regular: regular ? { id: regular.id, status: regular.status } : null };
 }
 
-async function obterOficinasService(aluno_id) {
+async function obterOficinasService(aluno_id, paginacao) {
   const aluno = await prisma.aluno.findUnique({ where: { id: aluno_id }, select: { id: true, deleted_at: true } });
   if (!aluno || aluno.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
+  const pagina = paginacao ? await paginarIds('oficinas_aluno', paginacao, { alunoId: aluno_id }) : null;
   const oficinas = await prisma.matricula_turma.findMany({
     where: {
       aluno_id: aluno_id,
+      ...(pagina ? { id: { in: pagina.ids } } : {}),
       OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }],
       turma: {
         tipo: 'OFICINA', deleted_at: null
@@ -179,10 +184,10 @@ async function obterOficinasService(aluno_id) {
       }
     }
   });
-  return oficinas;
+  return formatarPagina(oficinas, pagina);
 }
 
-async function obterAtendimentosService(aluno_id) {
+async function obterAtendimentosService(aluno_id, paginacao) {
   const aluno = await prisma.aluno.findUnique({ where: { id: aluno_id }, select: { id: true, deleted_at: true } });
   if (!aluno || aluno.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
   const partes = new Intl.DateTimeFormat('en-US', {
@@ -191,9 +196,11 @@ async function obterAtendimentosService(aluno_id) {
   const valor = (tipo) => partes.find((parte) => parte.type === tipo).value;
   const hoje = new Date(`${valor('year')}-${valor('month')}-${valor('day')}T00:00:00.000Z`);
 
+  const pagina = paginacao ? await paginarIds('atendimentos_aluno', paginacao, { alunoId: aluno_id }) : null;
   const atendimentos = await prisma.atendimento_clinico.findMany({
     where: {
       aluno_id: aluno_id,
+      ...(pagina ? { id: { in: pagina.ids } } : {}),
       AND: [{ OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', aluno: { status: 'RASCUNHO' } }] }],
       data_cancelamento: null,
       OR: [
@@ -209,7 +216,7 @@ async function obterAtendimentosService(aluno_id) {
     },
     orderBy: [{ data_inicio: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]
   });
-  return atendimentos;
+  return formatarPagina(atendimentos, pagina);
 }
 
 function conflitoEdicao(mensagem, detalhes) {

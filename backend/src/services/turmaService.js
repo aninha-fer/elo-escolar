@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const { paginarIds, formatarPagina } = require('./paginacaoService');
 const { criarTurmaDTO, editarTurmaDTO, excluirTurmaDTO, criarTurmaAPartirDTO } = require('../dtos/turmaDTO');
 const { bloquearProfissionalAtivo } = require('./profissionalService');
 const { agoraInstituicao, fimMatricula } = require('./encerramentoAtividade');
@@ -59,8 +60,9 @@ function gerarHorariosTurma({ tipo, turno, hora_inicio, hora_fim, dias_semana })
     });
 }
 
-async function listarTurmasService(tipo) {
-    const filtro = { deleted_at: null, ...(tipo ? { tipo } : {}) };
+async function listarTurmasService(tipo, paginacao) {
+    const pagina = paginacao ? await paginarIds('turmas', { ...paginacao, tipo }) : null;
+    const filtro = { deleted_at: null, ...(tipo ? { tipo } : {}), ...(pagina ? { id: { in: pagina.ids } } : {}) };
     const turmas = await prisma.turma.findMany({
         where: filtro,
         include: {
@@ -81,12 +83,12 @@ async function listarTurmasService(tipo) {
             nome: 'asc'
         }
     });
-    return turmas.map((turma) => ({
+    return formatarPagina(turmas.map((turma) => ({
         ...turma,
         vagas_ocupadas: turma._count.matriculas,
         vagas_disponiveis: turma.capacidade_maxima == null ? null : Math.max(turma.capacidade_maxima - turma._count.matriculas, 0),
         _count: undefined,
-    }));
+    })), pagina);
 }
 
 async function listarTurmasRegularesPorTurnoService(turno) {
@@ -221,7 +223,7 @@ async function criarTurmaAPartirService(id, entrada) {
     }, { isolationLevel: 'ReadCommitted', timeout: 15000 });
 }
 
-async function obterTurmaService(turma_id) {
+async function obterTurmaService(turma_id, incluirAlunos = true) {
   const turma = await prisma.turma.findUnique({
     where: { id: turma_id, deleted_at: null },
     select: {
@@ -240,7 +242,7 @@ async function obterTurmaService(turma_id) {
         select: { id: true, dia_semana: true, hora_inicio: true, hora_fim: true },
         orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]
       },
-      matriculas: {
+      ...(incluirAlunos ? { matriculas: {
         where: { status: 'ATIVO', aluno: { deleted_at: null } },
         orderBy: [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }],
         select: {
@@ -251,18 +253,30 @@ async function obterTurmaService(turma_id) {
             }
           }
         }
-      }
+      } } : {})
     },
   });
   if (!turma) return null;
-  const cancelamentos = await prisma.matricula_turma.findMany({
+  const cancelamentos = incluirAlunos ? await prisma.matricula_turma.findMany({
     where: { turma_id, ...filtroMatriculasParaEncerrar }, select: { id: true, status: true },
-  });
-  const { matriculas, _count, ...dados } = turma;
+  }) : [];
+  const { matriculas = [], _count, ...dados } = turma;
+  const quantidadeAtivas = incluirAlunos ? cancelamentos.filter((m) => m.status === 'ATIVO').length
+    : await prisma.matricula_turma.count({ where: { turma_id, status: 'ATIVO' } });
   return { ...dados, possui_matriculas: (_count?.matriculas ?? matriculas.length) > 0, alunos: matriculas.map((matricula) => matricula.aluno),
-    matriculas_ativas: cancelamentos.filter((m) => m.status === 'ATIVO').length,
-    confirmacao_cancelamentos: { matriculas: cancelamentos.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b),
-      matriculas_ativas: cancelamentos.filter((m) => m.status === 'ATIVO').length } };
+    matriculas_ativas: quantidadeAtivas,
+    ...(incluirAlunos ? { confirmacao_cancelamentos: { matriculas: cancelamentos.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b),
+      matriculas_ativas: quantidadeAtivas } } : {}) };
+}
+
+async function listarAlunosTurmaService(turmaId, paginacao) {
+    const turma = await prisma.turma.findUnique({ where: { id: turmaId, deleted_at: null }, select: { id: true } });
+    if (!turma) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
+    const pagina = await paginarIds('alunos_turma', paginacao, { turmaId });
+    const matriculas = await prisma.matricula_turma.findMany({ where: { id: { in: pagina.ids }, turma_id: turmaId },
+        select: { id: true, aluno: { select: { id: true, dias_frequencia: true, pessoa: { select: { nome: true } } } } } });
+    const resultado = formatarPagina(matriculas, pagina);
+    return { ...resultado, itens: resultado.itens.map((m) => m.aluno) };
 }
 
 async function editarTurmaService(id, entrada) {
@@ -344,4 +358,4 @@ async function excluirTurmaService(id, entrada = {}) {
     }, { isolationLevel: 'ReadCommitted' });
 }
 
-module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService };
+module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService };

@@ -1,6 +1,14 @@
 import { api } from './api';
 
 export const turmasService = {
+  async listarPaginadas(params, signal) {
+    const { data } = await api.get('/turmas', { params, signal });
+    return data;
+  },
+  async listarAlunosPaginados({ id, ...params }, signal) {
+    const { data } = await api.get(`/turmas/${id}/alunos`, { params, signal });
+    return data;
+  },
   async prepararNovaTurma(id, turno, signal) {
     const { data } = await api.get(`/turmas/${id}/nova-turma`, { params: { turno }, signal });
     return data;
@@ -16,8 +24,8 @@ export const turmasService = {
     const { data } = await api.patch(`/turmas/${id}`, dadosTurma);
     return data;
   },
-  async buscarPorId(id, signal) {
-    const { data } = await api.get(`/turmas/${id}`, { signal });
+  async buscarPorId(id, signal, params) {
+    const { data } = await api.get(`/turmas/${id}`, { signal, params });
     return data;
   },
 

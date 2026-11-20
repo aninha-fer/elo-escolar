@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useListagemInfinita } from '../../hooks/useListagemInfinita';
+import { CarregarMais } from '../../components/CarregarMais';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { usuariosService } from '../../services/usuariosService';
@@ -9,15 +11,8 @@ import { ResetarSenhaUsuario } from './ResetarSenhaUsuario';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 import { useAuth } from '../../contexts/AuthContext';
 
-function normalizarTexto(valor = '') {
-    return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
-}
-
 export function Usuarios() {
     const { usuario: usuarioAtual, recarregarSessao } = useAuth();
-    const [usuarios, setUsuarios] = useState([]);
-    const [carregando, setCarregando] = useState(true);
-    const [erro, setErro] = useState('');
     const [tentativa, setTentativa] = useState(0);
     const [modalAberto, setModalAberto] = useState(false);
     const [termoBusca, setTermoBusca] = useState('');
@@ -27,31 +22,15 @@ export function Usuarios() {
     const [erroStatus, setErroStatus] = useState('');
     const envioStatusEmAndamento = useRef(false);
 
-    useEffect(() => {
-        const controller = new AbortController();
-        async function carregarUsuarios() {
-            try {
-                const dados = await usuariosService.listarTodos(controller.signal);
-                if (!controller.signal.aborted) setUsuarios(dados);
-            } catch (error) {
-                if (controller.signal.aborted) return;
-                setErro(error.response?.data?.erro || 'Não foi possível carregar os usuários.');
-            } finally {
-                if (!controller.signal.aborted) setCarregando(false);
-            }
-        }
-        carregarUsuarios();
-        return () => controller.abort();
-    }, [tentativa]);
+    const listagem = useListagemInfinita(usuariosService.listarPaginados, { busca: termoBusca }, tentativa);
+    const { itens: usuarios, carregando, erro } = listagem;
 
     function tentarNovamente() {
-        setErro('');
-        setCarregando(true);
         setTentativa((atual) => atual + 1);
     }
 
-    function usuarioCriado(usuario) {
-        setUsuarios((atuais) => [...atuais, usuario].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+    function usuarioCriado() {
+        setTentativa((atual) => atual + 1);
         setModalAberto(false);
         setAviso('Usuário criado com sucesso.');
     }
@@ -63,8 +42,7 @@ export function Usuarios() {
     }
 
     function usuarioAtualizado(usuario, mensagem) {
-        setUsuarios((atuais) => atuais.map((atual) => atual.id === usuario.id ? usuario : atual)
-            .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+        setTentativa((atual) => atual + 1);
         setOperacao(null);
         setAviso(mensagem);
         if (usuario.id === usuarioAtual.id) recarregarSessao();
@@ -98,7 +76,7 @@ export function Usuarios() {
         setErroStatus('');
         try {
             await usuariosService.excluir(operacao.usuario.id);
-            setUsuarios((atuais) => atuais.filter((usuario) => usuario.id !== operacao.usuario.id));
+            setTentativa((atual) => atual + 1);
             setOperacao(null);
             setAviso('Usuário excluído com sucesso.');
             if (operacao.usuario.id === usuarioAtual.id) await recarregarSessao();
@@ -109,9 +87,6 @@ export function Usuarios() {
             setAlterandoStatus(false);
         }
     }
-
-    const busca = normalizarTexto(termoBusca);
-    const filtrados = usuarios.filter((usuario) => normalizarTexto(usuario.nome).includes(busca) || normalizarTexto(usuario.email).includes(busca));
 
     return (
         <div className="flex min-w-0 flex-col gap-lg">
@@ -139,11 +114,12 @@ export function Usuarios() {
                     <p role="alert">{erro}</p>
                     <button data-testid="usuarios-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold">Tentar novamente</button>
                 </div>
-            ) : <TabelaUsuarios usuarios={filtrados}
+            ) : <TabelaUsuarios usuarios={usuarios}
                 onEditar={(usuario) => abrirOperacao('editar', usuario)}
                 onResetarSenha={(usuario) => abrirOperacao('senha', usuario)}
                 onAlterarStatus={(usuario) => abrirOperacao('status', usuario)}
                 onExcluir={(usuario) => abrirOperacao('excluir', usuario)} />}
+            {!carregando && !erro && <CarregarMais testId="usuarios-paginacao" listagem={listagem} />}
             {modalAberto && <FormularioUsuario onClose={() => setModalAberto(false)} onCriado={usuarioCriado} />}
             {operacao?.tipo === 'editar' && <EditarUsuario key={operacao.usuario.id} usuario={operacao.usuario}
                 onClose={() => setOperacao(null)} onSalvo={(usuario) => usuarioAtualizado(usuario, 'Usuário atualizado com sucesso.')} />}

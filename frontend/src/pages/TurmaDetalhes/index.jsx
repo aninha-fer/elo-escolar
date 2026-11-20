@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useListagemInfinita } from '../../hooks/useListagemInfinita';
+import { CarregarMais } from '../../components/CarregarMais';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { DivInformacoes } from '../../components/DivInformacoes';
@@ -19,6 +21,7 @@ export function TurmaDetalhes() {
     const [tentativa, setTentativa] = useState(0);
     const [modalAberto, setModalAberto] = useState(false);
     const [aviso, setAviso] = useState('');
+    const listaAlunos = useListagemInfinita(turmasService.listarAlunosPaginados, { id }, tentativa);
     const idValido = /^\d+$/.test(id) && Number(id) > 0 && Number(id) <= 2147483647;
 
     useEffect(() => {
@@ -26,7 +29,7 @@ export function TurmaDetalhes() {
         const controller = new AbortController();
         async function carregarTurma() {
             try {
-                const dados = await turmasService.buscarPorId(id, controller.signal);
+                const dados = await turmasService.buscarPorId(id, controller.signal, { somente_dados: true });
                 if (!controller.signal.aborted) setResultado({ id, tentativa, dados, status: 'sucesso' });
             } catch (error) {
                 if (!controller.signal.aborted) setResultado({
@@ -100,7 +103,10 @@ export function TurmaDetalhes() {
                         </div> : <p className="text-sm text-slate-500">Não informado</p>}
                     </div>
                 </DivInformacoes>
-                <AlunosVinculados alunos={turma.alunos} capacidade={turma.capacidade_maxima} podeVincular={podeVincular} onVincular={() => { setAviso(''); setModalAberto(true); }} />
+                <div className="min-w-0">
+                    {!listaAlunos.carregando && !listaAlunos.erro && <AlunosVinculados alunos={listaAlunos.itens} total={listaAlunos.total} capacidade={turma.capacidade_maxima} podeVincular={podeVincular} onVincular={() => { setAviso(''); setModalAberto(true); }} />}
+                    <CarregarMais testId="turma-alunos-paginacao" listagem={listaAlunos} />
+                </div>
             </div>
             {/* {modalAberto && podeVincular && <VincularAlunoModal key={id} turma={turma} onClose={() => setModalAberto(false)} onVinculado={alunoVinculado} />} */}
         </section>

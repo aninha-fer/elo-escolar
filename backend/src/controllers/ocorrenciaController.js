@@ -1,5 +1,6 @@
 const dto = require('../dtos/ocorrenciaDTO');
 const service = require('../services/ocorrenciaService');
+const { lerPaginacao } = require('../dtos/paginacaoDTO');
 
 function tratarErro(error, res) {
     if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
@@ -12,7 +13,7 @@ function tratarErro(error, res) {
 async function listarOcorrencias(req, res) {
     try {
         const { aluno_id } = dto.alunoParamsDTO.parse(req.params);
-        return res.status(200).json(await service.listarOcorrenciasService(aluno_id));
+        return res.status(200).json(await service.listarOcorrenciasService(aluno_id, lerPaginacao(req.query)));
     } catch (error) { return tratarErro(error, res); }
 }
 

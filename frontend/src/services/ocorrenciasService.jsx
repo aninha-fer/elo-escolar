@@ -1,8 +1,8 @@
 import { api } from './api';
 
 export const ocorrenciasService = {
-    async listar(alunoId, signal) {
-        const { data } = await api.get(`/alunos/${Number(alunoId)}/ocorrencias`, { signal });
+    async listar(alunoId, signal, params) {
+        const { data } = await api.get(`/alunos/${Number(alunoId)}/ocorrencias`, { signal, params });
         return data;
     },
     async criar(alunoId, dados) {

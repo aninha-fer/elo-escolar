@@ -48,6 +48,7 @@ const criarTurmaDTO = z.object({
 const getTurmaDTO = z.object({
   id: z.coerce.number().int().positive('O ID da turma deve ser um número positivo.').max(2147483647)
 });
+const detalheTurmaQueryDTO = z.object({ somente_dados: z.enum(['true', 'false']).optional() });
 
 const prepararNovaTurmaQueryDTO = z.object({ turno: z.enum(['MANHA', 'TARDE']).optional() }).strict();
 
@@ -82,4 +83,4 @@ const editarTurmaDTO = z.object({
   if (!campos.length) contexto.addIssue({ code: 'custom', message: 'Informe ao menos um campo para atualizar.' });
 });
 
-module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO, prepararNovaTurmaQueryDTO, criarTurmaAPartirDTO };
+module.exports = { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO, prepararNovaTurmaQueryDTO, criarTurmaAPartirDTO, detalheTurmaQueryDTO };

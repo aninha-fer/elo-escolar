@@ -39,13 +39,13 @@ export const alunoService = {
     return response.data;
   },
 
-  async buscarOficinasPorId(id, signal) {
-    const response = await api.get(`/alunos/${id}/oficinas`, { signal });
+  async buscarOficinasPorId(id, signal, params) {
+    const response = await api.get(`/alunos/${id}/oficinas`, { signal, params });
     return response.data;
   },
 
-  async buscarAtendimentosPorId(id, signal) {
-    const response = await api.get(`/alunos/${id}/atendimentos`, { signal });
+  async buscarAtendimentosPorId(id, signal, params) {
+    const response = await api.get(`/alunos/${id}/atendimentos`, { signal, params });
     return response.data;
   },
 };

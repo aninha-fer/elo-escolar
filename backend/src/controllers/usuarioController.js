@@ -1,7 +1,9 @@
 const { criarUsuarioDTO, editarUsuarioDTO, editarUsuarioParamsDTO } = require('../dtos/usuarioDTO');
 const usuariosService = require('../services/usuarioService');
+const { lerPaginacao } = require('../dtos/paginacaoDTO');
 
 function responderErro(res, erro) {
+  if (erro.name === 'ZodError') return res.status(400).json({ erros: erro.issues });
   if (erro instanceof usuariosService.ErroUsuario) {
     return res.status(erro.statusCode).json({
       erro: erro.message,
@@ -9,6 +11,7 @@ function responderErro(res, erro) {
     });
   }
 
+  if (erro.statusCode === 400) return res.status(400).json({ erro: erro.message });
   console.error('Falha em uma operação de usuários.', {
     nome: erro.name,
     codigo: erro.code,
@@ -19,7 +22,7 @@ function responderErro(res, erro) {
 
 async function listarUsuarios(req, res) {
   try {
-    const usuarios = await usuariosService.listarUsuarios();
+    const usuarios = await usuariosService.listarUsuarios(lerPaginacao(req.query));
     return res.json(usuarios);
   } catch (erro) {
     return responderErro(res, erro);

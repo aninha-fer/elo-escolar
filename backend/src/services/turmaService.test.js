@@ -163,6 +163,22 @@ test('detalhe preserva turma sem matrículas e sem horários, com opcionais nulo
     assert.equal('matriculas' in turma, false);
 });
 
+test('detalhe sem alunos não carrega a lista inteira e mantém a contagem de matrículas ativas', async (t) => {
+    const consultar = simularConsultaTurma(t, async ({ select }) => {
+        assert.equal(select.matriculas, undefined);
+        return { id: 1, horarios: [], _count: { matriculas: 50 } };
+    });
+    const original = prisma.matricula_turma.count;
+    t.after(() => { prisma.matricula_turma.count = original; });
+    prisma.matricula_turma.count = async () => 45;
+    const turma = await obterTurmaService(1, false);
+    assert.equal(consultar.mock.callCount(), 1);
+    assert.deepEqual(turma.alunos, []);
+    assert.equal(turma.matriculas_ativas, 45);
+    assert.equal(turma.possui_matriculas, true);
+    assert.equal(turma.confirmacao_cancelamentos, undefined);
+});
+
 test('turma inexistente retorna null no service e 404 no controller', async (t) => {
     simularConsultaTurma(t, async () => null);
     assert.equal(await obterTurmaService(1), null);

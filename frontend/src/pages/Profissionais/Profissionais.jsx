@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useListagemInfinita } from '../../hooks/useListagemInfinita';
+import { CarregarMais } from '../../components/CarregarMais';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { profissionaisService } from '../../services/profissionaisService';
@@ -6,14 +8,7 @@ import { TabelaProfissionais } from './TabelaProfissionais';
 import { FormularioProfissional } from './FormularioProfissional';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
-function normalizarTexto(valor) {
-    return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
-}
-
 export function Profissionais() {
-    const [profissionais, setProfissionais] = useState([]);
-    const [carregando, setCarregando] = useState(true);
-    const [erro, setErro] = useState('');
     const [tentativa, setTentativa] = useState(0);
     const [busca, setBusca] = useState('');
     const [modalAberto, setModalAberto] = useState(false);
@@ -24,31 +19,15 @@ export function Profissionais() {
     const [conflitos, setConflitos] = useState([]);
     const envioStatusEmAndamento = useRef(false);
 
-    useEffect(() => {
-        const controller = new AbortController();
-        async function carregarProfissionais() {
-            try {
-                const dados = await profissionaisService.listarTodos(controller.signal);
-                if (!controller.signal.aborted) setProfissionais(dados);
-            } catch (error) {
-                if (controller.signal.aborted) return;
-                setErro(error.response?.data?.erro || 'Não foi possível carregar os profissionais.');
-            } finally {
-                if (!controller.signal.aborted) setCarregando(false);
-            }
-        }
-        carregarProfissionais();
-        return () => controller.abort();
-    }, [tentativa]);
+    const listagem = useListagemInfinita(profissionaisService.listarPaginados, { busca }, tentativa);
+    const { itens: profissionais, carregando, erro } = listagem;
 
     function tentarNovamente() {
-        setErro('');
-        setCarregando(true);
         setTentativa((atual) => atual + 1);
     }
 
-    function profissionalCriado(profissional) {
-        setProfissionais((atuais) => [...atuais, profissional].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+    function profissionalCriado() {
+        setTentativa((atual) => atual + 1);
         setModalAberto(false);
         setAviso('Profissional cadastrado com sucesso.');
     }
@@ -61,8 +40,7 @@ export function Profissionais() {
     }
 
     function profissionalAtualizado(profissional, mensagem) {
-        setProfissionais((atuais) => atuais.map((atual) => atual.id === profissional.id ? profissional : atual)
-            .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+        setTentativa((atual) => atual + 1);
         setOperacao(null);
         setAviso(mensagem);
     }
@@ -98,7 +76,7 @@ export function Profissionais() {
         setConflitos([]);
         try {
             await profissionaisService.excluir(operacao.profissional.id);
-            setProfissionais((atuais) => atuais.filter((p) => p.id !== operacao.profissional.id));
+            setTentativa((atual) => atual + 1);
             setOperacao(null);
             setAviso('Profissional excluído com sucesso.');
         } catch (error) {
@@ -106,9 +84,6 @@ export function Profissionais() {
             setConflitos(error.response?.data?.conflitos ?? []);
         } finally { envioStatusEmAndamento.current = false; setAlterandoStatus(false); }
     }
-
-    const termo = normalizarTexto(busca);
-    const filtrados = profissionais.filter((profissional) => normalizarTexto(profissional.nome).includes(termo));
 
     return (
         <section className="profissionais-page flex min-w-0 flex-col gap-lg" aria-labelledby="profissionais-titulo">
@@ -133,9 +108,10 @@ export function Profissionais() {
                     <p role="alert">{erro}</p>
                     <button data-testid="profissionais-tentar-novamente" type="button" className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold" onClick={tentarNovamente}>Tentar novamente</button>
                 </div>
-            ) : <TabelaProfissionais profissionais={filtrados} onEditar={(profissional) => abrirOperacao('editar', profissional)}
+            ) : <TabelaProfissionais profissionais={profissionais} onEditar={(profissional) => abrirOperacao('editar', profissional)}
                 onAlterarStatus={(profissional) => abrirOperacao('status', profissional)}
                 onExcluir={(profissional) => abrirOperacao('excluir', profissional)} />}
+            {!carregando && !erro && <CarregarMais testId="profissionais-paginacao" listagem={listagem} />}
             {modalAberto && <FormularioProfissional onClose={() => setModalAberto(false)} onCriado={profissionalCriado} />}
             {operacao?.tipo === 'editar' && <FormularioProfissional key={operacao.profissional.id} profissional={operacao.profissional}
                 onClose={() => setOperacao(null)} onSalvo={(profissional) => profissionalAtualizado(profissional, 'Profissional atualizado com sucesso.')} />}

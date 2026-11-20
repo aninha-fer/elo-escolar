@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useListagemInfinita } from '../../hooks/useListagemInfinita';
+import { CarregarMais } from '../../components/CarregarMais';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -10,14 +12,9 @@ import { normalizarProfissionais } from '../../utils/formatters';
 import { FormularioTurma } from './FormularioTurma';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
-function normalizarTexto(valor = '') {
-    return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
-}
-
 export function Turmas() {
     const navigate = useNavigate();
     const [tipoTurma, setTipoTurma] = useState('REGULAR');
-    const [resultado, setResultado] = useState({ tipo: 'REGULAR', tentativa: 0, status: 'carregando', turmas: [] });
     const [tentativa, setTentativa] = useState(0);
     const [termoBusca, setTermoBusca] = useState('');
     const [aviso, setAviso] = useState('');
@@ -30,30 +27,9 @@ export function Turmas() {
     const envioStatusEmAndamento = useRef(false);
 
 
-    useEffect(() => {
-        const controller = new AbortController();
-        async function carregarTurmas() {
-            try {
-                const dados = tipoTurma === 'REGULAR'
-                    ? await turmasService.listarRegularesDisponiveis(controller.signal)
-                    : await turmasService.listarOficinasDisponiveis(controller.signal);
-                if (!controller.signal.aborted) {
-                    setResultado({ tipo: tipoTurma, tentativa, status: 'sucesso', turmas: dados.map((turma) => ({ ...turma, profissionais: normalizarProfissionais(turma) })) });
-                }
-            } catch (error) {
-                if (!controller.signal.aborted) {
-                    setResultado({ tipo: tipoTurma, tentativa, status: 'erro', turmas: [], erro: error.response?.data?.erro || 'Não foi possível carregar as turmas. Tente novamente.' });
-                }
-            }
-        }
-        carregarTurmas();
-        return () => controller.abort();
-    }, [tipoTurma, tentativa]);
-
-    const carregando = resultado.tipo !== tipoTurma || resultado.tentativa !== tentativa || resultado.status === 'carregando';
-    const erro = !carregando && resultado.status === 'erro' ? resultado.erro : '';
-    const busca = normalizarTexto(termoBusca);
-    const filtrados = resultado.turmas.filter((turma) => normalizarTexto(turma.nome).includes(busca));
+    const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca }, tentativa);
+    const { carregando, erro } = listagem;
+    const filtrados = listagem.itens.map((turma) => ({ ...turma, profissionais: normalizarProfissionais(turma) }));
 
     function trocarTipo(tipo) {
         setTipoTurma(tipo);
@@ -185,6 +161,7 @@ export function Turmas() {
                         onSelecionar={(selecionada) => navigate(`/turmas/${selecionada.id}`)} />)}
                 </ul>
             )}
+            {!carregando && !erro && <CarregarMais testId="turmas-paginacao" listagem={listagem} />}
             {modalAberto && podeEditar && <FormularioTurma tipoInicial={tipoTurma} onClose={() => setModalAberto(false)} onCriado={turmaCriada} />}
             {operacao?.tipo === 'nova-a-partir' && podeEditar && <FormularioTurma key={operacao.turma.id} turmaOrigem={operacao.turma}
                 onClose={() => setOperacao(null)} onCriado={(turma) => turmaAtualizada(turma, 'Nova turma criada com sucesso.')} />}

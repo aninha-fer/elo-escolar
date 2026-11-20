@@ -12,6 +12,10 @@ function normalizarProfissional(profissional) {
 }
 
 export const profissionaisService = {
+    async listarPaginados(params, signal) {
+        const { data } = await api.get('/profissionais', { params, signal });
+        return data;
+    },
     async excluir(id) {
         await api.delete(`/profissionais/${id}`);
     },

@@ -1,13 +1,16 @@
-const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO, prepararNovaTurmaQueryDTO, criarTurmaAPartirDTO } = require('../dtos/turmaDTO');
-const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService } = require('../services/turmaService');
+const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO, prepararNovaTurmaQueryDTO, criarTurmaAPartirDTO, detalheTurmaQueryDTO } = require('../dtos/turmaDTO');
+const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService } = require('../services/turmaService');
+const { lerPaginacao } = require('../dtos/paginacaoDTO');
 
 async function listarTurmas(req, res) {
   try {
     const queryValidada = listarTurmasQueryDTO.parse(req.query);
-    const turmas = await listarTurmasService(queryValidada.tipo);
+    const turmas = await listarTurmasService(queryValidada.tipo, lerPaginacao(req.query));
     return res.status(200).json(turmas);
   } catch (error) {
     console.error(error);
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.statusCode === 400) return res.status(400).json({ erro: error.message });
     return res.status(500).json({ erro: 'Erro interno ao listar turmas.' });
   }
 }
@@ -39,7 +42,8 @@ async function criarTurma(req, res) {
 async function obterTurma(req, res) {
   try {
     const { id } = getTurmaDTO.parse(req.params);
-    const turma = await obterTurmaService(id);
+    const { somente_dados } = detalheTurmaQueryDTO.parse(req.query ?? {});
+    const turma = await obterTurmaService(id, somente_dados !== 'true');
     if (!turma) return res.status(404).json({ erro: 'Turma não encontrada.' });
     return res.status(200).json(turma);
   } catch (error) {
@@ -102,4 +106,17 @@ async function criarTurmaAPartir(req, res) {
   } catch (error) { return responderErroNovaTurma(res, error); }
 }
 
-module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma, excluirTurma, prepararNovaTurma, criarTurmaAPartir };
+async function listarAlunosTurma(req, res) {
+  try {
+    const { id } = getTurmaDTO.parse(req.params);
+    const paginacao = lerPaginacao({ ...req.query, paginado: 'true' });
+    return res.status(200).json(await listarAlunosTurmaService(id, paginacao));
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if ([400, 404].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    console.error('Erro ao listar alunos da turma.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Não foi possível carregar os alunos da turma.' });
+  }
+}
+
+module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma, excluirTurma, prepararNovaTurma, criarTurmaAPartir, listarAlunosTurma };

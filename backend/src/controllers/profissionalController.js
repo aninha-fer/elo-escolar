@@ -1,4 +1,5 @@
 const { criarProfissionalDTO, editarProfissionalDTO, editarProfissionalParamsDTO } = require('../dtos/profissionalDTO');
+const { lerPaginacao } = require('../dtos/paginacaoDTO');
 const { criarProfissionalService, listarProfissionaisService, editarProfissionalService, excluirProfissionalService } = require('../services/profissionalService');
 
 async function criarProfissional(req, res) {
@@ -21,10 +22,12 @@ async function criarProfissional(req, res) {
 
 async function listarProfissionais(req, res) {
   try {
-    const profissionais = await listarProfissionaisService();
+    const profissionais = await listarProfissionaisService(lerPaginacao(req.query));
     return res.status(200).json(profissionais);
   } catch (error) {
     console.error(error);
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if (error.statusCode === 400) return res.status(400).json({ erro: error.message });
     return res.status(500).json({ erro: 'Erro interno ao listar profissionais.' });
   }
 }

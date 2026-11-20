@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const { paginarIds, formatarPagina } = require('./paginacaoService');
 const { agoraInstituicao, inicioOcorrencia } = require('./encerramentoAtividade');
 
 async function bloquearProfissionalAtivo(tx, id) {
@@ -96,9 +97,10 @@ async function criarProfissionalService(dadosProfissional) {
     return novoProfissional;
 }
 
-async function listarProfissionaisService() {
+async function listarProfissionaisService(paginacao) {
+    const pagina = paginacao ? await paginarIds('profissionais', paginacao) : null;
     const profissionais = await prisma.funcionario.findMany({
-        where: { deleted_at: null },
+        where: { deleted_at: null, ...(pagina ? { id: { in: pagina.ids } } : {}) },
         select: {
             id: true,
             pessoa_id: true,
@@ -108,7 +110,7 @@ async function listarProfissionaisService() {
         orderBy: [{ pessoa: { nome: 'asc' } }, { id: 'asc' }],
     });
 
-    return profissionais.map(profissional => {
+    const itens = profissionais.map(profissional => {
         return {
             id: profissional.id,
             pessoa_id: profissional.pessoa_id,
@@ -118,6 +120,7 @@ async function listarProfissionaisService() {
             status_geral: profissional.pessoa.status_geral
         };
     });
+    return formatarPagina(itens, pagina);
 }
 
 async function editarProfissionalService(id, dados) {

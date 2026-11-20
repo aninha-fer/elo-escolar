@@ -21,8 +21,8 @@ function normalizarTexto(valor = '') {
     return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
 }
 
-function agruparOficinas(oficinas) {
-    return Object.values(
+function agruparOficinas(oficinas, ordenar = true) {
+    const grupos = Object.values(
         oficinas.reduce((grupos, oficina) => {
             const chave = oficina.matricula_id ?? oficina.turma_id ?? oficina.turma_nome;
             const grupoAtual = grupos[chave] ?? {
@@ -40,7 +40,8 @@ function agruparOficinas(oficinas) {
             grupos[chave] = grupoAtual;
             return grupos;
         }, {}),
-    ).sort((primeira, segunda) => primeira.turma_nome.localeCompare(segunda.turma_nome));
+    );
+    return ordenar ? grupos.sort((primeira, segunda) => primeira.turma_nome.localeCompare(segunda.turma_nome)) : grupos;
 }
 
 function normalizarTurmas(turmas) {
@@ -64,14 +65,14 @@ function normalizarTurmas(turmas) {
 }
 
 
-export function Oficinas({ oficinas = [], oficinasDisponiveis = [], turno, idAluno, statusAluno, onSuccess, permissao }) {
+export function Oficinas({ oficinas = [], oficinasDisponiveis = [], totalAtivas, turno, idAluno, statusAluno, onSuccess, permissao }) {
     const oficinasAgrupadas = agruparOficinas(normalizarTurmas(oficinas.map((matricula) => ({
         ...matricula.turma, matricula_id: matricula.id, status_vinculo: matricula.status,
-    }))));
+    }))), false);
     const oficinasParaSelecao = agruparOficinas(normalizarTurmas(
         oficinasDisponiveis.filter((oficina) => ['MANHA', 'TARDE'].includes(turno) && oficina.turno === turno)
     ));
-    const quantidadeAtivas = oficinasAgrupadas.filter((oficina) => oficina.status_vinculo === 'ATIVO').length;
+    const quantidadeAtivas = totalAtivas ?? oficinasAgrupadas.filter((oficina) => oficina.status_vinculo === 'ATIVO').length;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selecionadas, setSelecionadas] = useState([]);
     const [termoBusca, setTermoBusca] = useState('');
