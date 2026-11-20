@@ -1,0 +1,31 @@
+@reference "../../index.css";
+
+.conexao-tela { @apply bg-bg-main; position: fixed; inset: 0; z-index: 1000; overflow-y: auto; outline: none; }
+.conexao-inicial { display: grid; grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); }
+.conexao-conteudo { display: flex; min-height: 100dvh; min-width: 0; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; text-align: center; }
+.conexao-indicador { position: relative; display: grid; width: 164px; height: 164px; place-items: center; margin-bottom: 32px; }
+.conexao-orbita { position: absolute; border: 2px solid; border-radius: 50%; animation: conexao-girar 5s linear infinite; }
+.conexao-orbita-externa { inset: 0; border-color: #dbeafe; }
+.conexao-orbita-interna { @apply border-tertiary; inset: 15px; animation-duration: 7s; animation-direction: reverse; }
+.conexao-orbita span { @apply bg-secondary; position: absolute; top: -6px; left: calc(50% - 5px); width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 6px #dbeafe; }
+.conexao-orbita-interna span { @apply bg-tertiary; box-shadow: 0 0 0 5px #fffbeb; }
+.conexao-logo { display: grid; width: 82px; height: 82px; padding: 10px; place-items: center; border-radius: 20px; background: white; box-shadow: 0 12px 30px rgb(30 41 59 / 10%); }
+.conexao-logo img { width: 100%; height: 100%; object-fit: contain; }
+.conexao-etiqueta { @apply text-secondary; margin-bottom: 12px; font: 600 12px/1.5 monospace; letter-spacing: 2px; }
+.conexao-conteudo h1 { @apply text-text-main; max-width: 680px; font-size: clamp(24px, 3vw, 38px); font-weight: 800; line-height: 1.2; }
+.conexao-conteudo #conexao-descricao { @apply text-text-muted; max-width: 560px; margin-top: 16px; font-size: 15px; line-height: 1.6; }
+.conexao-barra { width: min(100%, 360px); height: 5px; margin-top: 48px; overflow: hidden; border-radius: 5px; background: #dbe3ed; }
+.conexao-barra span { @apply bg-linear-to-r from-secondary to-tertiary; display: block; width: 45%; height: 100%; border-radius: inherit; animation: conexao-avancar 2.5s ease-in-out infinite alternate; }
+.conexao-conteudo > button { margin-top: 32px; }
+.conexao-observacao { max-width: 400px; margin-top: 20px; color: #64748b; font: 11px/1.7 monospace; }
+.conexao-indicador-parado .conexao-orbita { animation: none; }
+@keyframes conexao-girar { to { transform: rotate(360deg); } }
+@keyframes conexao-avancar { from { transform: translateX(-100%); } to { transform: translateX(225%); } }
+@media (max-width: 767px) {
+    .conexao-inicial { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+    .conexao-inicial .conexao-conteudo { min-height: calc(100dvh - 96px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .conexao-orbita, .conexao-barra span { animation: none; }
+    .conexao-barra span { margin-inline: auto; }
+}

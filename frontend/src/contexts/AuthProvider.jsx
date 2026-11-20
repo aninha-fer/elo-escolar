@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AuthContext } from './AuthContext';
-import { api } from '../services/api';
+import { api, conexao } from '../services/api';
 import { authService } from '../services/authService';
+import { TelaConexao } from '../components/Conexao/TelaConexao';
 
 const sessaoCarregando = { status: 'carregando', usuario: null };
 const sessaoAnonima = { status: 'anonimo', usuario: null };
@@ -9,12 +10,43 @@ const sessaoAnonima = { status: 'anonimo', usuario: null };
 export function AuthProvider({ children }) {
   const [sessao, setSessao] = useState(sessaoCarregando);
   const [tentativa, setTentativa] = useState(0);
-  const versaoSessao = useRef(0);
+  const [estadoConexao, setEstadoConexao] = useState(conexao.obterEstado);
+  const focoAnterior = useRef(null);
+  const sobreposicaoVisivel = useRef(false);
+  const autenticacaoAtual = useRef(null);
+  const montado = useRef(false);
+
+  useEffect(() => {
+    montado.current = true;
+    function atualizar() {
+      const estado = conexao.obterEstado();
+      if (estado.visivel && !sobreposicaoVisivel.current) focoAnterior.current = document.activeElement;
+      sobreposicaoVisivel.current = estado.visivel;
+      setEstadoConexao(estado);
+    }
+    const remover = conexao.assinar(atualizar);
+    atualizar();
+    const removerSessao = conexao.assinarSessao((usuario, versao) => {
+      if (versao !== conexao.obterVersao()) return;
+      setSessao((anterior) => usuario ? { status: 'autenticado', usuario } : {
+        ...sessaoAnonima,
+        avisoSessao: anterior.usuario ? 'Sua sessão expirou. Entre novamente.' : anterior.avisoSessao,
+      });
+    });
+    return () => {
+      remover(); removerSessao(); montado.current = false;
+      queueMicrotask(() => {
+        if (!montado.current) { autenticacaoAtual.current?.abort(); conexao.invalidar(); }
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const interceptor = api.interceptors.response.use(
       (response) => response,
       (error) => {
+        if (error.code === 'ERR_CANCELED' || error.respostaApiValida === false
+          || (error.config?._versaoSessao !== undefined && error.config._versaoSessao !== conexao.obterVersao())) return Promise.reject(error);
         if (error.response?.status === 403 && error.response?.data?.codigo === 'TROCA_SENHA_OBRIGATORIA') {
           setTentativa((atual) => atual + 1);
         }
@@ -22,8 +54,7 @@ export function AuthProvider({ children }) {
           error.response?.status === 401 &&
           !error.config?.tratarSessaoLocalmente
         ) {
-          versaoSessao.current++;
-          setSessao(sessaoAnonima);
+          conexao.registrarSessao(null, conexao.invalidar());
         }
 
         return Promise.reject(error);
@@ -35,17 +66,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    const versao = versaoSessao.current;
+    const versao = conexao.obterVersao();
 
     async function verificarSessao() {
       try {
         const usuario = await authService.obterSessao(controller.signal);
 
-        if (!controller.signal.aborted && versao === versaoSessao.current) {
-          setSessao({ status: 'autenticado', usuario });
+        if (!controller.signal.aborted && versao === conexao.obterVersao()) {
+          setSessao(usuario ? { status: 'autenticado', usuario } : sessaoAnonima);
         }
       } catch (error) {
-        if (controller.signal.aborted || versao !== versaoSessao.current) return;
+        if (controller.signal.aborted || error.code === 'ERR_CANCELED' || versao !== conexao.obterVersao()) return;
 
         const codigo = error.response?.status;
 
@@ -53,8 +84,6 @@ export function AuthProvider({ children }) {
           setSessao(sessaoAnonima);
         } else if (codigo === 403) {
           setSessao({ status: 'acesso-negado', usuario: null });
-        } else {
-          setSessao({ status: 'erro', usuario: null });
         }
       }
     }
@@ -65,35 +94,43 @@ export function AuthProvider({ children }) {
   }, [tentativa]);
 
   function recarregarSessao() {
-    setSessao(sessaoCarregando);
     setTentativa((atual) => atual + 1);
   }
 
+  function iniciarAutenticacao() {
+    autenticacaoAtual.current?.abort();
+    autenticacaoAtual.current = new AbortController();
+    return { versao: conexao.invalidar(), signal: autenticacaoAtual.current.signal };
+  }
+
   async function entrar(credenciais) {
-    const usuario = await authService.login(credenciais);
-    versaoSessao.current++;
-    setSessao({ status: 'autenticado', usuario });
+    const { versao, signal } = iniciarAutenticacao();
+    const usuario = await authService.login(credenciais, signal);
+    if (versao === conexao.obterVersao()) conexao.registrarSessao(usuario, versao);
   }
 
   async function sair() {
+    const { versao, signal } = iniciarAutenticacao();
     try {
-      await authService.logout();
+      await authService.logout(signal);
     } catch (error) {
-      if (error.response?.status !== 401) throw error;
+      if (error.response?.status !== 401 || error.respostaApiValida !== true) throw error;
     }
 
-    versaoSessao.current++;
-    setSessao(sessaoAnonima);
+    if (versao === conexao.obterVersao()) {
+      conexao.registrarSessao(null, versao);
+      setSessao(sessaoAnonima);
+    }
   }
 
   async function trocarSenhaInicial(dados) {
+    const { versao, signal } = iniciarAutenticacao();
     try {
-      const usuario = await authService.trocarSenhaInicial(dados);
-      versaoSessao.current++;
-      setSessao({ status: 'autenticado', usuario });
+      const usuario = await authService.trocarSenhaInicial(dados, signal);
+      if (versao === conexao.obterVersao()) conexao.registrarSessao(usuario, versao);
     } catch (error) {
-      if (error.response?.status === 401) {
-        versaoSessao.current++;
+      if (versao === conexao.obterVersao() && error.response?.status === 401 && error.respostaApiValida !== false) {
+        conexao.registrarSessao(null, conexao.invalidar());
         setSessao({ ...sessaoAnonima, avisoSessao: error.response?.data?.erro || 'Sessão inválida ou expirada.' });
       }
       throw error;
@@ -104,7 +141,9 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{ ...sessao, entrar, sair, recarregarSessao, trocarSenhaInicial }}
     >
-      {children}
+      <div inert={estadoConexao.visivel} aria-hidden={estadoConexao.visivel ? true : undefined}>{children}</div>
+      {estadoConexao.visivel && <TelaConexao estado={estadoConexao} inicial={sessao.status === 'carregando'}
+        focoAnterior={focoAnterior} onTentarNovamente={() => { void conexao.verificar().catch(() => {}); }} />}
     </AuthContext.Provider>
   );
 }

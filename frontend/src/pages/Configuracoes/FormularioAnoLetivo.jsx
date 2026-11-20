@@ -52,9 +52,9 @@ export function FormularioAnoLetivo({ calendario, onSalvo }) {
         <form noValidate onSubmit={(event) => { event.preventDefault(); salvar(); }}>
             <div className="grid grid-cols-1 gap-md sm:grid-cols-[1fr_1.5fr_1.5fr]">
                 {[
-                    ['ano', 'Ano letivo', 'number', Boolean(calendario?.possui_turmas)],
-                    ['data_inicio', 'Início das atividades', 'date', inicioBloqueado],
-                    ['data_fim', 'Término das atividades', 'date', fimBloqueado],
+                    ['ano', 'Ano', 'number', Boolean(calendario?.possui_turmas)],
+                    ['data_inicio', 'Início', 'date', inicioBloqueado],
+                    ['data_fim', 'Término', 'date', fimBloqueado],
                 ].map(([campo, label, type, bloqueado]) => <div key={campo}>
                     <Input id={`calendario-${calendario?.id ?? 'novo'}-${campo}`} data-testid={`calendario-${calendario?.id ?? 'novo'}-${campo}`}
                         label={label} name={campo} type={type} required disabled={enviando || bloqueado} value={dados[campo]}

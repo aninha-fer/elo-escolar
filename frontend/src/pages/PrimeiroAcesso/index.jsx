@@ -36,9 +36,10 @@ export function PrimeiroAcesso() {
             setFormulario({ nova_senha: '', confirmacao_senha: '' });
             navigate('/', { replace: true });
         } catch (error) {
+            if (error.code === 'ERR_CANCELED') return;
             setErros(Object.fromEntries((error.response?.data?.erros ?? []).map((item) => [item.campo, item.mensagem])));
             setErroEnvio(error.response?.data?.erro || 'Não foi possível alterar a senha. Tente novamente.');
-            if (error.response?.status === 401) {
+            if (error.response?.status === 401 && error.respostaApiValida === true) {
                 setFormulario({ nova_senha: '', confirmacao_senha: '' });
                 navigate('/login', { replace: true, state: { aviso: error.response?.data?.erro } });
             }

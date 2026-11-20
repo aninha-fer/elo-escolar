@@ -1,30 +1,26 @@
-import { api } from './api';
+import { api, conexao } from './api';
 
 const tratarSessaoLocalmente = { tratarSessaoLocalmente: true };
 
 export const authService = {
-  async trocarSenhaInicial(dados) {
-    const { data } = await api.post('/auth/primeiro-acesso/senha', dados, tratarSessaoLocalmente);
+  async trocarSenhaInicial(dados, signal) {
+    const { data } = await api.post('/auth/primeiro-acesso/senha', dados, { ...tratarSessaoLocalmente, signal });
     return data;
   },
-  async login({ email, senha }) {
+  async login({ email, senha }, signal) {
     const { data } = await api.post(
       '/auth/login',
       { email, senha },
-      tratarSessaoLocalmente,
+      { ...tratarSessaoLocalmente, sessaoPublica: true, signal },
     );
     return data;
   },
 
   async obterSessao(signal) {
-    const { data } = await api.get('/auth/me', {
-      ...tratarSessaoLocalmente,
-      signal,
-    });
-    return data;
+    return conexao.verificar({ signal });
   },
 
-  async logout() {
-    await api.post('/auth/logout', undefined, tratarSessaoLocalmente);
+  async logout(signal) {
+    await api.post('/auth/logout', undefined, { ...tratarSessaoLocalmente, sessaoPublica: true, signal });
   },
 };
