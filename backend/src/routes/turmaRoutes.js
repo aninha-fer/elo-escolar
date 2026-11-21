@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma, excluirTurma, prepararNovaTurma, criarTurmaAPartir, listarAlunosTurma } = require('../controllers/turmaController');
+const { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma, excluirTurma, prepararNovaTurma, criarTurmaAPartir, listarAlunosTurma, obterDiarioTurma } = require('../controllers/turmaController');
 const { exigirPermissao } = require('../middlewares/exigirPermissao');
 
 const turmaLeituraRoutes = Router();
@@ -10,6 +10,7 @@ turmaLeituraRoutes.get('/turmas', lerTurmas, listarTurmas);
 turmaLeituraRoutes.get('/turmas/regulares', lerTurmas, listarTurmasRegularesPorTurno);
 turmaLeituraRoutes.get('/turmas/:id', lerTurmas, obterTurma);
 turmaLeituraRoutes.get('/turmas/:id/alunos', lerTurmas, listarAlunosTurma);
+turmaLeituraRoutes.get('/turmas/:id/diario', lerTurmas, obterDiarioTurma);
 
 turmaAdminRoutes.post('/turmas', criarTurma);
 turmaAdminRoutes.get('/turmas/:id/nova-turma', exigirPermissao('administracao:acessar'), prepararNovaTurma);

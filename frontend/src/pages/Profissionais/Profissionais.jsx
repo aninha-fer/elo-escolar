@@ -9,6 +9,18 @@ import { TabelaProfissionais } from './TabelaProfissionais';
 import { FormularioProfissional } from './FormularioProfissional';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
+function VinculosProfissional({ conflitos }) {
+    const turmas = conflitos.filter((item) => item.codigo === 'TURMA_VINCULADA' && item.turma_nome);
+    const atendimentos = conflitos.filter((item) => item.codigo === 'ATENDIMENTO_VINCULADO' && item.modalidade && item.aluno_nome);
+    const restantes = conflitos.filter((item) => !turmas.includes(item) && !atendimentos.includes(item));
+
+    return <>
+        {turmas.length > 0 && <span className="mt-xs block">Responsável pela(s) turma(s): {turmas.map((item) => item.turma_nome).join(', ')}.</span>}
+        {atendimentos.length > 0 && <span className="mt-xs block">Responsável pelo(s) atendimento(s): {atendimentos.map((item) => `${item.modalidade} (${item.aluno_nome})`).join(', ')}.</span>}
+        {restantes.map((item, indice) => <span key={indice} className="mt-xs block">{item.mensagem}</span>)}
+    </>;
+}
+
 export function Profissionais() {
     const { notificar } = useToast();
     const [tentativa, setTentativa] = useState(0);
@@ -123,7 +135,7 @@ export function Profissionais() {
                 onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus}
                 description={<>Deseja excluir o funcionário <strong>{operacao.profissional.nome}</strong>? Essa ação não pode ser desfeita.
                     {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}
-                        {conflitos.map((conflito, indice) => <span key={indice} className="mt-xs block">{conflito.mensagem}</span>)}
+                        <VinculosProfissional conflitos={conflitos} />
                     </span>}
                 </>} />}
             {operacao?.tipo === 'status' && <ModalConfirmacao testId="profissional-alterar-status" isOpen onClose={fecharConfirmacao} showCancel
@@ -131,10 +143,10 @@ export function Profissionais() {
                 title={operacao.profissional.status_geral === 'INATIVO' ? 'Ativar profissional?' : 'Inativar profissional?'}
                 description={<>
                     Deseja {operacao.profissional.status_geral === 'INATIVO' ? 'ativar' : 'inativar'} o profissional <strong>{operacao.profissional.nome}</strong>?
-                    {' '}O status da usuário vinculado também será atualizado, se houver.
+                    {' '}O status do usuário vinculado também será atualizado, se houver.
                     {operacao.profissional.status_geral !== 'INATIVO'}
                     {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}
-                        {conflitos.map((conflito, indice) => <span key={indice} className="mt-xs block">{conflito.mensagem}</span>)}
+                        <VinculosProfissional conflitos={conflitos} />
                     </span>}
                 </>}
                 confirmText={operacao.profissional.status_geral === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}

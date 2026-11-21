@@ -12,6 +12,8 @@ import { VincularAlunoModal } from './components/VincularAlunoModal';
 import { CampoInformacao } from '../../components/CampoInformacao';
 import { BotaoVoltar } from '../../components/BotaoVoltar';
 import { TagExpiradaTurma } from '../../components/TagExpiradaTurma';
+import { Download } from 'react-feather';
+import { ExportarDiarioModal } from './components/ExportarDiarioModal';
 
 const estilosStatus = { ATIVO: 'bg-emerald-50 text-emerald-600', INATIVO: 'bg-slate-100 text-slate-500', PROVISORIO: 'bg-amber-50 text-amber-700' };
 const rotulosStatus = { ATIVO: 'Ativa', INATIVO: 'Inativa', PROVISORIO: 'Provisória' };
@@ -24,6 +26,7 @@ export function TurmaDetalhes() {
     const [resultado, setResultado] = useState(null);
     const [tentativa, setTentativa] = useState(0);
     const [modalAberto, setModalAberto] = useState(false);
+    const [diarioAberto, setDiarioAberto] = useState(false);
     const listaAlunos = useListagemInfinita(turmasService.listarAlunosPaginados, { id }, tentativa);
     const idValido = /^\d+$/.test(id) && Number(id) > 0 && Number(id) <= 2147483647;
 
@@ -98,6 +101,10 @@ export function TurmaDetalhes() {
                 <div className="min-w-0 flex-1"><h1 id="turma-detalhes-titulo" className="break-words text-xl font-bold text-text-main">{turma.nome}</h1><p className="mt-xs text-sm text-slate-500">{tipo}</p></div>
                 <span className={`rounded-full px-md py-sm text-sm font-semibold ${estilosStatus[turma.status] ?? 'bg-slate-100 text-slate-500'}`}>{rotulosStatus[turma.status] ?? 'Não definido'}</span>
                 <TagExpiradaTurma expirada={turma.expirada} testId="turma-detalhes-expirada" />
+                {regular && turma.status === 'ATIVO' && <button data-testid="turma-exportar-diario" type="button" onClick={() => setDiarioAberto(true)}
+                    className="inline-flex items-center justify-center gap-sm rounded-sm border border-slate-200 bg-bg-surface px-md py-sm text-sm font-semibold text-text-main hover:bg-bg-main focus-visible:outline-2 focus-visible:outline-secondary">
+                    <Download size={16} aria-hidden="true" /> Exportar diário de classe
+                </button>}
             </header>
             <div className="grid min-w-0 grid-cols-1 gap-lg xl:grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)]">
                 <DivInformacoes>
@@ -123,6 +130,7 @@ export function TurmaDetalhes() {
                 </div>
             </div>
             {modalAberto && podeEditar && <VincularAlunoModal key={id} turma={turma} onClose={() => setModalAberto(false)} onVinculado={alunoVinculado} />}
+            {diarioAberto && regular && turma.status === 'ATIVO' && <ExportarDiarioModal turma={turma} onClose={() => setDiarioAberto(false)} />}
         </section>
     );
 }

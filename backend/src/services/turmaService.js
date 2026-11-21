@@ -269,6 +269,39 @@ async function listarAlunosTurmaService(turmaId, paginacao) {
     return { ...resultado, itens: resultado.itens.map((m) => m.aluno) };
 }
 
+async function obterDiarioTurmaService(id, mes) {
+    const turma = await prisma.turma.findUnique({ where: { id, deleted_at: null }, select: {
+        nome: true, tipo: true, status: true,
+        ano_letivo: { select: { ano: true, data_inicio: true, data_fim: true } },
+        matriculas: { where: { status: 'ATIVO', aluno: { deleted_at: null } },
+            orderBy: [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }],
+            select: { aluno: { select: { id: true, dias_frequencia: true, pessoa: { select: { nome: true } } } } } },
+    } });
+    if (!turma) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
+    if (turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
+        throw Object.assign(new Error('O diário de classe está disponível somente para turmas regulares ativas.'), { statusCode: 409 });
+    }
+    const calendario = turma.ano_letivo;
+    if (!calendario) throw Object.assign(new Error('A turma não possui calendário letivo cadastrado.'), { statusCode: 409 });
+    const hoje = hojeInstituicao();
+    const inicioMes = new Date(0); inicioMes.setUTCFullYear(calendario.ano, mes - 1, 1);
+    if (calendario.ano < hoje.getUTCFullYear() || (calendario.ano === hoje.getUTCFullYear() && mes < hoje.getUTCMonth() + 1)) {
+        throw Object.assign(new Error('Selecione o mês atual ou um mês futuro.'), { statusCode: 400 });
+    }
+    const fimMes = new Date(inicioMes); fimMes.setUTCMonth(mes, 0);
+    const inicio = new Date(Math.max(+inicioMes, +calendario.data_inicio));
+    const fim = new Date(Math.min(+fimMes, +calendario.data_fim));
+    let possuiDiaUtil = false;
+    for (const dia = new Date(inicio); dia <= fim; dia.setUTCDate(dia.getUTCDate() + 1)) {
+        if (dia.getUTCDay() !== 0 && dia.getUTCDay() !== 6) { possuiDiaUtil = true; break; }
+    }
+    if (!possuiDiaUtil) throw Object.assign(new Error('O mês selecionado não possui dias úteis dentro do calendário letivo.'), { statusCode: 400 });
+    const alunos = [...new Map(turma.matriculas.map(({ aluno }) => [aluno.id, {
+        nome: aluno.pessoa.nome, dias_frequencia: [...aluno.dias_frequencia].sort((a, b) => a - b),
+    }])).values()];
+    return { nome: turma.nome, calendario, alunos };
+}
+
 async function editarTurmaService(id, entrada) {
     const dados = editarTurmaDTO.parse(entrada);
     await sincronizarTurmasExpiradas({ turmaIds: [id] });
@@ -362,4 +395,4 @@ async function excluirTurmaService(id, entrada = {}) {
     }, { isolationLevel: 'ReadCommitted' });
 }
 
-module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService };
+module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService, obterDiarioTurmaService };

@@ -213,6 +213,23 @@ async function editar(body, id = '7') {
     return res;
 }
 
+test('bloqueio informa nomes de turmas, modalidade e aluno, sem repetir atendimento por sessão', async (t) => {
+    const atendimento = { id: 20, modalidade_cadastrada: { nome: 'Psicologia' }, aluno: { pessoa: { nome: 'Lucas Andrade' } }, status: 'ATIVO' };
+    const banco = simularEdicao(t, {
+        turmas: [{ id: 10, nome: 'Multiplos dias' }, { id: 11, nome: '3A' }],
+        atendimentos: [atendimento, atendimento],
+    });
+    const res = await editar({ status_geral: 'INATIVO' });
+    assert.equal(res.statusCode, 409);
+    assert.deepEqual(res.body.conflitos.filter((c) => c.codigo === 'TURMA_VINCULADA').map((c) => c.turma_nome), ['Multiplos dias', '3A']);
+    const clinicos = res.body.conflitos.filter((c) => c.codigo === 'ATENDIMENTO_VINCULADO');
+    assert.equal(clinicos.length, 1);
+    assert.equal(clinicos[0].modalidade, 'Psicologia');
+    assert.equal(clinicos[0].aluno_nome, 'Lucas Andrade');
+    assert.equal(clinicos[0].mensagem, 'Responsável pelo atendimento Psicologia (aluno Lucas Andrade).');
+    assert.equal(banco.estado.pessoa.status_geral, 'ATIVO');
+});
+
 test('edição altera nome, telefone e cargo atomicamente sem alterar status da conta', async (t) => {
     const banco = simularEdicao(t, { usuarios: [{ id: 3, pessoa_id: 50, status: 'INATIVO' }] });
     const res = await editar({ nome: ' Maria Silva ', telefone: '5133334444', cargo: ' Auxiliar ' });
