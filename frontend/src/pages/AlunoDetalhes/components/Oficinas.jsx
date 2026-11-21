@@ -1,3 +1,4 @@
+import { useToast } from '../../../contexts/ToastContext';
 import { useState } from "react";
 import { Button } from "../../../components/Button";
 import { Modal } from "../../../components/Modal";
@@ -66,6 +67,7 @@ function normalizarTurmas(turmas) {
 
 
 export function Oficinas({ oficinas = [], oficinasDisponiveis = [], totalAtivas, turno, idAluno, statusAluno, onSuccess, permissao }) {
+    const { notificar } = useToast();
     const oficinasAgrupadas = agruparOficinas(normalizarTurmas(oficinas.map((matricula) => ({
         ...matricula.turma, matricula_id: matricula.id, status_vinculo: matricula.status,
     }))), false);
@@ -81,35 +83,32 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], totalAtivas,
     const [modalView, setModalView] = useState('selecao');
     const [inscricaoParaCancelar, setInscricaoParaCancelar] = useState(null);
     const [cancelando, setCancelando] = useState(false);
-    const [erroCancelamento, setErroCancelamento] = useState('');
     const busca = normalizarTexto(termoBusca);
     const oficinasFiltradas = oficinasParaSelecao.filter((oficina) => normalizarTexto(oficina.turma_nome).includes(busca));
 
     function abrirCancelamento(oficina) {
-        setErroCancelamento('');
         setInscricaoParaCancelar(oficina);
     }
 
     function fecharCancelamento() {
         if (cancelando) return;
         setInscricaoParaCancelar(null);
-        setErroCancelamento('');
     }
 
     async function confirmarCancelamento() {
         if (cancelando || !inscricaoParaCancelar) return;
         try {
             setCancelando(true);
-            setErroCancelamento('');
             if (inscricaoParaCancelar.status_vinculo === 'PROVISORIO') {
                 await matriculasService.removerProvisoria(idAluno, inscricaoParaCancelar.matricula_id);
             } else {
                 await matriculasService.cancelarOficina(idAluno, inscricaoParaCancelar.matricula_id);
             }
+            notificar('Inscrição cancelada com sucesso.', 'sucesso');
             setInscricaoParaCancelar(null);
             onSuccess?.();
         } catch (err) {
-            setErroCancelamento(err.response?.data?.erro || err.message || 'Não foi possível cancelar a inscrição.');
+            notificar(err.response?.data?.erro || err.message || 'Não foi possível cancelar a inscrição.');
         } finally {
             setCancelando(false);
         }
@@ -136,6 +135,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], totalAtivas,
                 selecionadas,
                 controller.signal
             );
+            notificar(statusAluno === 'RASCUNHO' ? 'Inscrição provisória realizada com sucesso.' : 'Inscrição realizada com sucesso.', 'sucesso');
             setIsModalOpen(false);
             setSelecionadas([]);
             setConflitos([]);
@@ -145,11 +145,10 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], totalAtivas,
             if (err.name === 'CanceledError' || err.name === 'AbortError') return;
 
             const conflitosRecebidos = err.response?.data?.conflitos;
-            setConflitos(Array.isArray(conflitosRecebidos)
-                ? conflitosRecebidos
-                : [err.response?.data?.erro || 'Não foi possível concluir a inscrição.']);
-            setModalView('conflitos');
-            console.log(err);
+            if (Array.isArray(conflitosRecebidos) && conflitosRecebidos.length) {
+                setConflitos(conflitosRecebidos);
+                setModalView('conflitos');
+            } else notificar(err.response?.data?.erro || 'Não foi possível concluir a inscrição.');
         } finally {
             setIsSubmitting(false);
         }
@@ -269,7 +268,6 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], totalAtivas,
                         {inscricaoParaCancelar?.status_vinculo === 'PROVISORIO'
                             ? 'Esta matrícula provisória será encerrada e essa ação não pode ser desfeita.'
                             : 'Essa oficina deixará de ser exibida no calendário. A ação não altera o calendário de dias anteriores.'}
-                        {erroCancelamento && <p role="alert" className="mt-md text-sm text-red-700">{erroCancelamento}</p>}
                     </>
                 }
             />

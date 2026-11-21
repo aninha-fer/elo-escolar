@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
@@ -26,6 +27,7 @@ const carregarAtendimentos = ({ id, ...params }, signal) => alunoService.buscarA
 const carregarOcorrencias = ({ id, ...params }, signal) => ocorrenciasService.listar(id, signal, params);
 
 export function AlunoDetalhes() {
+    const { notificar } = useToast();
     const { id } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const [aluno, setAluno] = useState(null);
@@ -39,7 +41,6 @@ export function AlunoDetalhes() {
     const [error, setError] = useState(null);
     const [alunoEdicao, setAlunoEdicao] = useState(null);
     const [carregandoEdicao, setCarregandoEdicao] = useState(false);
-    const [erroEdicao, setErroEdicao] = useState('');
     const edicaoController = useRef(null);
     const dataReferencia = searchParams.get('data') || '';
     const { usuario } = useAuth();
@@ -167,12 +168,11 @@ export function AlunoDetalhes() {
         const controller = new AbortController();
         edicaoController.current = controller;
         setCarregandoEdicao(true);
-        setErroEdicao('');
         try {
             const dados = await alunoService.buscarPorId(id, controller.signal);
             if (!controller.signal.aborted) setAlunoEdicao(dados);
         } catch (err) {
-            if (!controller.signal.aborted) setErroEdicao(err.response?.data?.erro || 'Não foi possível carregar o aluno para edição. Tente novamente.');
+            if (!controller.signal.aborted) notificar(err.response?.data?.erro || 'Não foi possível carregar o aluno para edição. Tente novamente.');
         } finally {
             if (edicaoController.current === controller) {
                 edicaoController.current = null;
@@ -208,7 +208,6 @@ export function AlunoDetalhes() {
             </div>
 
             {carregandoEdicao && <p role="status" className="text-sm text-text-muted">Carregando dados para edição...</p>}
-            {erroEdicao && podeEditar && <p role="alert" className="rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEdicao}</p>}
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-8" aria-label="Abas de navegação">
                     {TABS.map((tab) => {

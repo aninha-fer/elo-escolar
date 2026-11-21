@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { Input } from '../../components/Input';
@@ -7,10 +8,10 @@ import { SaveIcon } from '../../components/icons/SaveIcon';
 const funcoes = ['Professor', 'Terapeuta', 'Auxiliar'];
 
 export function FormularioProfissional({ profissional, onClose, onCriado, onSalvo, trapFocus = false }) {
+    const { notificar } = useToast();
     const editando = Boolean(profissional);
     const [formulario, setFormulario] = useState(() => ({ nome: profissional?.nome ?? '', telefone: profissional?.telefone ?? '', cargo: profissional?.funcao ?? '' }));
     const [erros, setErros] = useState({});
-    const [erroEnvio, setErroEnvio] = useState('');
     const [enviando, setEnviando] = useState(false);
     const envioEmAndamento = useRef(false);
     const funcoesDisponiveis = [...new Set([...funcoes, ...(profissional?.funcao ? [profissional.funcao] : [])])];
@@ -23,7 +24,6 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
     function atualizarCampo(campo, valor) {
         setFormulario((atual) => ({ ...atual, [campo]: valor }));
         setErros((atuais) => ({ ...atuais, [campo]: undefined }));
-        setErroEnvio('');
     }
 
     function fecharModal() {
@@ -42,7 +42,6 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
         if (formulario.telefone.trim() && !telefone) novosErros.telefone = 'Informe um telefone válido ou deixe o campo vazio.';
         if (!funcoesDisponiveis.includes(formulario.cargo)) novosErros.cargo = 'Selecione uma função.';
         setErros(novosErros);
-        setErroEnvio('');
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
             form.querySelector(`[name="${primeiroErro}"]`)?.focus();
@@ -67,7 +66,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
                 if (['nome', 'telefone', 'cargo'].includes(campo)) errosCampos[campo] = item.message;
             }
             setErros(errosCampos);
-            setErroEnvio(error.response?.data?.erro || `Não foi possível ${editando ? 'editar' : 'cadastrar'} o profissional. Verifique os dados e tente novamente.`);
+            if (!Object.keys(errosCampos).length) notificar(error.response?.data?.erro || `Não foi possível ${editando ? 'editar' : 'cadastrar'} o profissional. Verifique os dados e tente novamente.`);
         } finally {
             envioEmAndamento.current = false;
             setEnviando(false);
@@ -109,7 +108,6 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
                             </div>
                             {erros.cargo && <p id="profissional-cargo-erro" className="mt-sm text-sm text-red-700">{erros.cargo}</p>}
                         </fieldset>
-                        {erroEnvio && <p role="alert" className="mt-md rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}
                     </fieldset>
                 </form>
             </Modal>

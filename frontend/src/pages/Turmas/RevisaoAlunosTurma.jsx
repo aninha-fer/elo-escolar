@@ -1,20 +1,20 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useState } from 'react';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { sortearAlunosTurma } from '../../utils/sorteioTurma';
 
 export function RevisaoAlunosTurma({ alunos, selecionados, bloqueados, capacidade, onSelecionar, onBloquear, onSortear, carregando, erro, onTentarNovamente, disabled }) {
+    const { notificar } = useToast();
     const [busca, setBusca] = useState('');
-    const [aviso, setAviso] = useState('');
     const normalizar = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
     const filtrados = alunos.filter((aluno) => normalizar(aluno.nome).includes(normalizar(busca)));
     const excedeu = capacidade !== '' && selecionados.length > Number(capacidade);
 
     function sortear() {
-        if (capacidade === '') { setAviso('Defina o número de vagas para essa ação'); return; }
+        if (capacidade === '') { notificar('Defina o número de vagas para essa ação'); return; }
         const ids = sortearAlunosTurma(alunos, bloqueados, Number(capacidade));
-        if (!ids) { setAviso('Revise o número de vagas e a quantidade de alunos bloqueados antes de sortear.'); return; }
-        setAviso('');
+        if (!ids) { notificar('Revise o número de vagas e a quantidade de alunos bloqueados antes de sortear.'); return; }
         onSortear(ids);
     }
 
@@ -29,7 +29,6 @@ export function RevisaoAlunosTurma({ alunos, selecionados, bloqueados, capacidad
                 </div>
             </div>
             <p className="mb-md rounded-sm border border-amber-200 bg-amber-50 p-sm text-sm text-amber-800">Bloqueie os alunos selecionados que devem permanecer. Um novo sorteio preserva os bloqueados e preenche as vagas restantes.</p>
-            {aviso && <p role="alert" className="mb-md rounded-sm bg-amber-50 p-sm text-sm text-amber-800">{aviso}</p>}
             {excedeu && <p role="alert" className="mb-md rounded-sm bg-red-50 p-sm text-sm text-red-700">A seleção excede o número de vagas. Remova alunos ou ajuste a capacidade.</p>}
             <Input data-testid="turma-nova-busca-aluno" aria-label="Buscar aluno por nome" placeholder="Buscar aluno por nome..." value={busca} onChange={(event) => setBusca(event.target.value)} disabled={disabled}
                 icon={<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>} />

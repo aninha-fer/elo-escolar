@@ -1,3 +1,4 @@
+import { useToast } from '../../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Download, ArrowRight } from 'react-feather';
@@ -6,16 +7,16 @@ import { exportarCalendarioOficinas } from '../../../utils/exportarCalendarioOfi
 import { OficinaCalendarioItem } from './OficinaCalendarioItem';
 
 export function CalendarioOficinas({ dias, dataReferencia, carregando, erro, onTentarNovamente }) {
+    const { notificar } = useToast();
     const [exportando, setExportando] = useState(false);
-    const [erroExportacao, setErroExportacao] = useState('');
     const envio = useRef(false);
     const vazio = dias.every((dia) => !dia.oficinas.length);
 
     async function exportar() {
         if (envio.current || carregando || erro || vazio) return;
-        envio.current = true; setExportando(true); setErroExportacao('');
-        try { await exportarCalendarioOficinas(dias, dataReferencia); }
-        catch { setErroExportacao('Não foi possível exportar o calendário. Tente novamente.'); }
+        envio.current = true; setExportando(true);
+        try { await exportarCalendarioOficinas(dias, dataReferencia); notificar('Download preparado.', 'sucesso'); }
+        catch { notificar('Não foi possível exportar o calendário. Tente novamente.'); }
         finally { envio.current = false; setExportando(false); }
     }
 
@@ -33,7 +34,6 @@ export function CalendarioOficinas({ dias, dataReferencia, carregando, erro, onT
                 <Link data-testid="inicio-ver-oficinas" to="/turmas?tipo=OFICINA" className="inline-flex items-center gap-xs rounded-sm text-blue-600 hover:underline">Ver todas<ArrowRight size={17} aria-hidden="true" /></Link>
             </div>
         </header>
-        {erroExportacao && <p role="alert" className="mx-lg mt-md rounded-sm bg-red-50 p-sm text-sm text-danger">{erroExportacao}</p>}
         {carregando ? <p role="status" className="p-lg text-sm text-text-muted">Carregando oficinas...</p> : erro ? <div role="alert" className="m-lg rounded-sm bg-red-50 p-md text-sm text-danger">
             <p>{erro}</p><Button data-testid="inicio-oficinas-tentar" type="button" onClick={onTentarNovamente} className="mt-sm">Tentar novamente</Button>
         </div> : <dl className="divide-y divide-slate-200 px-sm py-sm sm:px-md">

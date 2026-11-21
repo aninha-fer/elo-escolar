@@ -95,7 +95,7 @@ export async function criarPdfCalendarioAluno(calendario) {
     } while (continuar);
 
     titulo('Turma regular');
-    if (!calendario.turmas_regulares.length) bloco('Sem turma regular ativa ou provisória vigente.', []);
+    if (!calendario.turmas_regulares.length) bloco('Sem turma.', []);
     for (const turma of calendario.turmas_regulares) {
         const grupos = new Map();
         for (const horario of turma.horarios) {
@@ -106,7 +106,7 @@ export async function criarPdfCalendarioAluno(calendario) {
             ...[...grupos].map(([horario, dias]) => `${dias.join(', ')}: ${horario}`)], turma.provisorio);
     }
     titulo('Atendimentos clínicos');
-    if (!calendario.atendimentos.length) bloco('Sem atendimentos ativos ou provisórios vigentes.', []);
+    if (!calendario.atendimentos.length) bloco('Sem atendimentos clínicos.', []);
     for (const atendimento of calendario.atendimentos) {
         const eventual = atendimento.tipo_recorrencia === 'EVENTUAL', mensal = atendimento.tipo_recorrencia === 'MENSAL';
         const recorrencia = eventual ? `Eventual em ${data(atendimento.proxima_data)}`

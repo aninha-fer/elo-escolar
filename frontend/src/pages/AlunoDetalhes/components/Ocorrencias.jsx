@@ -1,3 +1,4 @@
+import { useToast } from '../../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { Button } from '../../../components/Button';
 import { BotaoAcoes } from '../../../components/BotaoAcoes';
@@ -9,9 +10,9 @@ import { formatarDataBR, formatarDataHoraInstituicao } from '../../../utils/form
 import { FormularioOcorrencia } from './FormularioOcorrencia';
 
 export function Ocorrencias({ ocorrencias = [], idAluno, statusAluno, onSuccess, carregando, erro, onTentarNovamente }) {
+    const { notificar } = useToast();
     const [operacao, setOperacao] = useState(null);
     const [excluindo, setExcluindo] = useState(false);
-    const [erroExclusao, setErroExclusao] = useState('');
     const ocupado = useRef(false);
 
     function salvo() { setOperacao(null); onSuccess(); }
@@ -21,12 +22,12 @@ export function Ocorrencias({ ocorrencias = [], idAluno, statusAluno, onSuccess,
         if (ocupado.current || operacao?.tipo !== 'excluir') return;
         ocupado.current = true;
         setExcluindo(true);
-        setErroExclusao('');
         try {
             await ocorrenciasService.excluir(idAluno, operacao.ocorrencia.id);
+            notificar('Ocorrência excluída com sucesso.', 'sucesso');
             salvo();
         } catch (error) {
-            setErroExclusao(error.response?.data?.erro || 'Não foi possível excluir a ocorrência.');
+            notificar(error.response?.data?.erro || 'Não foi possível excluir a ocorrência.');
         } finally { ocupado.current = false; setExcluindo(false); }
     }
 
@@ -55,7 +56,7 @@ export function Ocorrencias({ ocorrencias = [], idAluno, statusAluno, onSuccess,
                         </div>
                         <BotaoAcoes testId={`ocorrencia-${ocorrencia.id}-acoes`} label={`Ações de ${ocorrencia.resumo}`} disabled={excluindo} options={[
                             { id: 'editar', label: 'Editar', icon: <EditIcon />, onClick: () => setOperacao({ tipo: 'editar', ocorrencia }) },
-                            { id: 'excluir', label: 'Excluir', icon: <TrashIcon />, textColor: 'var(--color-danger)', onClick: () => { setErroExclusao(''); setOperacao({ tipo: 'excluir', ocorrencia }); } },
+                            { id: 'excluir', label: 'Excluir', icon: <TrashIcon />, textColor: 'var(--color-danger)', onClick: () => { setOperacao({ tipo: 'excluir', ocorrencia }); } },
                         ]} />
                     </li>;
                 })}</ul> : <p className="p-lg text-center text-sm text-text-muted">Nenhuma ocorrência registrada para este aluno.</p>}
@@ -64,6 +65,6 @@ export function Ocorrencias({ ocorrencias = [], idAluno, statusAluno, onSuccess,
         {operacao?.tipo === 'excluir' && <ModalConfirmacao testId="ocorrencia-excluir" isOpen estado="atencao" title="Excluir ocorrência?"
             confirmText="Confirmar exclusão" onClose={fechar} onConfirm={excluir} isConfirmLoading={excluindo}
             description={<>Deseja excluir <strong>{operacao.ocorrencia.resumo}</strong>? Essa ação não pode ser desfeita.
-                {erroExclusao && <span role="alert" className="mt-md block text-sm text-red-700">{erroExclusao}</span>}</>} />}
+                </>} />}
     </section>;
 }

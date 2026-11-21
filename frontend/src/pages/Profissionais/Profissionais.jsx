@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
@@ -9,10 +10,10 @@ import { FormularioProfissional } from './FormularioProfissional';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 
 export function Profissionais() {
+    const { notificar } = useToast();
     const [tentativa, setTentativa] = useState(0);
     const [busca, setBusca] = useState('');
     const [modalAberto, setModalAberto] = useState(false);
-    const [aviso, setAviso] = useState('');
     const [operacao, setOperacao] = useState(null);
     const [alterandoStatus, setAlterandoStatus] = useState(false);
     const [erroStatus, setErroStatus] = useState('');
@@ -29,11 +30,10 @@ export function Profissionais() {
     function profissionalCriado() {
         setTentativa((atual) => atual + 1);
         setModalAberto(false);
-        setAviso('Profissional cadastrado com sucesso.');
+        notificar('Profissional cadastrado com sucesso.', 'sucesso');
     }
 
     function abrirOperacao(tipo, profissional) {
-        setAviso('');
         setErroStatus('');
         setConflitos([]);
         setOperacao({ tipo, profissional });
@@ -42,7 +42,7 @@ export function Profissionais() {
     function profissionalAtualizado(profissional, mensagem) {
         setTentativa((atual) => atual + 1);
         setOperacao(null);
-        setAviso(mensagem);
+        notificar(mensagem, 'sucesso');
     }
 
     function fecharConfirmacao() {
@@ -60,7 +60,9 @@ export function Profissionais() {
             const atualizado = await profissionaisService.editar(operacao.profissional.id, { status_geral: ativando ? 'ATIVO' : 'INATIVO' });
             profissionalAtualizado(atualizado, ativando ? 'Profissional ativado com sucesso.' : 'Profissional inativado com sucesso.');
         } catch (error) {
-            setErroStatus(error.response?.data?.erro || 'Não foi possível alterar o status do profissional. Tente novamente.');
+            const mensagemErro = error.response?.data?.erro || 'Não foi possível alterar o status do profissional. Tente novamente.';
+            if (error.response?.data?.conflitos?.length) setErroStatus(mensagemErro);
+            else notificar(mensagemErro);
             setConflitos(error.response?.data?.conflitos ?? []);
         } finally {
             envioStatusEmAndamento.current = false;
@@ -78,9 +80,11 @@ export function Profissionais() {
             await profissionaisService.excluir(operacao.profissional.id);
             setTentativa((atual) => atual + 1);
             setOperacao(null);
-            setAviso('Profissional excluído com sucesso.');
+            notificar('Profissional excluído com sucesso.', 'sucesso');
         } catch (error) {
-            setErroStatus(error.response?.data?.erro || 'Não foi possível excluir o profissional. Tente novamente.');
+            const mensagemErro = error.response?.data?.erro || 'Não foi possível excluir o profissional. Tente novamente.';
+            if (error.response?.data?.conflitos?.length) setErroStatus(mensagemErro);
+            else notificar(mensagemErro);
             setConflitos(error.response?.data?.conflitos ?? []);
         } finally { envioStatusEmAndamento.current = false; setAlterandoStatus(false); }
     }
@@ -97,12 +101,11 @@ export function Profissionais() {
                         </svg>
                     } />
                 <Button data-testid="profissionais-novo" type="button" className="novo-profissional disabled:cursor-not-allowed disabled:opacity-50" disabled={carregando || Boolean(erro)}
-                    onClick={() => { setAviso(''); setModalAberto(true); }}>
+                    onClick={() => { setModalAberto(true); }}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
                     Novo Profissional
                 </Button>
             </div>
-            {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
             {carregando ? <p role="status">Carregando profissionais...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>

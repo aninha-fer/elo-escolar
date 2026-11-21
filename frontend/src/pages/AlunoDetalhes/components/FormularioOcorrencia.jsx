@@ -1,3 +1,4 @@
+import { useToast } from '../../../contexts/ToastContext';
 import { useId, useRef, useState } from 'react';
 import { Input } from '../../../components/Input';
 import { Modal } from '../../../components/Modal';
@@ -5,12 +6,12 @@ import { ocorrenciasService } from '../../../services/ocorrenciasService';
 import { formatarDataHoraInstituicao } from '../../../utils/formatters';
 
 export function FormularioOcorrencia({ idAluno, ocorrencia, onClose, onSuccess }) {
+    const { notificar } = useToast();
     const id = useId();
     const inicial = formatarDataHoraInstituicao(ocorrencia ? new Date(ocorrencia.ocorrido_em) : new Date());
     const [formulario, setFormulario] = useState({ resumo: ocorrencia?.resumo ?? '', descricao: ocorrencia?.descricao ?? '',
         data: inicial.slice(0, 10), hora: inicial.slice(11, 16) });
     const [erros, setErros] = useState({});
-    const [erro, setErro] = useState('');
     const [salvando, setSalvando] = useState(false);
     const ocupado = useRef(false);
     const formularioRef = useRef(null);
@@ -42,7 +43,6 @@ export function FormularioOcorrencia({ idAluno, ocorrencia, onClose, onSuccess }
         else if (formulario.data > formatarDataHoraInstituicao().slice(0, 10)) problemas.data = 'A data da ocorrência não pode ser futura.';
         if (!formulario.hora) problemas.hora = 'Informe o horário.';
         setErros(problemas);
-        setErro('');
         if (Object.keys(problemas).length) {
             formularioRef.current?.elements.namedItem(Object.keys(problemas)[0])?.focus();
             return;
@@ -52,6 +52,7 @@ export function FormularioOcorrencia({ idAluno, ocorrencia, onClose, onSuccess }
         try {
             if (ocorrencia) await ocorrenciasService.editar(idAluno, ocorrencia.id, formulario);
             else await ocorrenciasService.criar(idAluno, formulario);
+            notificar(ocorrencia ? 'Ocorrência atualizada com sucesso.' : 'Ocorrência cadastrada com sucesso.', 'sucesso');
             onSuccess();
         } catch (error) {
             const campos = {};
@@ -64,7 +65,7 @@ export function FormularioOcorrencia({ idAluno, ocorrencia, onClose, onSuccess }
             const mensagemErro = error.response?.data?.erro;
             if (mensagemErro === 'A data da ocorrência não pode ser futura.') campos.data = mensagemErro;
             setErros(campos);
-            setErro(Object.keys(campos).length ? gerais.join(' ') : mensagemErro || gerais.join(' ') || 'Não foi possível salvar a ocorrência.');
+            notificar(Object.keys(campos).length ? gerais.join(' ') : mensagemErro || gerais.join(' ') || 'Não foi possível salvar a ocorrência.');
         } finally { ocupado.current = false; setSalvando(false); }
     }
 
@@ -81,7 +82,6 @@ export function FormularioOcorrencia({ idAluno, ocorrencia, onClose, onSuccess }
             <textarea data-testid="ocorrencia-formulario-descricao" {...atributos('descricao')} rows={4} placeholder="Descreva o que aconteceu e quais providências foram tomadas."
                 className="mb-sm w-full rounded-sm border border-slate-200 bg-bg-surface p-sm text-text-main placeholder:text-placeholder focus:outline-none focus:ring-1" />
             {mensagem('descricao')}
-            {erro && <p role="alert" className="rounded-sm bg-red-50 p-sm text-sm text-red-700">{erro}</p>}
         </form>
     </Modal>;
 }

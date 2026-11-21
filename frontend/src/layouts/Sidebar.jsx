@@ -1,12 +1,13 @@
+import { useToast } from '../contexts/ToastContext';
 import apaeLogo from '../assets/apae.png'
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 function Sidebar() {
+    const { notificar } = useToast();
     const { usuario, sair } = useAuth();
     const [saindo, setSaindo] = useState(false);
-    const [erroSaida, setErroSaida] = useState('');
     const perfil = { admin: 'Administrador', professor: 'Professor' }[usuario?.role] ?? usuario?.role ?? '';
     const inicial = usuario?.nome?.trim().charAt(0).toLocaleUpperCase('pt-BR') || '?';
     const botaoBase = 'rounded-sm flex items-center gap-sm p-sm font-inter text-[14px] [&_path]:stroke-current [&_path]:[stroke-opacity:1] ';
@@ -19,12 +20,11 @@ function Sidebar() {
         if (saindo) return;
 
         setSaindo(true);
-        setErroSaida('');
 
         try {
             await sair();
         } catch {
-            setErroSaida('Não foi possível sair do sistema. Tente novamente.');
+            notificar('Não foi possível sair do sistema. Tente novamente.');
         } finally {
             setSaindo(false);
         }
@@ -157,7 +157,6 @@ function Sidebar() {
                     </svg>
                 </button>
             </div>
-            {erroSaida && <p role="alert" className="px-md pb-md text-sm text-red-300">{erroSaida}</p>}
         </div>
     )
 }

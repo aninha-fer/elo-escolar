@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useToast } from '../../../contexts/ToastContext';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Input } from '../../../components/Input';
@@ -6,13 +7,20 @@ import { Button } from '../../../components/Button';
 import { LoginIcon } from './LoginIcon';
 
 export function LoginForm() {
+    const { notificar } = useToast();
     const location = useLocation();
     const { entrar, avisoSessao } = useAuth();
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [mostrarSenha, setMostrarSenha] = useState(false);
     const [erros, setErros] = useState({});
-    const [aviso, setAviso] = useState(location.state?.aviso || avisoSessao || '');
+    const avisoInicial = useRef(location.state?.aviso || avisoSessao);
+    useEffect(() => {
+        if (avisoInicial.current) {
+            notificar(avisoInicial.current);
+            avisoInicial.current = null;
+        }
+    }, [notificar]);
     const navigate = useNavigate();
     const [enviando, setEnviando] = useState(false);
     const envio = useRef(false);
@@ -21,7 +29,6 @@ export function LoginForm() {
         if (campo === 'email') setEmail(valor);
         else setSenha(valor);
         setErros((atuais) => ({ ...atuais, [campo]: undefined }));
-        setAviso('');
     }
 
     async function enviar(event) {
@@ -36,7 +43,6 @@ export function LoginForm() {
         else if (senha.length < 8) novosErros.senha = 'A senha deve ter pelo menos 8 caracteres.';
 
         setErros(novosErros);
-        setAviso('');
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
             campos[primeiroErro].focus();
@@ -54,15 +60,15 @@ export function LoginForm() {
 
             if (error.code === 'ERR_CANCELED') return;
             if (['RESULTADO_NAO_CONFIRMADO', 'CONEXAO_INDISPONIVEL', 'RESPOSTA_INVALIDA'].includes(error.code)) {
-                setAviso(error.response.data.erro);
+                notificar(error.response.data.erro);
             } else if (codigo === 401) {
-                setAviso('E-mail ou senha inválidos.');
+                notificar('E-mail ou senha inválidos.');
             } else if (codigo === 403) {
-                setAviso('Acesso negado.');
+                notificar('Acesso negado.');
             } else if (codigo === 429) {
-                setAviso('Muitas tentativas. Tente novamente mais tarde.');
+                notificar('Muitas tentativas. Tente novamente mais tarde.');
             } else {
-                setAviso('Não foi possível entrar. Tente novamente.');
+                notificar('Não foi possível entrar. Tente novamente.');
             }
         } finally {
             envio.current = false;
@@ -97,12 +103,12 @@ export function LoginForm() {
             />
             {erros.senha && <p className="login-error" id="login-senha-error">{erros.senha}</p>}
             <div className="login-options flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <button data-testid="login-recuperar-senha" type="button" className="login-recovery" onClick={() => setAviso('A recuperação de senha ainda não está disponível. Entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
+                <button data-testid="login-recuperar-senha" type="button" className="login-recovery" onClick={() => notificar('A recuperação de senha ainda não está disponível. Entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
             </div>
             <Button data-testid="login-entrar" type="submit" className="login-submit" disabled={enviando}>
                 {enviando ? 'Entrando...' : 'Entrar no sistema'}
             </Button>
-            <p className="login-notice" role="status" aria-live="polite">{aviso}</p>
+
         </form>
     );
 }

@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
@@ -16,13 +17,13 @@ const estilosStatus = { ATIVO: 'bg-emerald-50 text-emerald-600', INATIVO: 'bg-sl
 const rotulosStatus = { ATIVO: 'Ativa', INATIVO: 'Inativa', PROVISORIO: 'Provisória' };
 
 export function TurmaDetalhes() {
+    const { notificar } = useToast();
     const { id } = useParams();
     const { usuario } = useAuth();
     const podeEditar = usuario?.role === 'admin';
     const [resultado, setResultado] = useState(null);
     const [tentativa, setTentativa] = useState(0);
     const [modalAberto, setModalAberto] = useState(false);
-    const [aviso, setAviso] = useState('');
     const listaAlunos = useListagemInfinita(turmasService.listarAlunosPaginados, { id }, tentativa);
     const idValido = /^\d+$/.test(id) && Number(id) > 0 && Number(id) <= 2147483647;
 
@@ -84,9 +85,9 @@ export function TurmaDetalhes() {
 
     function alunoVinculado(matricula) {
         setModalAberto(false);
-        setAviso(matricula.status === 'PROVISORIO'
+        notificar(matricula.status === 'PROVISORIO'
             ? 'Vínculo provisório criado no planejamento do aluno em rascunho. Ele não ocupa vaga nem aparece na lista de matrículas ativas até a ativação.'
-            : 'Aluno vinculado à turma com sucesso.');
+            : 'Aluno vinculado à turma com sucesso.', 'sucesso');
         setTentativa((atual) => atual + 1);
     }
 
@@ -98,7 +99,6 @@ export function TurmaDetalhes() {
                 <span className={`rounded-full px-md py-sm text-sm font-semibold ${estilosStatus[turma.status] ?? 'bg-slate-100 text-slate-500'}`}>{rotulosStatus[turma.status] ?? 'Não definido'}</span>
                 <TagExpiradaTurma expirada={turma.expirada} testId="turma-detalhes-expirada" />
             </header>
-            {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
             <div className="grid min-w-0 grid-cols-1 gap-lg xl:grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)]">
                 <DivInformacoes>
                     <dl>
@@ -118,7 +118,7 @@ export function TurmaDetalhes() {
                     </div>
                 </DivInformacoes>
                 <div className="min-w-0">
-                    {!listaAlunos.carregando && !listaAlunos.erro && <AlunosVinculados alunos={listaAlunos.itens} total={listaAlunos.total} capacidade={turma.capacidade_maxima} podeVincular={podeEditar} onVincular={() => { setAviso(''); setModalAberto(true); }} />}
+                    {!listaAlunos.carregando && !listaAlunos.erro && <AlunosVinculados alunos={listaAlunos.itens} total={listaAlunos.total} capacidade={turma.capacidade_maxima} podeVincular={podeEditar} onVincular={() => { setModalAberto(true); }} />}
                     <CarregarMais testId="turma-alunos-paginacao" listagem={listaAlunos} />
                 </div>
             </div>

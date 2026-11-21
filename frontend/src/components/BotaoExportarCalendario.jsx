@@ -4,9 +4,11 @@ import { alunoService } from '../services/alunoService';
 import { criarPdfCalendarioAluno, nomeArquivoAluno } from '../utils/exportarCalendarioAluno';
 import { criarZipCalendariosAlunos } from '../utils/exportarCalendariosZip';
 import { baixarArquivo } from '../utils/baixarArquivo';
+import { useToast } from '../contexts/ToastContext';
 
 export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = false, className = '', testId }) {
-    const [exportando, setExportando] = useState(false), [progresso, setProgresso] = useState(''), [erro, setErro] = useState('');
+    const { notificar } = useToast();
+    const [exportando, setExportando] = useState(false), [progresso, setProgresso] = useState('');
     const envio = useRef(null);
     useEffect(() => () => envio.current?.abort(), []);
 
@@ -17,7 +19,7 @@ export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = fa
         const controller = new AbortController(); envio.current = controller;
         const filtrosIniciais = { ...filtros };
         const { signal } = controller;
-        setExportando(true); setErro(''); setProgresso('Preparando exportação...');
+        setExportando(true); setProgresso('Preparando exportação...');
         try {
             if (alunoId) {
                 const dados = await alunoService.buscarCalendarioExportacao(alunoId, signal);
@@ -35,9 +37,10 @@ export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = fa
                 const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(selecao.referencia));
                 baixarArquivo(arquivo, `calendarios-alunos-${hoje}.zip`);
             }
-            setProgresso('Download preparado.');
+            setProgresso('');
+            notificar('Download preparado.', 'sucesso');
         } catch (error) {
-            if (!signal.aborted && error.code !== 'ERR_CANCELED') { setErro(error.response?.data?.erro || error.message || 'Não foi possível exportar os calendários.'); setProgresso(''); }
+            if (!signal.aborted && error.code !== 'ERR_CANCELED') { notificar(error.response?.data?.erro || error.message || 'Não foi possível exportar os calendários.'); setProgresso(''); }
         } finally {
             if (envio.current === controller) { envio.current = null; if (!signal.aborted) setExportando(false); }
         }
@@ -51,6 +54,5 @@ export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = fa
             </button>
         </div>
         {progresso && <p role="status" className="max-w-80 text-right text-xs text-text-muted">{progresso}</p>}
-        {erro && <p role="alert" className="max-w-80 text-right text-sm text-danger">{erro}</p>}
     </div>;
 }

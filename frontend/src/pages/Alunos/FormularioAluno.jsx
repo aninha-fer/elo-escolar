@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
@@ -28,6 +29,7 @@ const formularioInicial = {
 };
 
 export function FormularioAluno({ aluno, onClose, onSalvo }) {
+    const { notificar } = useToast();
     const editando = Boolean(aluno);
     const turmaAtual = aluno?.turma_regular;
     const [formulario, setFormulario] = useState(() => aluno ? {
@@ -217,6 +219,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                 };
                 await alunoService.editar(aluno.id, dados);
             } else await alunoService.criarAluno(dadosAluno);
+            notificar(editando ? 'Aluno atualizado com sucesso.' : status === 'RASCUNHO' ? 'Rascunho salvo com sucesso.' : 'Aluno cadastrado com sucesso.', 'sucesso');
             onSalvo();
         } catch (err) {
             if (err.response?.data?.confirmacao) {
@@ -243,7 +246,9 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
             }
             setErros(errosCampos);
             focarPrimeiroErro(errosCampos);
-            setSubmitError(err.response?.data?.erro || mensagensGerais.join(' ') || (Object.keys(errosCampos).length ? '' : 'Não foi possível salvar o aluno.'));
+            const mensagemErro = err.response?.data?.erro || mensagensGerais.join(' ') || (Object.keys(errosCampos).length ? '' : 'Não foi possível salvar o aluno.');
+            if (err.response?.data?.conflitos?.length) setSubmitError(mensagemErro);
+            else if (!Object.keys(errosCampos).length || mensagensGerais.length) notificar(mensagemErro);
         } finally {
             enviando.current = false;
             setIsSubmitting(false);

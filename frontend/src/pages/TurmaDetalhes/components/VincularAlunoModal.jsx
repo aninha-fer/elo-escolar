@@ -1,3 +1,4 @@
+import { useToast } from '../../../contexts/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../../components/Modal';
 import { Input } from '../../../components/Input';
@@ -11,6 +12,7 @@ function normalizarTexto(valor) {
 }
 
 export function VincularAlunoModal({ turma, onClose, onVinculado }) {
+    const { notificar } = useToast();
     const [resultado, setResultado] = useState(null);
     const [tentativa, setTentativa] = useState(0);
     const [busca, setBusca] = useState('');
@@ -55,7 +57,9 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
             const matricula = await matriculasService.matricularRegular(alunoSelecionado.id, turma.id);
             onVinculado(matricula);
         } catch (error) {
-            setErroEnvio(error.response?.data?.erro || 'Não foi possível vincular o aluno. Tente novamente.');
+            const mensagemErro = error.response?.data?.erro || 'Não foi possível vincular o aluno. Tente novamente.';
+            if (error.response?.data?.conflitos?.length) setErroEnvio(mensagemErro);
+            else notificar(mensagemErro);
             setConflitos(error.response?.data?.conflitos ?? []);
         } finally {
             envioEmAndamento.current = false;
@@ -66,7 +70,7 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
     return (
         <Modal testId="turma-vincular-aluno" isOpen title="Vincular Aluno" subtitle={`Selecione um aluno para ${turma.nome}.`}
             onClose={fecharModal} confirmFormId="form-vincular-aluno" onConfirm={enviar}
-            isConfirmDisabled={carregando || !alunoSelecionado} isConfirmLoading={enviando} 
+            isConfirmDisabled={carregando || !alunoSelecionado} isConfirmLoading={enviando}
             confirmText={<span className="inline-flex items-center gap-sm">
                 <SaveIcon />
                 Vincular Aluno

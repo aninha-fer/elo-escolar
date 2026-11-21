@@ -1,3 +1,4 @@
+import { useToast } from '../../../contexts/ToastContext';
 import { Input } from "../../../components/Input";
 import { Modal } from "../../../components/Modal";
 import { useEffect, useRef, useState } from "react";
@@ -22,6 +23,7 @@ const erroInicioPassado = 'Não é possível agendar um atendimento em uma data 
 const erroInicioMensal = 'A data de início da recorrência mensal deve ser de segunda a sexta-feira.';
 
 export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess }) {
+    const { notificar } = useToast();
     const editando = Boolean(atendimento);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRecorrente, setIsRecorrente] = useState(atendimento ? atendimento.tipo_recorrencia !== 'EVENTUAL' : false);
@@ -101,6 +103,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
     function profissionalCriado(criado) {
         setProfissionais((atuais) => [...atuais.filter((item) => item.id !== criado.id), criado].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id - b.id));
         setFormulario((atual) => ({ ...atual, profissional_id: String(criado.id) }));
+        notificar('Profissional cadastrado com sucesso.', 'sucesso');
         fecharProfissional();
     }
 
@@ -133,15 +136,15 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         const duracao_minutos = Number(formulario.duracao_minutos);
         const frequencia = Number(formulario.frequencia);
         if (!Number.isInteger(aluno_id) || aluno_id < 1) {
-            setSubmitError('Aluno não identificado.');
+            notificar('Aluno não identificado.');
             return;
         }
         if (!modalidades.some((item) => item.id === Number(formulario.modalidade_id)) || !profissionais.some((profissional) => profissional.id === profissional_id)) {
-            setSubmitError('Selecione a modalidade e um profissional cadastrado.');
+            notificar('Selecione a modalidade e um profissional cadastrado.');
             return;
         }
         if (!formulario.data_inicio || !formulario.hora_inicio || !Number.isInteger(duracao_minutos) || duracao_minutos < 1) {
-            setSubmitError('Informe a data, o horário e uma duração válida.');
+            notificar('Informe a data, o horário e uma duração válida.');
             return;
         }
         const instanteEnvio = new Date();
@@ -151,15 +154,15 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         }
         if (inicioMensalNoFimDeSemana) return;
         if (isRecorrente && (!Number.isInteger(frequencia) || frequencia < 1 || !formulario.data_termino)) {
-            setSubmitError('Informe a frequência e a data de término da recorrência.');
+            notificar('Informe a frequência e a data de término da recorrência.');
             return;
         }
         if (isRecorrente && formulario.data_termino < formulario.data_inicio) {
-            setSubmitError('A data de término não pode ser anterior à data de início.');
+            notificar('A data de término não pode ser anterior à data de início.');
             return;
         }
         if (isRecorrente && formulario.tipo_recorrencia === 'SEMANAL' && formulario.dias_semana.length === 0) {
-            setSubmitError('Selecione ao menos um dia da semana.');
+            notificar('Selecione ao menos um dia da semana.');
             return;
         }
 
@@ -181,10 +184,13 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                 if (!Object.keys(alterados).length) { onClose(); return; }
                 await atendimentosService.editar(idAluno, atendimento.id, alterados);
             } else await atendimentosService.criar(dadosAtendimento);
+            notificar(editando ? 'Atendimento atualizado com sucesso.' : 'Atendimento cadastrado com sucesso.', 'sucesso');
             onSuccess();
         } catch (err) {
             const mensagens = err.response?.data?.erros?.map((erro) => erro.message).join(' ');
-            setSubmitError(mensagens || err.response?.data?.erro || 'Não foi possível agendar o atendimento.');
+            const mensagemErro = mensagens || err.response?.data?.erro || 'Não foi possível agendar o atendimento.';
+            if (err.response?.data?.conflitos?.length) setSubmitError(mensagemErro);
+            else notificar(mensagemErro);
             setConflitos(Array.isArray(err.response?.data?.conflitos) ? err.response.data.conflitos : []);
         } finally {
             enviando.current = false;
@@ -367,7 +373,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             </div>
                         </div>
                     )}
-                    {(submitError || erroInicio) && (
+                    {(conflitos.length > 0 || erroInicio) && (
                         <div role="alert" className="mt-md rounded-sm border border-red-200 bg-red-50 p-md text-sm text-red-700">
                             <p>{erroInicio || submitError}</p>
                             {!erroInicio && conflitos.length > 0 && (

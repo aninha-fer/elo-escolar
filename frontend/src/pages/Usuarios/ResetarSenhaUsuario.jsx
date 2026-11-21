@@ -1,12 +1,13 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { Input } from '../../components/Input';
 import { usuariosService } from '../../services/usuariosService';
 
 export function ResetarSenhaUsuario({ usuario, onClose, onSalvo }) {
+    const { notificar } = useToast();
     const [formulario, setFormulario] = useState({ senha: '', confirmacao: '' });
     const [erros, setErros] = useState({});
-    const [erroEnvio, setErroEnvio] = useState('');
     const [enviando, setEnviando] = useState(false);
     const envioEmAndamento = useRef(false);
 
@@ -17,7 +18,6 @@ export function ResetarSenhaUsuario({ usuario, onClose, onSalvo }) {
     function atualizarCampo(campo, valor) {
         setFormulario((atual) => ({ ...atual, [campo]: valor }));
         setErros((atuais) => ({ ...atuais, [campo]: undefined, ...(campo === 'senha' ? { confirmacao: undefined } : {}) }));
-        setErroEnvio('');
     }
 
     async function enviar(event) {
@@ -27,7 +27,6 @@ export function ResetarSenhaUsuario({ usuario, onClose, onSalvo }) {
         if (formulario.senha.length < 8 || formulario.senha.length > 100) novosErros.senha = 'A senha deve ter entre 8 e 100 caracteres.';
         if (!formulario.confirmacao || formulario.confirmacao !== formulario.senha) novosErros.confirmacao = 'A confirmação deve ser igual à nova senha.';
         setErros(novosErros);
-        setErroEnvio('');
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
             event.currentTarget.elements.namedItem(primeiroErro)?.focus();
@@ -41,7 +40,7 @@ export function ResetarSenhaUsuario({ usuario, onClose, onSalvo }) {
         } catch (error) {
             const erroSenha = error.response?.data?.erros?.find((item) => item.campo === 'senha');
             setErros(erroSenha ? { senha: erroSenha.mensagem } : {});
-            setErroEnvio(error.response?.data?.erro || 'Não foi possível redefinir a senha. Tente novamente.');
+            if (!erroSenha) notificar(error.response?.data?.erro || 'Não foi possível redefinir a senha. Tente novamente.');
         } finally {
             envioEmAndamento.current = false;
             setEnviando(false);
@@ -60,7 +59,6 @@ export function ResetarSenhaUsuario({ usuario, onClose, onSalvo }) {
                             aria-invalid={Boolean(erros[campo])} aria-describedby={erros[campo] ? `resetar-${campo}-erro` : undefined} />
                         {erros[campo] && <p id={`resetar-${campo}-erro`} className="mb-md text-sm text-red-700">{erros[campo]}</p>}
                     </div>)}
-                    {erroEnvio && <p role="alert" className="rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}
                 </fieldset>
             </form>
         </Modal>

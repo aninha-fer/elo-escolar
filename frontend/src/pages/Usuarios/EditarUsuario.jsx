@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { z } from 'zod';
 import { Modal } from '../../components/Modal';
@@ -8,9 +9,9 @@ import { usuariosService } from '../../services/usuariosService';
 const emailSchema = z.string().email().max(254);
 
 export function EditarUsuario({ usuario, onClose, onSalvo }) {
+    const { notificar } = useToast();
     const [formulario, setFormulario] = useState({ nome: usuario.nome, email: usuario.email, role: usuario.role });
     const [erros, setErros] = useState({});
-    const [erroEnvio, setErroEnvio] = useState('');
     const [enviando, setEnviando] = useState(false);
     const envioEmAndamento = useRef(false);
     const dados = {
@@ -26,7 +27,6 @@ export function EditarUsuario({ usuario, onClose, onSalvo }) {
     function atualizarCampo(campo, valor) {
         setFormulario((atual) => ({ ...atual, [campo]: valor }));
         setErros((atuais) => ({ ...atuais, [campo]: undefined }));
-        setErroEnvio('');
     }
 
     async function enviar(event) {
@@ -37,7 +37,6 @@ export function EditarUsuario({ usuario, onClose, onSalvo }) {
         if (!emailSchema.safeParse(formulario.email.trim()).success) novosErros.email = 'Informe um e-mail válido de até 254 caracteres.';
         if (!['admin', 'professor'].includes(formulario.role)) novosErros.role = 'Selecione a função do usuário.';
         setErros(novosErros);
-        setErroEnvio('');
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
             event.currentTarget.elements.namedItem(primeiroErro)?.focus();
@@ -56,7 +55,7 @@ export function EditarUsuario({ usuario, onClose, onSalvo }) {
                 if (campos[item.campo]) errosCampos[campos[item.campo]] = item.mensagem;
             }
             setErros(errosCampos);
-            setErroEnvio(error.response?.data?.erro || 'Não foi possível salvar as alterações. Tente novamente.');
+            if (!Object.keys(errosCampos).length) notificar(error.response?.data?.erro || 'Não foi possível salvar as alterações. Tente novamente.');
         } finally {
             envioEmAndamento.current = false;
             setEnviando(false);
@@ -86,7 +85,6 @@ export function EditarUsuario({ usuario, onClose, onSalvo }) {
                     <Select data-testid="usuario-editar-funcao" id="editar-usuario-role" name="role" label="Função" labelClassName="font-mono" required value={formulario.role}
                         onChange={(event) => atualizarCampo('role', event.target.value)} error={erros.role}
                         options={[{ value: 'admin', label: 'Administrador' }, { value: 'professor', label: 'Professor' }]} />
-                    {erroEnvio && <p role="alert" className="rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}
                 </fieldset>
             </form>
         </Modal>
