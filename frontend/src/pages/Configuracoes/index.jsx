@@ -18,8 +18,7 @@ export function Configuracoes() {
 
     return <div className="flex flex-col gap-lg">
         <header>
-            <p className="mb-sm font-mono text-xs uppercase tracking-widest text-secondary">Administração</p>
-            <h1 className="text-2xl font-bold text-text-main">Configurações</h1>
+            <h1 id="alunos-titulo" className="text-xl font-bold text-text-main">Configurações</h1>
         </header>
         <div className='flex flex-row gap-lg'>
             <div className='flex flex-col gap-lg w-[50%]'>

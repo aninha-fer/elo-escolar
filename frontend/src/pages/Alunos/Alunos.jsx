@@ -24,7 +24,7 @@ export function Alunos() {
     const [excluindo, setExcluindo] = useState(false);
     const envioExclusao = useRef(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [statusSelecionado, setStatusSelecionado] = useState('TODOS');
+    const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
     const [termoBusca, setTermoBusca] = useState('');
     const { usuario } = useAuth();
     const podeEditar = usuario?.role === 'admin';
@@ -83,16 +83,8 @@ export function Alunos() {
 
     return (
         <div className="flex flex-col gap-lg">
+            <h1 id="alunos-titulo" className="text-xl font-bold text-text-main">Alunos</h1>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
-                <FiltroEstado data-testid="alunos-filtro-todos"
-                    count={contagemStatus.TODOS}
-                    tipo="TODOS"
-                    isSelecionado={statusSelecionado === 'TODOS'}
-                    aria-pressed={statusSelecionado === 'TODOS'}
-                    onClick={() => setStatusSelecionado('TODOS')}
-                >
-                    Todos
-                </FiltroEstado>
                 <FiltroEstado data-testid="alunos-filtro-ativo"
                     count={contagemStatus.ATIVO}
                     tipo="ATIVO"
@@ -119,6 +111,15 @@ export function Alunos() {
                     onClick={() => setStatusSelecionado('RASCUNHO')}
                 >
                     Rascunhos
+                </FiltroEstado>
+                <FiltroEstado data-testid="alunos-filtro-todos"
+                    count={contagemStatus.TODOS}
+                    tipo="TODOS"
+                    isSelecionado={statusSelecionado === 'TODOS'}
+                    aria-pressed={statusSelecionado === 'TODOS'}
+                    onClick={() => setStatusSelecionado('TODOS')}
+                >
+                    Todos
                 </FiltroEstado>
             </div>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
@@ -150,8 +151,8 @@ export function Alunos() {
                     <BotaoExportarCalendario testId="alunos-exportar-calendarios" total={listagem.total} disabled={listagem.carregando || Boolean(listagem.erro)} filtros={{ busca: termoBusca, status: statusSelecionado }} />
                 </div>
                 {!listagem.carregando && !listagem.erro && <TabelaAlunos semBorda alunos={listagem.itens} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
-                onAlterarStatus={podeEditar && !carregandoEdicao ? abrirStatus : undefined}
-                onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />}
+                    onAlterarStatus={podeEditar && !carregandoEdicao ? abrirStatus : undefined}
+                    onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />}
             </div>
             <CarregarMais testId="alunos-paginacao" listagem={listagem} />
             {podeEditar && alunoExclusao && <ModalConfirmacao testId="aluno-excluir" isOpen estado="atencao" showCancel

@@ -8,6 +8,7 @@ import { profissionaisService } from '../../services/profissionaisService';
 import { TabelaProfissionais } from './TabelaProfissionais';
 import { FormularioProfissional } from './FormularioProfissional';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
+import { FiltroEstado } from '../../components/FiltroEstado';
 
 function VinculosProfissional({ conflitos }) {
     const turmas = conflitos.filter((item) => item.codigo === 'TURMA_VINCULADA' && item.turma_nome);
@@ -32,7 +33,9 @@ export function Profissionais() {
     const [conflitos, setConflitos] = useState([]);
     const envioStatusEmAndamento = useRef(false);
 
-    const listagem = useListagemInfinita(profissionaisService.listarPaginados, { busca }, tentativa);
+    const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
+    const listagem = useListagemInfinita(profissionaisService.listarPaginados, { busca, status: statusSelecionado }, tentativa);    
+    const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     const { itens: profissionais, carregando, erro } = listagem;
 
     function tentarNovamente() {
@@ -104,6 +107,35 @@ export function Profissionais() {
     return (
         <section className="profissionais-page flex min-w-0 flex-col gap-lg" aria-labelledby="profissionais-titulo">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Profissionais</h1>
+            <div className="flex w-full  flex-col gap-sm sm:flex-row sm:items-stretch">
+                <FiltroEstado data-testid="profissionais-filtro-ativo"
+                    count={contagemStatus.ATIVO}
+                    tipo="ATIVO"
+                    isSelecionado={statusSelecionado === 'ATIVO'}
+                    aria-pressed={statusSelecionado === 'ATIVO'}
+                    onClick={() => setStatusSelecionado('ATIVO')}
+                >
+                    Ativos
+                </FiltroEstado>
+                <FiltroEstado data-testid="profissionais-filtro-inativo"
+                    count={contagemStatus.INATIVO}
+                    tipo="INATIVO"
+                    isSelecionado={statusSelecionado === 'INATIVO'}
+                    aria-pressed={statusSelecionado === 'INATIVO'}
+                    onClick={() => setStatusSelecionado('INATIVO')}
+                >
+                    Inativos
+                </FiltroEstado>
+                <FiltroEstado data-testid="profissionais-filtro-todos"
+                    count={contagemStatus.TODOS}
+                    tipo="TODOS"
+                    isSelecionado={statusSelecionado === 'TODOS'}
+                    aria-pressed={statusSelecionado === 'TODOS'}
+                    onClick={() => setStatusSelecionado('TODOS')}
+                >
+                    Todos
+                </FiltroEstado>
+            </div>
             <div className="flex flex-col gap-sm sm:flex-row sm:items-start">
                 <Input data-testid="profissionais-busca" id="busca-profissional" placeholder="Buscar por nome..." aria-label="Buscar profissional por nome"
                     wrapperClassName="mb-0! min-w-0" inputClassName="h-11" value={busca} onChange={(event) => setBusca(event.target.value)}

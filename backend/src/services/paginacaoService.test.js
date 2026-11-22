@@ -4,12 +4,13 @@ const prisma = require('../prismaClient');
 const { paginarIds, formatarPagina } = require('./paginacaoService');
 const { lerPaginacao } = require('../dtos/paginacaoDTO');
 
-function simular(t, paginas, total = 41) {
+function simular(t, paginas, total = 41, contagensTurmas = [{ status: 'ATIVO', total: 30n }, { status: 'INATIVO', total: 11n }]) {
   const original = prisma.$queryRaw, consultas = [];
   t.after(() => { prisma.$queryRaw = original; });
   prisma.$queryRaw = async (sql) => {
     const texto = sql.text ?? sql.join('?');
     consultas.push({ texto, valores: sql.values });
+    if (['GROUP BY t.status', 'GROUP BY p.status_geral', 'GROUP BY a.status'].some(grupo => texto.includes(grupo))) return contagensTurmas;
     if (texto.includes('GROUP BY status')) return [{ status: 'ATIVO', total: 30n }, { status: 'RASCUNHO', total: 11n }];
     if (texto.includes('count(*) AS total')) return [{ total: BigInt(total), total_ativas: BigInt(total) }];
     return paginas.shift();
@@ -28,17 +29,20 @@ test('paginação é opcional e valida parâmetros antes de consultar', () => {
 
 test('Home filtra status e ano antes de contar e paginar turmas, sem reutilizar cursor de outro ano', async (t) => {
   const registros = Array.from({ length: 21 }, (_, i) => ({ id: i + 1, chave: `Turma ${String(i).padStart(2, '0')}` }));
-  const consultas = simular(t, [registros], 25);
+  const consultas = simular(t, [registros], 25, [{ status: 'ATIVO', total: 25n }, { status: 'INATIVO', total: 2n }]);
   const params = lerPaginacao({ paginado: 'true', tipo: 'REGULAR', status: 'ATIVO', ano: '2026' });
   const pagina = await paginarIds('turmas', params);
   assert.equal(pagina.ids.length, 20);
   assert.equal(pagina.total, 25);
   for (const consulta of consultas) {
-    assert.ok(consulta.texto.includes('t.status::text ='));
     assert.ok(consulta.texto.includes('al.ano ='));
-    assert.ok(consulta.valores.includes('ATIVO'));
     assert.ok(consulta.valores.includes(2026));
+    if (!consulta.texto.includes('GROUP BY t.status')) {
+      assert.ok(consulta.texto.includes('t.status::text ='));
+      assert.ok(consulta.valores.includes('ATIVO'));
+    }
   }
+  assert.deepEqual(pagina.contagens_status, { TODOS: 27, ATIVO: 25, INATIVO: 2 });
   await assert.rejects(() => paginarIds('turmas', { ...params, ano: 2027, cursor: pagina.proximo_cursor }), { statusCode: 400 });
 });
 
@@ -47,6 +51,60 @@ test('consulta de turmas sem filtros novos preserva o contrato usado por modais 
   await paginarIds('turmas', lerPaginacao({ paginado: 'true', tipo: 'OFICINA' }));
   assert.ok(consultas.every((c) => !c.texto.includes('t.status::text =') && !c.texto.includes('ano_letivo al')));
 });
+
+for (const tipo of ['REGULAR', 'OFICINA']) {
+  test(`totalizadores de ${tipo} contam todos os status da aba, independentemente da busca e dos vinte carregados`, async t => {
+    const registros = Array.from({ length: 21 }, (_, i) => ({ id: i + 1, chave: `Turma ${i}` }));
+    const consultas = simular(t, [registros], 25);
+    const pagina = await paginarIds('turmas', lerPaginacao({ paginado: 'true', tipo, status: 'ATIVO', busca: 'Girassol' }));
+    assert.equal(pagina.ids.length, 20);
+    assert.equal(pagina.total, 25);
+    assert.deepEqual(pagina.contagens_status, { TODOS: 41, ATIVO: 30, INATIVO: 11 });
+    const totais = consultas.find(c => c.texto.includes('GROUP BY t.status'));
+    assert.ok(totais.texto.includes('t.deleted_at IS NULL'));
+    assert.ok(totais.texto.includes('t.tipo::text ='));
+    assert.deepEqual(totais.valores, [tipo]);
+    assert.ok(!totais.texto.includes('LIMIT') && !totais.texto.includes('t.status::text =') && !totais.texto.includes('strpos'));
+    const resposta = formatarPagina(pagina.ids.map(id => ({ id })), pagina);
+    assert.deepEqual(resposta.contagens_status, pagina.contagens_status);
+  });
+}
+
+test('totalizadores de uma aba sem turmas retornam todos os valores em zero', async t => {
+  simular(t, [[]], 0, []);
+  const pagina = await paginarIds('turmas', lerPaginacao({ paginado: 'true', tipo: 'OFICINA' }));
+  assert.deepEqual(pagina.contagens_status, { TODOS: 0, ATIVO: 0, INATIVO: 0 });
+});
+
+for (const [recurso, coluna, tabela] of [['profissionais', 'p.status_geral', 'funcionario'], ['usuarios', 'a.status', 'usuario']]) {
+  for (const status of ['ATIVO', 'INATIVO', 'TODOS']) {
+    test(`totalizadores e filtro de ${recurso} com status ${status} respeitam a origem do status e ignoram paginação e busca nas contagens`, async t => {
+      const registros = Array.from({ length: 21 }, (_, i) => ({ id: i + 1, chave: `Nome ${i}` }));
+      const consultas = simular(t, [registros], 25);
+      const pagina = await paginarIds(recurso, lerPaginacao({ paginado: 'true', status, busca: 'Silva' }));
+      assert.equal(pagina.ids.length, 20);
+      assert.equal(pagina.total, 25);
+      assert.deepEqual(pagina.contagens_status, { TODOS: 41, ATIVO: 30, INATIVO: 11 });
+      const contagem = consultas.find(c => c.texto.includes(`GROUP BY ${coluna}`));
+      assert.ok(contagem.texto.includes(`${tabela} a JOIN pessoa p`));
+      assert.ok(contagem.texto.includes('a.deleted_at IS NULL'));
+      assert.deepEqual(contagem.valores, []);
+      assert.ok(!contagem.texto.includes('LIMIT') && !contagem.texto.includes('strpos'));
+      for (const consulta of consultas.filter(c => c !== contagem)) {
+        assert.equal(consulta.texto.includes(`${coluna}::text =`), status !== 'TODOS');
+        assert.equal(consulta.valores.includes(status), status !== 'TODOS');
+        assert.ok(consulta.valores.includes('silva'));
+      }
+      assert.deepEqual(formatarPagina(pagina.ids.map(id => ({ id })), pagina).contagens_status, pagina.contagens_status);
+    });
+  }
+
+  test(`totalizadores de ${recurso} sem registros retornam zero`, async t => {
+    simular(t, [[]], 0, []);
+    const pagina = await paginarIds(recurso, lerPaginacao({ paginado: 'true' }));
+    assert.deepEqual(pagina.contagens_status, { TODOS: 0, ATIVO: 0, INATIVO: 0 });
+  });
+}
 
 test('calendários carregam vinte por vez, em ordem decrescente de ano e com cursor', async (t) => {
   const registros = Array.from({ length: 21 }, (_, i) => ({ id: 2100 - i, chave: String(2100 - i) }));

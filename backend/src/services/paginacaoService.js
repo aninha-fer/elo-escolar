@@ -22,6 +22,10 @@ function configurarConsulta(recurso, parametros, alunoId, turmaId) {
     chave = Prisma.sql`p.nome`; id = Prisma.sql`a.id`;
     filtros.push(Prisma.sql`a.deleted_at IS NULL`);
     if (recurso === 'alunos' && parametros.status !== 'TODOS') filtros.push(Prisma.sql`a.status::text = ${parametros.status}`);
+    if (['profissionais', 'usuarios'].includes(recurso) && parametros.status && parametros.status !== 'TODOS') {
+      const status = recurso === 'profissionais' ? Prisma.sql`p.status_geral` : Prisma.sql`a.status`;
+      filtros.push(Prisma.sql`${status}::text = ${parametros.status}`);
+    }
     if (busca) {
       const nome = contem(Prisma.sql`p.nome`, busca);
       if (recurso === 'alunos') filtros.push(Prisma.sql`(${nome} OR EXISTS (SELECT 1 FROM aluno_responsavel ar JOIN pessoa r ON r.id = ar.pessoa_id WHERE ar.aluno_id = a.id AND ${contem(Prisma.sql`r.nome`, busca)}))`);
@@ -100,6 +104,13 @@ async function paginarIds(recurso, parametros, contexto = {}) {
   if (recurso === 'alunos') {
     const contagens = await prisma.$queryRaw`SELECT status, count(*) AS total FROM aluno WHERE deleted_at IS NULL GROUP BY status`;
     pagina.contagens_status = { TODOS: 0, ATIVO: 0, INATIVO: 0, RASCUNHO: 0 };
+    for (const grupo of contagens) { pagina.contagens_status[grupo.status] = Number(grupo.total); pagina.contagens_status.TODOS += Number(grupo.total); }
+  }
+  if (['turmas', 'profissionais', 'usuarios'].includes(recurso)) {
+    const consulta = configurarConsulta(recurso, { ...parametros, status: 'TODOS', busca: '' });
+    const status = { turmas: Prisma.sql`t.status`, profissionais: Prisma.sql`p.status_geral`, usuarios: Prisma.sql`a.status` }[recurso];
+    const contagens = await prisma.$queryRaw(Prisma.sql`SELECT ${status} AS status, count(*) AS total FROM ${consulta.origem} WHERE ${consulta.filtro} GROUP BY ${status}`);
+    pagina.contagens_status = { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     for (const grupo of contagens) { pagina.contagens_status[grupo.status] = Number(grupo.total); pagina.contagens_status.TODOS += Number(grupo.total); }
   }
   return pagina;

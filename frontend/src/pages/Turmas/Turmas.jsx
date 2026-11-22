@@ -12,6 +12,7 @@ import { TurmaItem } from './TurmaItem';
 import { normalizarProfissionais } from '../../utils/formatters';
 import { FormularioTurma } from './FormularioTurma';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
+import { FiltroEstado } from '../../components/FiltroEstado';
 
 export function Turmas() {
     const { notificar } = useToast();
@@ -40,7 +41,9 @@ export function Turmas() {
     }, []);
 
 
-    const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca }, tentativa);
+    const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
+    const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca, status: statusSelecionado }, tentativa);
+    const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     const { carregando, erro } = listagem;
     const filtrados = listagem.itens.map((turma) => ({ ...turma, profissionais: normalizarProfissionais(turma) }));
 
@@ -101,8 +104,10 @@ export function Turmas() {
         envioStatusEmAndamento.current = true;
         setAlterandoStatus(true);
         try {
-            const atualizada = await turmasService.editar(operacao.turma.id, { status: ativando ? 'ATIVO' : 'INATIVO',
-                ...(!ativando ? { confirmar_cancelamentos: operacao.confirmacao } : {}) });
+            const atualizada = await turmasService.editar(operacao.turma.id, {
+                status: ativando ? 'ATIVO' : 'INATIVO',
+                ...(!ativando ? { confirmar_cancelamentos: operacao.confirmacao } : {})
+            });
             turmaAtualizada(atualizada, ativando ? 'Turma ativada com sucesso.' : 'Turma inativada com sucesso.');
         } catch (error) {
             atualizarConfirmacao(error);
@@ -115,8 +120,10 @@ export function Turmas() {
 
     function atualizarConfirmacao(error) {
         const dados = error.response?.data;
-        if (dados?.confirmacao) setOperacao((atual) => ({ ...atual, confirmacao: dados.confirmacao,
-            turma: { ...atual.turma, matriculas_ativas: dados.matriculas_ativas } }));
+        if (dados?.confirmacao) setOperacao((atual) => ({
+            ...atual, confirmacao: dados.confirmacao,
+            turma: { ...atual.turma, matriculas_ativas: dados.matriculas_ativas }
+        }));
     }
 
     async function confirmarExclusao() {
@@ -156,7 +163,36 @@ export function Turmas() {
                         {tipoTurma === 'REGULAR' ? 'Nova Turma' : 'Nova Oficina'}
                     </Button>}
                 </div>
-                <AlternadorTipoTurma value={tipoTurma} onChange={trocarTipo} />
+                <div className="flex w-full h-13 flex-col gap-sm sm:flex-row sm:items-stretch">
+                    <AlternadorTipoTurma value={tipoTurma} onChange={trocarTipo} />
+                    <FiltroEstado data-testid="turmas-filtro-ativo"
+                        count={contagemStatus.ATIVO}
+                        tipo="ATIVO"
+                        isSelecionado={statusSelecionado === 'ATIVO'}
+                        aria-pressed={statusSelecionado === 'ATIVO'}
+                        onClick={() => setStatusSelecionado('ATIVO')}
+                    >
+                        Ativas
+                    </FiltroEstado>
+                    <FiltroEstado data-testid="turmas-filtro-inativo"
+                        count={contagemStatus.INATIVO}
+                        tipo="INATIVO"
+                        isSelecionado={statusSelecionado === 'INATIVO'}
+                        aria-pressed={statusSelecionado === 'INATIVO'}
+                        onClick={() => setStatusSelecionado('INATIVO')}
+                    >
+                        Inativas
+                    </FiltroEstado>
+                    <FiltroEstado data-testid="turmas-filtro-todos"
+                        count={contagemStatus.TODOS}
+                        tipo="TODOS"
+                        isSelecionado={statusSelecionado === 'TODOS'}
+                        aria-pressed={statusSelecionado === 'TODOS'}
+                        onClick={() => setStatusSelecionado('TODOS')}
+                    >
+                        Todos
+                    </FiltroEstado>
+                </div>
             </div>
             {carregando ? <p role="status">Carregando {tipoTurma === 'REGULAR' ? 'turmas regulares' : 'oficinas'}...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">

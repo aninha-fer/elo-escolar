@@ -11,6 +11,7 @@ import { EditarUsuario } from './EditarUsuario';
 import { ResetarSenhaUsuario } from './ResetarSenhaUsuario';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 import { useAuth } from '../../contexts/AuthContext';
+import { FiltroEstado } from '../../components/FiltroEstado';
 
 export function Usuarios() {
     const { notificar } = useToast();
@@ -22,7 +23,9 @@ export function Usuarios() {
     const [alterandoStatus, setAlterandoStatus] = useState(false);
     const envioStatusEmAndamento = useRef(false);
 
-    const listagem = useListagemInfinita(usuariosService.listarPaginados, { busca: termoBusca }, tentativa);
+    const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
+    const listagem = useListagemInfinita(usuariosService.listarPaginados, { busca: termoBusca, status: statusSelecionado }, tentativa);
+    const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     const { itens: usuarios, carregando, erro } = listagem;
 
     function tentarNovamente() {
@@ -87,6 +90,35 @@ export function Usuarios() {
     return (
         <div className="flex min-w-0 flex-col gap-lg">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Usuários</h1>
+            <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
+                <FiltroEstado data-testid="turmas-filtro-ativo"
+                    count={contagemStatus.ATIVO}
+                    tipo="ATIVO"
+                    isSelecionado={statusSelecionado === 'ATIVO'}
+                    aria-pressed={statusSelecionado === 'ATIVO'}
+                    onClick={() => setStatusSelecionado('ATIVO')}
+                >
+                    Ativas
+                </FiltroEstado>
+                <FiltroEstado data-testid="turmas-filtro-inativo"
+                    count={contagemStatus.INATIVO}
+                    tipo="INATIVO"
+                    isSelecionado={statusSelecionado === 'INATIVO'}
+                    aria-pressed={statusSelecionado === 'INATIVO'}
+                    onClick={() => setStatusSelecionado('INATIVO')}
+                >
+                    Inativas
+                </FiltroEstado>
+                <FiltroEstado data-testid="turmas-filtro-todos"
+                    count={contagemStatus.TODOS}
+                    tipo="TODOS"
+                    isSelecionado={statusSelecionado === 'TODOS'}
+                    aria-pressed={statusSelecionado === 'TODOS'}
+                    onClick={() => setStatusSelecionado('TODOS')}
+                >
+                    Todos
+                </FiltroEstado>
+            </div>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
                 <Input data-testid="usuarios-busca" placeholder="Pesquisar por nome ou e-mail..." aria-label="Pesquisar por nome ou e-mail"
                     value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)}
