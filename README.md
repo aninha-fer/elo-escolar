@@ -160,3 +160,31 @@ e remove `nome_responsavel` e `telefone_responsavel` sem transferir os dados
 fictícios antigos. Os timestamps novos seguem o padrão existente (`DateTime`,
 `created_at` com `@default(now())` e `updated_at` com `@updatedAt`). A tabela de
 ocorrências não faz parte desta entrega.
+
+## Expiração da sessão
+
+A sessão expira após 60 minutos sem atividade reconhecida pelo servidor, com
+limite absoluto de oito horas. Login e troca inicial de senha iniciam ambos os
+prazos. Sessões antigas sem `ultimaAtividadeEm` exigem novo login após a atualização;
+não há alteração no schema do banco.
+
+O frontend registra interações reais em documentos visíveis, no máximo uma vez
+por minuto por aba, em `POST /api/auth/atividade`. Consultas automáticas e a
+verificação periódica de `/api/auth/me` não renovam a atividade. Abas compartilham
+a sessão pelo cookie; nenhuma aba encerra a sessão apenas pelo próprio relógio.
+A retomada verifica o servidor antes de renovar, e sinais pendentes de atividade
+são descartados após 60 segundos.
+
+Os testes de sessão e conexão usam relógio controlado. Em `backend`, `npm test`
+inclui os testes HTTP de expiração e concorrência com logout. Para executar também
+o teste de atualização atômica no PostgreSQL configurado no `.env`, use no PowerShell:
+
+```powershell
+$env:TESTAR_SESSAO_POSTGRES = '1'
+node --test src/services/sessaoService.test.js
+Remove-Item Env:TESTAR_SESSAO_POSTGRES
+```
+
+Esse teste usa somente tabelas temporárias, removidas ao final da transação,
+sem modificar registros do sistema. Em `frontend`, execute os testes do monitor
+e da conexão com `node --test src/services/*.test.js`.

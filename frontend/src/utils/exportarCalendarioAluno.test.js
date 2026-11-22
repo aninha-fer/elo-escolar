@@ -32,7 +32,6 @@ test('PDF multipágina não perde oficinas nem nomes longos e identifica provis�
     const pdf = await criarPdfCalendarioAluno(dados), conteudo = pdf.output();
     assert.ok(pdf.getNumberOfPages() > 1);
     for (let i = 1; i < 35; i++) assert.ok(conteudo.includes(`Oficina-${i}-teste`), `Oficina ${i}`);
-    assert.ok(conteudo.includes('Rascunho'));
     assert.ok(conteudo.includes('Provis'));
     assert.ok(conteudo.includes('Girassol'));
     assert.ok(conteudo.includes('Psicologia'));

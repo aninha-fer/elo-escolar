@@ -27,7 +27,6 @@ export async function criarPdfCalendarioAluno(calendario) {
         pdf.text(nome, margem, 16);
         y = 16 + nome.length * 5;
         pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor('#64748B');
-        const status = { ATIVO: 'Ativo', RASCUNHO: 'Rascunho', INATIVO: 'Inativo' }[calendario.aluno.status];
         pdf.text(`${data(calendario.data_referencia)}`, margem, y);
         y += 8;
     }

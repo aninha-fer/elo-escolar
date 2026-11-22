@@ -28,7 +28,7 @@ export function criarConexao({ consultarSessao, agora = () => Date.now(), tempor
     let versao = 0, ultimaComunicacao = -Infinity, usuario;
     let verificacao = null;
     let estado = { fase: 'ociosa', visivel: false, erro: '' };
-    const ouvintes = new Set(), ouvintesSessao = new Set();
+    const ouvintes = new Set(), ouvintesSessao = new Set(), ouvintesInvalidacao = new Set();
 
     function publicar(proximo) {
         estado = proximo;
@@ -138,8 +138,10 @@ export function criarConexao({ consultarSessao, agora = () => Date.now(), tempor
         obterEstado: () => estado,
         assinar(ouvinte) { ouvintes.add(ouvinte); return () => ouvintes.delete(ouvinte); },
         assinarSessao(ouvinte) { ouvintesSessao.add(ouvinte); return () => ouvintesSessao.delete(ouvinte); },
+        assinarInvalidacao(ouvinte) { ouvintesInvalidacao.add(ouvinte); return () => ouvintesInvalidacao.delete(ouvinte); },
         invalidar() {
             versao++; usuario = undefined; ultimaComunicacao = -Infinity;
+            ouvintesInvalidacao.forEach((ouvinte) => ouvinte());
             verificacao?.controller.abort(); verificacao = null;
             publicar({ fase: 'ociosa', visivel: false, erro: '' });
             return versao;

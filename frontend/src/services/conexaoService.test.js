@@ -124,6 +124,14 @@ test('invalidação impede resposta antiga de restaurar a identidade e libera no
     assert.equal(conexao.registrarSessao(usuario, 0), false);
 });
 
+test('invalidação avisa os monitores imediatamente e permite remover a assinatura', () => {
+    const conexao = criarConexao({ consultarSessao: async () => usuario });
+    const versoes = [];
+    const remover = conexao.assinarInvalidacao(() => versoes.push(conexao.obterVersao()));
+    conexao.invalidar(); remover(); conexao.invalidar();
+    assert.deepEqual(versoes, [1]);
+});
+
 for (const status of [403, 429]) {
     test(`verificação não repete resposta definitiva ${status}`, async () => {
         let chamadas = 0;

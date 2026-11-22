@@ -108,8 +108,11 @@ test('HTTP: sessão restrita em ambos os perfis, origem, troca e invalidação d
     const { authPublicas, authProtegidas } = require('../routes/authRoutes');
     const { exigirOrigemPermitida } = require('../middlewares/exigirOrigemPermitida');
     const usuario = simular(t);
+    const executarOriginal = prisma.$executeRaw;
+    t.after(() => { prisma.$executeRaw = executarOriginal; });
+    prisma.$executeRaw = t.mock.fn(async () => 1);
     const sessoes = new Map();
-    const novaSessao = (versao = 1) => ({ usuarioId: 1, senha_versao: versao, autenticadoEm: Date.now(),
+    const novaSessao = (versao = 1) => ({ usuarioId: 1, senha_versao: versao, autenticadoEm: Date.now(), ultimaAtividadeEm: Date.now(),
         regenerate(cb) { cb(); }, save(cb) { cb(); }, destroy(cb) { delete this.usuarioId; cb(); } });
     sessoes.set('a', novaSessao()); sessoes.set('b', novaSessao()); sessoes.set('legada', novaSessao(undefined));
     delete sessoes.get('legada').senha_versao;
@@ -132,6 +135,7 @@ test('HTTP: sessão restrita em ambos os perfis, origem, troca e invalidação d
     assert.equal(identidadeLogin.deve_trocar_senha, true);
     assert.equal('senha_versao' in identidadeLogin, false);
     assert.equal(sessoes.get('a').senha_versao, 1);
+    assert.equal(sessoes.get('a').ultimaAtividadeEm, sessoes.get('a').autenticadoEm);
     for (const role of ['admin', 'professor']) {
         usuario.role = role;
         const bloqueio = await requisitar('/negocio');
@@ -139,12 +143,17 @@ test('HTTP: sessão restrita em ambos os perfis, origem, troca e invalidação d
         assert.equal((await bloqueio.json()).codigo, 'TROCA_SENHA_OBRIGATORIA');
         const me = await requisitar('/auth/me'); assert.equal(me.status, 200);
         assert.equal('senha_versao' in await me.json(), false);
+        assert.equal((await requisitar('/auth/atividade', 'a', { method: 'POST' })).status, 204);
+        assert.equal(usuario.deve_trocar_senha, true);
     }
+    assert.equal((await requisitar('/auth/atividade', 'a', { method: 'POST', headers: { Origin: 'http://outra.example' } })).status, 403);
+    assert.equal(prisma.$executeRaw.mock.callCount(), 2);
     assert.equal((await requisitar('/negocio', 'legada')).status, 401);
     assert.equal((await requisitar('/auth/primeiro-acesso/senha', 'a', { method: 'POST', headers: { Origin: 'http://outra.example' }, body: '{}' })).status, 403);
     const troca = await requisitar('/auth/primeiro-acesso/senha', 'a', { method: 'POST', body: JSON.stringify({ nova_senha: 'Definitiva123', confirmacao_senha: 'Definitiva123' }) });
     assert.equal(troca.status, 200);
     assert.equal((await troca.json()).deve_trocar_senha, false);
+    assert.equal(sessoes.get('a').ultimaAtividadeEm, sessoes.get('a').autenticadoEm);
     assert.equal((await requisitar('/negocio')).status, 200);
     assert.equal((await requisitar('/negocio', 'b')).status, 401);
     usuario.senha_versao++; usuario.deve_trocar_senha = true;

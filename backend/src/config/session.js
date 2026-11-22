@@ -1,6 +1,7 @@
 const session = require('express-session');
 const PgSessionStore = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
+const { INATIVIDADE_MAXIMA_MS } = require('./prazosSessao');
 
 const secret = process.env.SESSION_SECRET;
 
@@ -28,6 +29,6 @@ module.exports = session({
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/api',
-    maxAge: 15 * 60 * 1000,
+    maxAge: INATIVIDADE_MAXIMA_MS,
   },
 });
