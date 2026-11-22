@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
@@ -11,17 +12,21 @@ import { VincularAlunoModal } from './components/VincularAlunoModal';
 import { CampoInformacao } from '../../components/CampoInformacao';
 import { BotaoVoltar } from '../../components/BotaoVoltar';
 import { TagExpiradaTurma } from '../../components/TagExpiradaTurma';
+import { Download } from 'react-feather';
+import { ExportarDiarioModal } from './components/ExportarDiarioModal';
 
 const estilosStatus = { ATIVO: 'bg-emerald-50 text-emerald-600', INATIVO: 'bg-slate-100 text-slate-500', PROVISORIO: 'bg-amber-50 text-amber-700' };
 const rotulosStatus = { ATIVO: 'Ativa', INATIVO: 'Inativa', PROVISORIO: 'Provisória' };
 
 export function TurmaDetalhes() {
+    const { notificar } = useToast();
     const { id } = useParams();
     const { usuario } = useAuth();
+    const podeEditar = usuario?.role === 'admin';
     const [resultado, setResultado] = useState(null);
     const [tentativa, setTentativa] = useState(0);
     const [modalAberto, setModalAberto] = useState(false);
-    const [aviso, setAviso] = useState('');
+    const [diarioAberto, setDiarioAberto] = useState(false);
     const listaAlunos = useListagemInfinita(turmasService.listarAlunosPaginados, { id }, tentativa);
     const idValido = /^\d+$/.test(id) && Number(id) > 0 && Number(id) <= 2147483647;
 
@@ -73,7 +78,6 @@ export function TurmaDetalhes() {
     const grupos = agruparHorarios(turma.horarios);
     const dias = [...new Set(grupos.flatMap((grupo) => grupo.dias))].sort((a, b) => a - b);
     const nomeProfissional = turma.profissional?.pessoa?.nome;
-    const podeVincular = usuario?.role === 'admin' && regular && turma.status === 'ATIVO' && !turma.expirada;
     const campos = [
         ['Período', formatarTurno(turma.turno)],
         ['Dias da semana', dias.length ? formatarFrequencia(dias) : 'Não informados'],
@@ -84,9 +88,9 @@ export function TurmaDetalhes() {
 
     function alunoVinculado(matricula) {
         setModalAberto(false);
-        setAviso(matricula.status === 'PROVISORIO'
+        notificar(matricula.status === 'PROVISORIO'
             ? 'Vínculo provisório criado no planejamento do aluno em rascunho. Ele não ocupa vaga nem aparece na lista de matrículas ativas até a ativação.'
-            : 'Aluno vinculado à turma com sucesso.');
+            : 'Aluno vinculado à turma com sucesso.', 'sucesso');
         setTentativa((atual) => atual + 1);
     }
 
@@ -97,8 +101,11 @@ export function TurmaDetalhes() {
                 <div className="min-w-0 flex-1"><h1 id="turma-detalhes-titulo" className="break-words text-xl font-bold text-text-main">{turma.nome}</h1><p className="mt-xs text-sm text-slate-500">{tipo}</p></div>
                 <span className={`rounded-full px-md py-sm text-sm font-semibold ${estilosStatus[turma.status] ?? 'bg-slate-100 text-slate-500'}`}>{rotulosStatus[turma.status] ?? 'Não definido'}</span>
                 <TagExpiradaTurma expirada={turma.expirada} testId="turma-detalhes-expirada" />
+                {regular && turma.status === 'ATIVO' && <button data-testid="turma-exportar-diario" type="button" onClick={() => setDiarioAberto(true)}
+                    className="inline-flex items-center justify-center gap-sm rounded-sm border border-slate-200 bg-bg-surface px-md py-sm text-sm font-semibold text-text-main hover:bg-bg-main focus-visible:outline-2 focus-visible:outline-secondary">
+                    <Download size={16} aria-hidden="true" /> Exportar diário de classe
+                </button>}
             </header>
-            {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
             <div className="grid min-w-0 grid-cols-1 gap-lg xl:grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)]">
                 <DivInformacoes>
                     <dl>
@@ -118,11 +125,12 @@ export function TurmaDetalhes() {
                     </div>
                 </DivInformacoes>
                 <div className="min-w-0">
-                    {!listaAlunos.carregando && !listaAlunos.erro && <AlunosVinculados alunos={listaAlunos.itens} total={listaAlunos.total} capacidade={turma.capacidade_maxima} podeVincular={podeVincular} onVincular={() => { setAviso(''); setModalAberto(true); }} />}
+                    {!listaAlunos.carregando && !listaAlunos.erro && <AlunosVinculados alunos={listaAlunos.itens} total={listaAlunos.total} capacidade={turma.capacidade_maxima} podeVincular={podeEditar} onVincular={() => { setModalAberto(true); }} />}
                     <CarregarMais testId="turma-alunos-paginacao" listagem={listaAlunos} />
                 </div>
             </div>
-            {/* {modalAberto && podeVincular && <VincularAlunoModal key={id} turma={turma} onClose={() => setModalAberto(false)} onVinculado={alunoVinculado} />} */}
+            {modalAberto && podeEditar && <VincularAlunoModal key={id} turma={turma} onClose={() => setModalAberto(false)} onVinculado={alunoVinculado} />}
+            {diarioAberto && regular && turma.status === 'ATIVO' && <ExportarDiarioModal turma={turma} onClose={() => setDiarioAberto(false)} />}
         </section>
     );
 }

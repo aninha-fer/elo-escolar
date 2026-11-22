@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Check, Key, Mail } from 'react-feather';
@@ -13,36 +14,36 @@ const requisitos = [
 ];
 
 export function PrimeiroAcesso() {
+    const { notificar } = useToast();
     const { usuario, trocarSenhaInicial } = useAuth();
     const navigate = useNavigate();
     const [formulario, setFormulario] = useState({ nova_senha: '', confirmacao_senha: '' });
     const [erros, setErros] = useState({});
-    const [erroEnvio, setErroEnvio] = useState('');
     const [enviando, setEnviando] = useState(false);
     const envio = useRef(false);
     const valido = requisitos.every((item) => item.validar(formulario.nova_senha)) && formulario.nova_senha === formulario.confirmacao_senha;
 
     function atualizar(campo, valor) {
         setFormulario((atual) => ({ ...atual, [campo]: valor }));
-        setErros({}); setErroEnvio('');
+        setErros({});
     }
 
     async function enviar(event) {
         event.preventDefault();
         if (envio.current || !valido) return;
-        envio.current = true; setEnviando(true); setErroEnvio('');
+        envio.current = true; setEnviando(true);
         try {
             await trocarSenhaInicial(formulario);
             setFormulario({ nova_senha: '', confirmacao_senha: '' });
+            notificar('Senha alterada com sucesso.', 'sucesso');
             navigate('/', { replace: true });
         } catch (error) {
             if (error.code === 'ERR_CANCELED') return;
             setErros(Object.fromEntries((error.response?.data?.erros ?? []).map((item) => [item.campo, item.mensagem])));
-            setErroEnvio(error.response?.data?.erro || 'Não foi possível alterar a senha. Tente novamente.');
             if (error.response?.status === 401 && error.respostaApiValida === true) {
                 setFormulario({ nova_senha: '', confirmacao_senha: '' });
                 navigate('/login', { replace: true, state: { aviso: error.response?.data?.erro } });
-            }
+            } else if (!error.response?.data?.erros?.length) notificar(error.response?.data?.erro || 'Não foi possível alterar a senha. Tente novamente.');
         } finally { envio.current = false; setEnviando(false); }
     }
 
@@ -67,7 +68,6 @@ export function PrimeiroAcesso() {
                             <span aria-hidden="true" className="flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-200">{item.validar(formulario.nova_senha) ? <Check size={13} /> : '•'}</span>{item.texto}
                         </li>)}
                     </ul>
-                    {erroEnvio && <p role="alert" className="mt-md rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}
                 </fieldset>
             </form>
         </Modal>

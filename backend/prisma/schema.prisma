@@ -216,13 +216,20 @@ model matricula_turma {
   @@index([turma_id])
 }
 
+model modalidade {
+  id Int @id @default(autoincrement())
+  nome String @db.VarChar(200)
+  atendimentos atendimento_clinico[]
+}
+
 model atendimento_clinico {
   id               Int              @id @default(autoincrement())
   aluno_id         Int
   aluno            aluno            @relation(fields: [aluno_id], references: [id])
   profissional_id  Int
   profissional     funcionario      @relation(fields: [profissional_id], references: [id])
-  modalidade       String
+  modalidade_id Int
+  modalidade_cadastrada modalidade @relation(fields: [modalidade_id], references: [id], onDelete: Restrict)
   tipo_recorrencia tipo_recorrencia @default(EVENTUAL)
   data_inicio      DateTime         @db.Date
   hora_inicio      DateTime         @db.Time
@@ -238,6 +245,7 @@ model atendimento_clinico {
 
   @@index([aluno_id])
   @@index([profissional_id])
+  @@index([modalidade_id])
 }
 
 model atendimento_sessao {

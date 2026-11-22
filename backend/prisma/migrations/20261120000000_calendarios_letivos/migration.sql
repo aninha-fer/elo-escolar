@@ -26,7 +26,6 @@ CREATE TABLE "ano_letivo" (
 );
 CREATE UNIQUE INDEX "ano_letivo_ano_key" ON "ano_letivo"("ano");
 INSERT INTO "ano_letivo" (ano, data_inicio, data_fim) VALUES
-  (2025, '2025-02-05', '2025-12-20'),
   (2026, '2026-02-03', '2026-12-19'),
   (2027, '2027-02-08', '2027-12-18');
 

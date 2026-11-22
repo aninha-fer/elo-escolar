@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { Link } from 'react-router-dom';
 import { anosLetivosService } from '../../services/anosLetivosService';
 import { hojeInstituicao, periodoLetivo } from '../../utils/anoLetivo';
@@ -24,6 +25,7 @@ const faixasOficina = [
 const diasSemana = [1, 2, 3, 4, 5].map((value, indice) => ({ value, label: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][indice] }));
 
 export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, onClose, onCriado, onSalvo }) {
+    const { notificar } = useToast();
     const editando = Boolean(turma);
     const criandoAPartir = Boolean(turmaOrigem);
     const base = turma ?? turmaOrigem;
@@ -42,7 +44,6 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
         ano_letivo_id: criandoAPartir ? '' : String(turma?.ano_letivo_id ?? ''),
     }));
     const [erros, setErros] = useState({});
-    const [erroEnvio, setErroEnvio] = useState('');
     const [profissionais, setProfissionais] = useState({ status: 'carregando', dados: [] });
     const [calendarios, setCalendarios] = useState({ status: 'carregando', dados: [] });
     const [salas, setSalas] = useState({ status: 'carregando', dados: [] });
@@ -126,7 +127,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
     const regular = formulario.tipo === 'REGULAR';
     const carregandoAlunos = !candidatos || candidatos.turno !== formulario.turno || candidatos.tentativa !== tentativa;
     const excedeuVagas = formulario.capacidade_maxima !== '' && selecionados.length > Number(formulario.capacidade_maxima);
-    const cargosPermitidos = regular ? ['professor', 'auxiliar'] : ['professor', 'oficineiro'];
+    const cargosPermitidos = ['professor', 'auxiliar'];
     const elegiveis = profissionais.dados.filter((profissional) => (editando && profissional.id === profissionalInicial)
         || (profissional.status_geral === 'ATIVO' && cargosPermitidos.includes(profissional.funcao?.trim().toLocaleLowerCase('pt-BR'))));
     const faixa = faixasOficina.find((opcao) => opcao.value === formulario.horario);
@@ -167,7 +168,6 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
         if (campo === 'tipo' && valor === formulario.tipo) return;
         setFormulario((atual) => ({ ...atual, [campo]: valor, ...(campo === 'tipo' ? { profissional_id: '' } : {}) }));
         setErros((atuais) => campo === 'tipo' ? {} : { ...atuais, [campo]: undefined });
-        setErroEnvio('');
         if (criandoAPartir && campo === 'turno' && valor !== formulario.turno) {
             setSelecionados([]);
             setBloqueados([]);
@@ -177,7 +177,6 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
     function alternarAluno(id) {
         setSelecionados((atuais) => atuais.includes(id) ? atuais.filter((atual) => atual !== id) : [...atuais, id]);
         setBloqueados((atuais) => atuais.filter((atual) => atual !== id));
-        setErroEnvio('');
     }
 
     function alternarBloqueio(id) {
@@ -208,11 +207,10 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
         }
         if (!profissionalValido || profissionais.status !== 'sucesso') novosErros.profissional_id = 'Selecione um profissional com função compatível.';
         if (editando && infoEdicao?.status !== 'sucesso') {
-            setErroEnvio('Aguarde a consulta das restrições da turma ou tente novamente.');
+            notificar('Aguarde a consulta das restrições da turma ou tente novamente.');
             return;
         }
         setErros(novosErros);
-        setErroEnvio('');
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
             if (criandoAPartir) setAba('dados');
@@ -253,7 +251,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
             setErros(errosCampos);
             if (criandoAPartir && Object.keys(errosCampos).some((campo) => campo !== 'alunos_ids')) setAba('dados');
             if (criandoAPartir && error.response?.status === 409) setTentativa((atual) => atual + 1);
-            setErroEnvio(error.response?.data?.erro || `Não foi possível ${editando ? 'editar' : 'cadastrar'}. Verifique os dados e tente novamente.`);
+            if (!Object.keys(errosCampos).length || errosCampos.alunos_ids) notificar(error.response?.data?.erro || errosCampos.alunos_ids || `Não foi possível ${editando ? 'editar' : 'cadastrar'}. Verifique os dados e tente novamente.`);
         } finally {
             envioEmAndamento.current = false;
             setEnviando(false);
@@ -357,17 +355,16 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                             value={formulario.descricao} onChange={(event) => atualizarCampo('descricao', event.target.value)} {...acessibilidadeCampo('descricao')} />
                         {erroCampo('descricao')}
                     </div>
-                    <SeletorProfissional key={formulario.tipo} tipo={formulario.tipo} profissionais={elegiveis} value={formulario.profissional_id}
+                    <SeletorProfissional key={formulario.tipo} profissionais={elegiveis} value={formulario.profissional_id}
                         onChange={(valor) => atualizarCampo('profissional_id', valor)} carregando={profissionais.status === 'carregando'}
                         erroCarga={profissionais.erro} onTentarNovamente={tentarNovamente} error={erros.profissional_id} />
                     {criandoAPartir && profissionais.status === 'sucesso' && !profissionalValido && <p role="alert" className="mb-md text-sm text-amber-800">O profissional da turma anterior não está disponível. Selecione um profissional ativo com função compatível.</p>}
                     </div>
                     {criandoAPartir && <div id="turma-nova-alunos" data-testid="turma-nova-alunos" role="tabpanel" aria-labelledby="turma-nova-aba-alunos" hidden={aba !== 'alunos'}>
                         <RevisaoAlunosTurma alunos={carregandoAlunos ? [] : candidatos.dados} selecionados={selecionados} bloqueados={bloqueados} capacidade={formulario.capacidade_maxima}
-                            onSelecionar={alternarAluno} onBloquear={alternarBloqueio} onSortear={(ids) => { setSelecionados(ids); setErroEnvio(''); }} disabled={enviando}
+                            onSelecionar={alternarAluno} onBloquear={alternarBloqueio} onSortear={(ids) => { setSelecionados(ids); }} disabled={enviando}
                             carregando={carregandoAlunos} erro={!carregandoAlunos && candidatos.erro} onTentarNovamente={() => setTentativa((atual) => atual + 1)} />
                     </div>}
-                    {erroEnvio && <p role="alert" className="mt-md rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}
                 </fieldset>
             </form>
         </Modal>

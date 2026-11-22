@@ -69,7 +69,7 @@ for (const turno of ['MANHA', 'TARDE']) {
 for (const [turno, inicio, fim] of [['MANHA', '08:15', '09:15'], ['MANHA', '09:45', '11:00'],
     ['TARDE', '13:30', '14:45'], ['TARDE', '15:15', '16:30']]) {
     test(`oficina aceita ${inicio}–${fim}, sem ano letivo, e elimina dias duplicados`, async (t) => {
-        simularTransacao(t, { cargo: 'Oficineiro' });
+        simularTransacao(t, { cargo: 'Professor' });
         const turma = await criarTurmaService({ ...oficina, turno, hora_inicio: inicio, hora_fim: fim,
             dias_semana: [4, 2, 4], ambiente_id: 2, descricao: ' Oficina semanal ' });
         assert.equal(turma.ano_letivo_id, null);
@@ -99,7 +99,14 @@ test('entradas inválidas são recusadas antes da transação', async (t) => {
     ]) await assert.rejects(criarTurmaService(dados), { name: 'ZodError' });
 });
 
-for (const [tipo, cargo] of [['REGULAR', 'Oficineiro'], ['OFICINA', 'Auxiliar'], ['REGULAR', 'Terapeuta']]) {
+for (const cargo of ['Professor', 'Auxiliar']) {
+    test(`oficina aceita ${cargo} como responsável no cadastro`, async (t) => {
+        simularTransacao(t, { cargo });
+        assert.equal((await criarTurmaService(oficina)).profissional_id, oficina.profissional_id);
+    });
+}
+
+for (const [tipo, cargo] of [['REGULAR', 'Cargo inválido'], ['OFICINA', 'Clínico'], ['REGULAR', 'Clínico'], ['OFICINA', 'Outro'], ['REGULAR', 'Outro']]) {
     test(`${tipo} recusa cargo ${cargo} antes de gravar`, async (t) => {
         const estado = simularTransacao(t, { cargo });
         await assert.rejects(criarTurmaService(tipo === 'REGULAR' ? regular : oficina), { statusCode: 400 });
@@ -150,7 +157,11 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
             status: 'ATIVO', created_at: new Date('2026-01-01T00:00:00.000Z'), horarios: [horario] };
         simularConsultaTurma(t, async ({ where, select }) => {
             assert.deepEqual(where, { id: 10, deleted_at: null });
-            assert.deepEqual(select.matriculas.where, { status: 'ATIVO', aluno: { deleted_at: null } });
+            assert.equal(select.matriculas.where.status, 'ATIVO');
+            assert.deepEqual(select.matriculas.where.aluno, { deleted_at: null });
+            assert.deepEqual(select.matriculas.where.OR.map((f) => Object.keys(f)), [['data_fim'], ['data_fim']]);
+            assert.equal(select.matriculas.where.OR[0].data_fim, null);
+            assert.ok(select.matriculas.where.OR[1].data_fim.gte instanceof Date);
             assert.deepEqual(select.matriculas.orderBy, [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }]);
             assert.deepEqual(select.matriculas.select, { aluno: { select: {
                 id: true, dias_frequencia: true, pessoa: { select: { nome: true } }

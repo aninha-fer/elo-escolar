@@ -1,6 +1,7 @@
 const { promisify } = require('node:util');
 const { verificarCredenciais, removerVersao, trocarSenhaInicial } = require('../services/authService');
 const { trocarSenhaInicialDTO } = require('../dtos/authDTO');
+const { registrarAtividade, encerrarSessao } = require('../services/sessaoService');
 
 async function login(req, res) {
   if (!req.session) {
@@ -17,6 +18,7 @@ async function login(req, res) {
 
   req.session.usuarioId = usuario.id;
   req.session.autenticadoEm = Date.now();
+  req.session.ultimaAtividadeEm = req.session.autenticadoEm;
   req.session.senha_versao = usuario.senha_versao;
 
   await promisify(req.session.save).call(req.session);
@@ -26,6 +28,16 @@ async function login(req, res) {
 
 function me(req, res) {
   return res.status(200).json(removerVersao(req.usuario));
+}
+
+async function atividade(req, res) {
+  try {
+    // Não alterar req.session: o save automático usa upsert e poderia desfazer um logout.
+    if (!await registrarAtividade(req.sessionID, req.session)) return encerrarSessao(req, res);
+    return res.status(204).end();
+  } catch {
+    return res.status(503).json({ erro: 'Não foi possível registrar a atividade. Tente novamente.' });
+  }
 }
 
 async function logout(req, res) {
@@ -49,6 +61,7 @@ async function alterarSenhaInicial(req, res) {
     await promisify(req.session.regenerate).call(req.session);
     req.session.usuarioId = usuario.id;
     req.session.autenticadoEm = Date.now();
+    req.session.ultimaAtividadeEm = req.session.autenticadoEm;
     req.session.senha_versao = usuario.senha_versao;
     await promisify(req.session.save).call(req.session);
   } catch {
@@ -59,4 +72,4 @@ async function alterarSenhaInicial(req, res) {
   return res.status(200).json(removerVersao(usuario));
 }
 
-module.exports = { login, me, logout, alterarSenhaInicial };
+module.exports = { login, me, logout, alterarSenhaInicial, atividade };

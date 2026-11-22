@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
@@ -7,19 +8,34 @@ import { profissionaisService } from '../../services/profissionaisService';
 import { TabelaProfissionais } from './TabelaProfissionais';
 import { FormularioProfissional } from './FormularioProfissional';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
+import { FiltroEstado } from '../../components/FiltroEstado';
+
+function VinculosProfissional({ conflitos }) {
+    const turmas = conflitos.filter((item) => item.codigo === 'TURMA_VINCULADA' && item.turma_nome);
+    const atendimentos = conflitos.filter((item) => item.codigo === 'ATENDIMENTO_VINCULADO' && item.modalidade && item.aluno_nome);
+    const restantes = conflitos.filter((item) => !turmas.includes(item) && !atendimentos.includes(item));
+
+    return <>
+        {turmas.length > 0 && <span className="mt-xs block">Responsável pela(s) turma(s): {turmas.map((item) => item.turma_nome).join(', ')}.</span>}
+        {atendimentos.length > 0 && <span className="mt-xs block">Responsável pelo(s) atendimento(s): {atendimentos.map((item) => `${item.modalidade} (${item.aluno_nome})`).join(', ')}.</span>}
+        {restantes.map((item, indice) => <span key={indice} className="mt-xs block">{item.mensagem}</span>)}
+    </>;
+}
 
 export function Profissionais() {
+    const { notificar } = useToast();
     const [tentativa, setTentativa] = useState(0);
     const [busca, setBusca] = useState('');
     const [modalAberto, setModalAberto] = useState(false);
-    const [aviso, setAviso] = useState('');
     const [operacao, setOperacao] = useState(null);
     const [alterandoStatus, setAlterandoStatus] = useState(false);
     const [erroStatus, setErroStatus] = useState('');
     const [conflitos, setConflitos] = useState([]);
     const envioStatusEmAndamento = useRef(false);
 
-    const listagem = useListagemInfinita(profissionaisService.listarPaginados, { busca }, tentativa);
+    const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
+    const listagem = useListagemInfinita(profissionaisService.listarPaginados, { busca, status: statusSelecionado }, tentativa);    
+    const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     const { itens: profissionais, carregando, erro } = listagem;
 
     function tentarNovamente() {
@@ -29,11 +45,10 @@ export function Profissionais() {
     function profissionalCriado() {
         setTentativa((atual) => atual + 1);
         setModalAberto(false);
-        setAviso('Profissional cadastrado com sucesso.');
+        notificar('Profissional cadastrado com sucesso.', 'sucesso');
     }
 
     function abrirOperacao(tipo, profissional) {
-        setAviso('');
         setErroStatus('');
         setConflitos([]);
         setOperacao({ tipo, profissional });
@@ -42,7 +57,7 @@ export function Profissionais() {
     function profissionalAtualizado(profissional, mensagem) {
         setTentativa((atual) => atual + 1);
         setOperacao(null);
-        setAviso(mensagem);
+        notificar(mensagem, 'sucesso');
     }
 
     function fecharConfirmacao() {
@@ -60,7 +75,9 @@ export function Profissionais() {
             const atualizado = await profissionaisService.editar(operacao.profissional.id, { status_geral: ativando ? 'ATIVO' : 'INATIVO' });
             profissionalAtualizado(atualizado, ativando ? 'Profissional ativado com sucesso.' : 'Profissional inativado com sucesso.');
         } catch (error) {
-            setErroStatus(error.response?.data?.erro || 'Não foi possível alterar o status do profissional. Tente novamente.');
+            const mensagemErro = error.response?.data?.erro || 'Não foi possível alterar o status do profissional. Tente novamente.';
+            if (error.response?.data?.conflitos?.length) setErroStatus(mensagemErro);
+            else notificar(mensagemErro);
             setConflitos(error.response?.data?.conflitos ?? []);
         } finally {
             envioStatusEmAndamento.current = false;
@@ -78,9 +95,11 @@ export function Profissionais() {
             await profissionaisService.excluir(operacao.profissional.id);
             setTentativa((atual) => atual + 1);
             setOperacao(null);
-            setAviso('Profissional excluído com sucesso.');
+            notificar('Profissional excluído com sucesso.', 'sucesso');
         } catch (error) {
-            setErroStatus(error.response?.data?.erro || 'Não foi possível excluir o profissional. Tente novamente.');
+            const mensagemErro = error.response?.data?.erro || 'Não foi possível excluir o profissional. Tente novamente.';
+            if (error.response?.data?.conflitos?.length) setErroStatus(mensagemErro);
+            else notificar(mensagemErro);
             setConflitos(error.response?.data?.conflitos ?? []);
         } finally { envioStatusEmAndamento.current = false; setAlterandoStatus(false); }
     }
@@ -88,6 +107,35 @@ export function Profissionais() {
     return (
         <section className="profissionais-page flex min-w-0 flex-col gap-lg" aria-labelledby="profissionais-titulo">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Profissionais</h1>
+            <div className="flex w-full  flex-col gap-sm sm:flex-row sm:items-stretch">
+                <FiltroEstado data-testid="profissionais-filtro-ativo"
+                    count={contagemStatus.ATIVO}
+                    tipo="ATIVO"
+                    isSelecionado={statusSelecionado === 'ATIVO'}
+                    aria-pressed={statusSelecionado === 'ATIVO'}
+                    onClick={() => setStatusSelecionado('ATIVO')}
+                >
+                    Ativos
+                </FiltroEstado>
+                <FiltroEstado data-testid="profissionais-filtro-inativo"
+                    count={contagemStatus.INATIVO}
+                    tipo="INATIVO"
+                    isSelecionado={statusSelecionado === 'INATIVO'}
+                    aria-pressed={statusSelecionado === 'INATIVO'}
+                    onClick={() => setStatusSelecionado('INATIVO')}
+                >
+                    Inativos
+                </FiltroEstado>
+                <FiltroEstado data-testid="profissionais-filtro-todos"
+                    count={contagemStatus.TODOS}
+                    tipo="TODOS"
+                    isSelecionado={statusSelecionado === 'TODOS'}
+                    aria-pressed={statusSelecionado === 'TODOS'}
+                    onClick={() => setStatusSelecionado('TODOS')}
+                >
+                    Todos
+                </FiltroEstado>
+            </div>
             <div className="flex flex-col gap-sm sm:flex-row sm:items-start">
                 <Input data-testid="profissionais-busca" id="busca-profissional" placeholder="Buscar por nome..." aria-label="Buscar profissional por nome"
                     wrapperClassName="mb-0! min-w-0" inputClassName="h-11" value={busca} onChange={(event) => setBusca(event.target.value)}
@@ -97,12 +145,11 @@ export function Profissionais() {
                         </svg>
                     } />
                 <Button data-testid="profissionais-novo" type="button" className="novo-profissional disabled:cursor-not-allowed disabled:opacity-50" disabled={carregando || Boolean(erro)}
-                    onClick={() => { setAviso(''); setModalAberto(true); }}>
+                    onClick={() => { setModalAberto(true); }}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
                     Novo Profissional
                 </Button>
             </div>
-            {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
             {carregando ? <p role="status">Carregando profissionais...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
@@ -120,7 +167,7 @@ export function Profissionais() {
                 onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus}
                 description={<>Deseja excluir o funcionário <strong>{operacao.profissional.nome}</strong>? Essa ação não pode ser desfeita.
                     {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}
-                        {conflitos.map((conflito, indice) => <span key={indice} className="mt-xs block">{conflito.mensagem}</span>)}
+                        <VinculosProfissional conflitos={conflitos} />
                     </span>}
                 </>} />}
             {operacao?.tipo === 'status' && <ModalConfirmacao testId="profissional-alterar-status" isOpen onClose={fecharConfirmacao} showCancel
@@ -128,10 +175,10 @@ export function Profissionais() {
                 title={operacao.profissional.status_geral === 'INATIVO' ? 'Ativar profissional?' : 'Inativar profissional?'}
                 description={<>
                     Deseja {operacao.profissional.status_geral === 'INATIVO' ? 'ativar' : 'inativar'} o profissional <strong>{operacao.profissional.nome}</strong>?
-                    {' '}O status da usuário vinculado também será atualizado, se houver.
+                    {' '}O status do usuário vinculado também será atualizado, se houver.
                     {operacao.profissional.status_geral !== 'INATIVO'}
                     {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}
-                        {conflitos.map((conflito, indice) => <span key={indice} className="mt-xs block">{conflito.mensagem}</span>)}
+                        <VinculosProfissional conflitos={conflitos} />
                     </span>}
                 </>}
                 confirmText={operacao.profissional.status_geral === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}

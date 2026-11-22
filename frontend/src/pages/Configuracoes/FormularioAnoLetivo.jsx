@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
@@ -7,6 +8,7 @@ import { anosLetivosService } from '../../services/anosLetivosService';
 import { hojeInstituicao } from '../../utils/anoLetivo';
 
 export function FormularioAnoLetivo({ calendario, onSalvo }) {
+    const { notificar } = useToast();
     const [dados, setDados] = useState(() => ({ ano: calendario?.ano ?? Number(hojeInstituicao().slice(0, 4)),
         data_inicio: calendario?.data_inicio.slice(0, 10) ?? '', data_fim: calendario?.data_fim.slice(0, 10) ?? '' }));
     const [erros, setErros] = useState({});
@@ -36,6 +38,7 @@ export function FormularioAnoLetivo({ calendario, onSalvo }) {
             else await anosLetivosService.criar(entrada);
             setConfirmacao(null);
             if (!calendario) setDados({ ano: Number(hoje.slice(0, 4)), data_inicio: '', data_fim: '' });
+            notificar(calendario ? 'Calendário atualizado com sucesso.' : 'Calendário cadastrado com sucesso.', 'sucesso');
             onSalvo();
         } catch (error) {
             const resposta = error.response?.data;
@@ -43,7 +46,8 @@ export function FormularioAnoLetivo({ calendario, onSalvo }) {
             else {
                 setConfirmacao(null);
                 if (resposta?.erros) setErros(Object.fromEntries(resposta.erros.map((e) => [e.path[0], e.message])));
-                else setErro({ mensagem: resposta?.erro || 'Não foi possível salvar o calendário.', conflitos: resposta?.conflitos });
+                else if (resposta?.conflitos?.length) setErro({ mensagem: resposta?.erro || 'Não foi possível salvar o calendário.', conflitos: resposta.conflitos });
+                else notificar(resposta?.erro || 'Não foi possível salvar o calendário.');
             }
         } finally { envio.current = false; setEnviando(false); }
     }

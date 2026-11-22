@@ -11,9 +11,9 @@ export function AlunosVinculados({ alunos = [], total = alunos.length, capacidad
                         ({capacidade == null ? `${total} alunos · sem limite de vagas` : `${total} / ${capacidade} vagas`})
                     </span>
                 </h2>
-                {/* {podeVincular && <Button type="button" onClick={onVincular}>
+                {podeVincular && <Button type="button" onClick={onVincular}>
                     <span aria-hidden="true">＋</span> Vincular Aluno
-                </Button>} */}
+                </Button>}
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-sm">

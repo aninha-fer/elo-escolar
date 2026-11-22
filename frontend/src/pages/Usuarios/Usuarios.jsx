@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
@@ -10,19 +11,21 @@ import { EditarUsuario } from './EditarUsuario';
 import { ResetarSenhaUsuario } from './ResetarSenhaUsuario';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 import { useAuth } from '../../contexts/AuthContext';
+import { FiltroEstado } from '../../components/FiltroEstado';
 
 export function Usuarios() {
+    const { notificar } = useToast();
     const { usuario: usuarioAtual, recarregarSessao } = useAuth();
     const [tentativa, setTentativa] = useState(0);
     const [modalAberto, setModalAberto] = useState(false);
     const [termoBusca, setTermoBusca] = useState('');
-    const [aviso, setAviso] = useState('');
     const [operacao, setOperacao] = useState(null);
     const [alterandoStatus, setAlterandoStatus] = useState(false);
-    const [erroStatus, setErroStatus] = useState('');
     const envioStatusEmAndamento = useRef(false);
 
-    const listagem = useListagemInfinita(usuariosService.listarPaginados, { busca: termoBusca }, tentativa);
+    const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
+    const listagem = useListagemInfinita(usuariosService.listarPaginados, { busca: termoBusca, status: statusSelecionado }, tentativa);
+    const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     const { itens: usuarios, carregando, erro } = listagem;
 
     function tentarNovamente() {
@@ -32,19 +35,17 @@ export function Usuarios() {
     function usuarioCriado() {
         setTentativa((atual) => atual + 1);
         setModalAberto(false);
-        setAviso('Usuário criado com sucesso.');
+        notificar('Usuário criado com sucesso.', 'sucesso');
     }
 
     function abrirOperacao(tipo, usuario) {
-        setAviso('');
-        setErroStatus('');
         setOperacao({ tipo, usuario });
     }
 
     function usuarioAtualizado(usuario, mensagem) {
         setTentativa((atual) => atual + 1);
         setOperacao(null);
-        setAviso(mensagem);
+        notificar(mensagem, 'sucesso');
         if (usuario.id === usuarioAtual.id) recarregarSessao();
     }
 
@@ -57,12 +58,11 @@ export function Usuarios() {
         const ativando = operacao.usuario.status === 'INATIVO';
         envioStatusEmAndamento.current = true;
         setAlterandoStatus(true);
-        setErroStatus('');
         try {
             const atualizado = await usuariosService.editar(operacao.usuario.id, { status: ativando ? 'ATIVO' : 'INATIVO' });
             usuarioAtualizado(atualizado, ativando ? 'Usuário ativado com sucesso.' : 'Usuário inativado com sucesso.');
         } catch (error) {
-            setErroStatus(error.response?.data?.erro || 'Não foi possível alterar o status do usuário. Tente novamente.');
+            notificar(error.response?.data?.erro || 'Não foi possível alterar o status do usuário. Tente novamente.');
         } finally {
             envioStatusEmAndamento.current = false;
             setAlterandoStatus(false);
@@ -73,15 +73,14 @@ export function Usuarios() {
         if (envioStatusEmAndamento.current || operacao?.tipo !== 'excluir') return;
         envioStatusEmAndamento.current = true;
         setAlterandoStatus(true);
-        setErroStatus('');
         try {
             await usuariosService.excluir(operacao.usuario.id);
             setTentativa((atual) => atual + 1);
             setOperacao(null);
-            setAviso('Usuário excluído com sucesso.');
+            notificar('Usuário excluído com sucesso.', 'sucesso');
             if (operacao.usuario.id === usuarioAtual.id) await recarregarSessao();
         } catch (error) {
-            setErroStatus(error.response?.data?.erro || 'Não foi possível excluir o usuário. Tente novamente.');
+            notificar(error.response?.data?.erro || 'Não foi possível excluir o usuário. Tente novamente.');
         } finally {
             envioStatusEmAndamento.current = false;
             setAlterandoStatus(false);
@@ -91,6 +90,35 @@ export function Usuarios() {
     return (
         <div className="flex min-w-0 flex-col gap-lg">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Usuários</h1>
+            <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
+                <FiltroEstado data-testid="turmas-filtro-ativo"
+                    count={contagemStatus.ATIVO}
+                    tipo="ATIVO"
+                    isSelecionado={statusSelecionado === 'ATIVO'}
+                    aria-pressed={statusSelecionado === 'ATIVO'}
+                    onClick={() => setStatusSelecionado('ATIVO')}
+                >
+                    Ativas
+                </FiltroEstado>
+                <FiltroEstado data-testid="turmas-filtro-inativo"
+                    count={contagemStatus.INATIVO}
+                    tipo="INATIVO"
+                    isSelecionado={statusSelecionado === 'INATIVO'}
+                    aria-pressed={statusSelecionado === 'INATIVO'}
+                    onClick={() => setStatusSelecionado('INATIVO')}
+                >
+                    Inativas
+                </FiltroEstado>
+                <FiltroEstado data-testid="turmas-filtro-todos"
+                    count={contagemStatus.TODOS}
+                    tipo="TODOS"
+                    isSelecionado={statusSelecionado === 'TODOS'}
+                    aria-pressed={statusSelecionado === 'TODOS'}
+                    onClick={() => setStatusSelecionado('TODOS')}
+                >
+                    Todos
+                </FiltroEstado>
+            </div>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
                 <Input data-testid="usuarios-busca" placeholder="Pesquisar por nome ou e-mail..." aria-label="Pesquisar por nome ou e-mail"
                     value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)}
@@ -108,7 +136,6 @@ export function Usuarios() {
                     Novo Usuário
                 </Button>
             </div>
-            {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
             {carregando ? <p role="status">Carregando usuários...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
@@ -132,7 +159,6 @@ export function Usuarios() {
                     {operacao.usuario.status === 'INATIVO'
                         ? <>Deseja ativar o usuário <strong>{operacao.usuario.nome}</strong>?</>
                         : <>Deseja inativar o usuário <strong>{operacao.usuario.nome}</strong>? Ele perderá o acesso ao sistema.</>}
-                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}</span>}
                 </>}
                 confirmText={operacao.usuario.status === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}
                 onConfirm={confirmarStatus} isConfirmLoading={alterandoStatus} />}
@@ -140,7 +166,6 @@ export function Usuarios() {
                 estado="atencao" showCancel title="Excluir usuário?"
                 description={<>
                     Deseja excluir o usuário <strong>{operacao.usuario.nome}</strong>? Essa ação não pode ser desfeita.
-                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}</span>}
                 </>}
                 confirmText="Confirmar exclusão" onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus} />}
         </div>

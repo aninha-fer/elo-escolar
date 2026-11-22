@@ -16,7 +16,7 @@ const inteiroPositivoDTO = z.preprocess(
 const criarAtendimentoDTO = z.object({
   aluno_id: inteiroPositivoDTO,
   profissional_id: inteiroPositivoDTO,
-  modalidade: z.string().trim().min(1, 'A modalidade é obrigatória.'),
+  modalidade_id: inteiroPositivoDTO,
   tipo_recorrencia: z.enum(['EVENTUAL', 'SEMANAL', 'MENSAL']),
   data_inicio: dataDTO,
   hora_inicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'A hora deve estar no formato HH:mm.'),
@@ -70,7 +70,7 @@ const removerAtendimentoProvisorioDTO = z.object({
 
 const editarAtendimentoDTO = z.object({
   profissional_id: z.number().int().positive(),
-  modalidade: z.string().trim().min(1, 'Informe a modalidade.'),
+  modalidade_id: z.number().int().positive(),
   tipo_recorrencia: z.enum(['EVENTUAL', 'SEMANAL', 'MENSAL']),
   data_inicio: dataDTO,
   hora_inicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Informe um horário válido.'),

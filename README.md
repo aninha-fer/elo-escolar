@@ -160,3 +160,55 @@ e remove `nome_responsavel` e `telefone_responsavel` sem transferir os dados
 fictícios antigos. Os timestamps novos seguem o padrão existente (`DateTime`,
 `created_at` com `@default(now())` e `updated_at` com `@updatedAt`). A tabela de
 ocorrências não faz parte desta entrega.
+
+## Expiração da sessão
+
+A sessão expira após 60 minutos sem atividade reconhecida pelo servidor, com
+limite absoluto de oito horas. Login e troca inicial de senha iniciam ambos os
+prazos. Sessões antigas sem `ultimaAtividadeEm` exigem novo login após a atualização;
+não há alteração no schema do banco.
+
+O frontend registra interações reais em documentos visíveis, no máximo uma vez
+por minuto por aba, em `POST /api/auth/atividade`. Consultas automáticas e a
+verificação periódica de `/api/auth/me` não renovam a atividade. Abas compartilham
+a sessão pelo cookie; nenhuma aba encerra a sessão apenas pelo próprio relógio.
+A retomada verifica o servidor antes de renovar, e sinais pendentes de atividade
+são descartados após 60 segundos.
+
+Os testes de sessão e conexão usam relógio controlado. Em `backend`, `npm test`
+inclui os testes HTTP de expiração e concorrência com logout. Para executar também
+o teste de atualização atômica no PostgreSQL configurado no `.env`, use no PowerShell:
+
+```powershell
+$env:TESTAR_SESSAO_POSTGRES = '1'
+node --test src/services/sessaoService.test.js
+Remove-Item Env:TESTAR_SESSAO_POSTGRES
+```
+
+Esse teste usa somente tabelas temporárias, removidas ao final da transação,
+sem modificar registros do sistema. Em `frontend`, execute os testes do monitor
+e da conexão com `node --test src/services/*.test.js`.
+
+## Vigência das matrículas
+
+Matrículas `ATIVO` com `data_fim` anterior ao dia atual em `America/Sao_Paulo`
+não ocupam vagas, não aparecem nos vínculos atuais e não impedem novas matrículas,
+troca de turno, redução de frequência ou ativação de rascunhos. O término é inclusivo:
+uma matrícula com término hoje permanece vigente até a virada do dia. Matrículas
+com início futuro continuam reservando vagas. Provisórias só participam do planejamento
+enquanto não possuem `data_fim`, sem ocupar vagas efetivas.
+
+O critério vale também para paginação, candidatos a nova turma, capacidade e diário.
+A reinscrição cria outro registro; a agenda histórica preserva a matrícula anterior.
+No encerramento da turma, vencidas não entram na confirmação de cancelamentos e
+suas datas anteriores são preservadas. A sincronização de turmas regulares cujo ano
+letivo terminou continua sob demanda.
+
+O teste de paginação no PostgreSQL usa tabelas temporárias, sem alterar os registros
+do sistema. Para executá-lo em `backend`, com o banco configurado no `.env`:
+
+```powershell
+$env:TESTAR_MATRICULAS_POSTGRES = '1'
+node --test src/services/paginacaoService.test.js
+Remove-Item Env:TESTAR_MATRICULAS_POSTGRES
+```

@@ -4,7 +4,7 @@ import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/f
 import EditIcon from '../../components/icons/EditIcon';
 import { TrashIcon } from '../../components/icons/TrashIcon';
 
-export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, alterandoStatus = false }) {
+export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, alterandoStatus = false, semBorda = false, podeEditar = false }) {
     const navigate = useNavigate();
 
     const estilosStatus = {
@@ -37,7 +37,7 @@ export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, 
     }
 
     return (
-        <div className="w-full overflow-x-auto rounded-md border border-slate-200 bg-bg-surface shadow-sm">
+        <div className={`w-full overflow-x-auto bg-bg-surface ${semBorda ? '' : 'rounded-md border border-slate-200 shadow-sm'}`}>
             <table className="w-max min-w-full table-auto border-collapse text-left">
                 <thead className="bg-bg-main text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <tr>
@@ -45,13 +45,13 @@ export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, 
                         <th scope="col" className="px-6 py-4">Turma</th>
                         <th scope="col" className="px-6 py-4">Período / Frequência</th>
                         <th scope="col" className="px-6 py-4">Status</th>
-                        <th scope="col" className="px-6 py-4 text-right">Ações</th>
+                        {podeEditar && <th scope="col" className="px-6 py-4 text-right">Ações</th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                     {alunos.length === 0 ? (
                         <tr>
-                            <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">
+                            <td colSpan={podeEditar ? 5 : 4} className="px-6 py-10 text-center text-sm text-slate-500">
                                 Nenhum aluno encontrado.
                             </td>
                         </tr>
@@ -111,7 +111,7 @@ export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, 
                                         {formatarStatus(status)}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                {podeEditar && <td className="px-6 py-4 text-right">
                                     {(onAcao || onAlterarStatus || onExcluir) && <div className="inline-flex" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                                         <BotaoAcoes testId={`aluno-${aluno.id}-acoes`} label={`Ações para ${nome}`} disabled={alterandoStatus} options={[
                                             { id: 'editar', label: 'Editar', disabled: !onAcao, onClick: () => onAcao?.(aluno), icon: <EditIcon /> },
@@ -121,7 +121,7 @@ export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, 
                                                 disabled: !onExcluir, onClick: () => onExcluir?.(aluno) },
                                         ]} />
                                     </div>}
-                                </td>
+                                </td>}
                             </tr>
                         );
                     })}

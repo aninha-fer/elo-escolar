@@ -20,11 +20,11 @@ export function FiltroEstado({ children, count, tipo, isSelecionado, className =
         ? BUTTON_ACTIVE_STYLES[tipo]
         : BUTTON_DEFAULT_STYLE;
 
-    const baseStyles = 'flex cursor-pointer h-18 w-full min-w-0 items-center justify-start gap-4 rounded-sm border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:flex-1';
+    const baseStyles = 'flex cursor-pointer h-fill w-full min-w-0 items-center justify-start gap-4 rounded-sm border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:flex-1';
 
     return (
         <button type="button" className={`${baseStyles} ${buttonVariantClass} ${className}`} {...props}>
-            <span className={`flex size-10 shrink-0 items-center justify-center rounded-sm text-[20px] font-bold ${SPAN_STYLES[tipo]}`}>
+            <span className={`flex size-9 shrink-0 items-center justify-center rounded-sm text-[18px] font-bold ${SPAN_STYLES[tipo]}`}>
                 {count}
             </span>
             <span className="text-[14px] font-semibold text-text-main">

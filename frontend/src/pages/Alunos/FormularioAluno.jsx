@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
@@ -28,6 +29,7 @@ const formularioInicial = {
 };
 
 export function FormularioAluno({ aluno, onClose, onSalvo }) {
+    const { notificar } = useToast();
     const editando = Boolean(aluno);
     const turmaAtual = aluno?.turma_regular;
     const [formulario, setFormulario] = useState(() => aluno ? {
@@ -68,8 +70,6 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
         }));
         limparErros(campo, ...(campo === 'turno' ? ['turma_id'] : []));
     }
-
-
 
     function adicionarResponsavel() {
         const chave = sequenciaResponsavel.current--;
@@ -219,6 +219,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                 };
                 await alunoService.editar(aluno.id, dados);
             } else await alunoService.criarAluno(dadosAluno);
+            notificar(editando ? 'Aluno atualizado com sucesso.' : status === 'RASCUNHO' ? 'Rascunho salvo com sucesso.' : 'Aluno cadastrado com sucesso.', 'sucesso');
             onSalvo();
         } catch (err) {
             if (err.response?.data?.confirmacao) {
@@ -245,7 +246,9 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
             }
             setErros(errosCampos);
             focarPrimeiroErro(errosCampos);
-            setSubmitError(err.response?.data?.erro || mensagensGerais.join(' ') || (Object.keys(errosCampos).length ? '' : 'Não foi possível salvar o aluno.'));
+            const mensagemErro = err.response?.data?.erro || mensagensGerais.join(' ') || (Object.keys(errosCampos).length ? '' : 'Não foi possível salvar o aluno.');
+            if (err.response?.data?.conflitos?.length) setSubmitError(mensagemErro);
+            else if (!Object.keys(errosCampos).length || mensagensGerais.length) notificar(mensagemErro);
         } finally {
             enviando.current = false;
             setIsSubmitting(false);
@@ -299,7 +302,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             name="telefone"
                             type="tel"
                             label="Telefone"
-                            placeholder="(11) 1 1111-1111"
+                            placeholder="(00) 0 0000-0000"
                             value={formulario.telefone}
                             onChange={(event) => atualizarCampo('telefone', event.target.value)}
                             {...acessibilidadeCampo('telefone')} />))}
@@ -337,7 +340,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                                     label="Parentesco" placeholder="Ex: Mãe" maxLength={30}
                                     value={responsavel.parentesco} onChange={(event) => atualizarResponsavel(responsavel.chave, 'parentesco', event.target.value)} {...acessibilidadeCampo(`responsaveis.${responsavel.chave}.parentesco`)} />))}
                                 {campoComErro(`responsaveis.${responsavel.chave}.telefone`, (<Input data-testid={`aluno-formulario-responsavel-${responsavel.chave}-telefone`} id={`responsavel-${responsavel.chave}-telefone`} name={`responsaveis.${responsavel.chave}.telefone`}
-                                    label="Telefone" type="tel" placeholder="(11) 99999-9999"
+                                    label="Telefone" type="tel" placeholder="(00) 0 0000-0000"
                                     value={responsavel.telefone} onChange={(event) => atualizarResponsavel(responsavel.chave, 'telefone', event.target.value)} {...acessibilidadeCampo(`responsaveis.${responsavel.chave}.telefone`)} />))}
                             </div>
                             <button data-testid={`aluno-formulario-responsavel-${responsavel.chave}-remover`} type="button" aria-label={`Remover responsável ${indice + 1}`} onClick={() => removerResponsavel(responsavel.chave)}

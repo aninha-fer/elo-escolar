@@ -20,6 +20,7 @@ export function Modal({
   ariaDescribedBy,
   testId,
   dismissible = true,
+  trapFocus = false,
 }) {
   const titleId = useId();
   if (!isOpen) return null;
@@ -33,10 +34,14 @@ export function Modal({
       />
 
       <div data-testid={testId} role="dialog" aria-modal="true" aria-labelledby={ariaLabelledBy ?? (showHeader ? titleId : undefined)} aria-describedby={ariaDescribedBy}
-        onKeyDown={!dismissible ? (event) => {
-          if (event.key === 'Escape') event.preventDefault();
+        onKeyDown={!dismissible || trapFocus ? (event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault(); event.stopPropagation();
+            if (dismissible) onClose?.();
+            return;
+          }
           if (event.key !== 'Tab') return;
-          const campos = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')];
+          const campos = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')];
           const primeiro = campos[0], ultimo = campos.at(-1);
           if (event.shiftKey && document.activeElement === primeiro) { event.preventDefault(); ultimo?.focus(); }
           else if (!event.shiftKey && document.activeElement === ultimo) { event.preventDefault(); primeiro?.focus(); }

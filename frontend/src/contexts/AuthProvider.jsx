@@ -3,6 +3,7 @@ import { AuthContext } from './AuthContext';
 import { api, conexao } from '../services/api';
 import { authService } from '../services/authService';
 import { TelaConexao } from '../components/Conexao/TelaConexao';
+import { useAtividadeSessao } from '../hooks/useAtividadeSessao';
 
 const sessaoCarregando = { status: 'carregando', usuario: null };
 const sessaoAnonima = { status: 'anonimo', usuario: null };
@@ -10,11 +11,13 @@ const sessaoAnonima = { status: 'anonimo', usuario: null };
 export function AuthProvider({ children }) {
   const [sessao, setSessao] = useState(sessaoCarregando);
   const [tentativa, setTentativa] = useState(0);
+  const [autenticando, setAutenticando] = useState(false);
   const [estadoConexao, setEstadoConexao] = useState(conexao.obterEstado);
   const focoAnterior = useRef(null);
   const sobreposicaoVisivel = useRef(false);
   const autenticacaoAtual = useRef(null);
   const montado = useRef(false);
+  useAtividadeSessao(sessao.status === 'autenticado' && !autenticando, conexao.obterVersao());
 
   useEffect(() => {
     montado.current = true;
@@ -98,6 +101,7 @@ export function AuthProvider({ children }) {
   }
 
   function iniciarAutenticacao() {
+    setAutenticando(true);
     autenticacaoAtual.current?.abort();
     autenticacaoAtual.current = new AbortController();
     return { versao: conexao.invalidar(), signal: autenticacaoAtual.current.signal };
@@ -105,8 +109,12 @@ export function AuthProvider({ children }) {
 
   async function entrar(credenciais) {
     const { versao, signal } = iniciarAutenticacao();
-    const usuario = await authService.login(credenciais, signal);
-    if (versao === conexao.obterVersao()) conexao.registrarSessao(usuario, versao);
+    try {
+      const usuario = await authService.login(credenciais, signal);
+      if (versao === conexao.obterVersao()) conexao.registrarSessao(usuario, versao);
+    } finally {
+      if (versao === conexao.obterVersao()) setAutenticando(false);
+    }
   }
 
   async function sair() {
@@ -115,6 +123,8 @@ export function AuthProvider({ children }) {
       await authService.logout(signal);
     } catch (error) {
       if (error.response?.status !== 401 || error.respostaApiValida !== true) throw error;
+    } finally {
+      if (versao === conexao.obterVersao()) setAutenticando(false);
     }
 
     if (versao === conexao.obterVersao()) {
@@ -134,6 +144,8 @@ export function AuthProvider({ children }) {
         setSessao({ ...sessaoAnonima, avisoSessao: error.response?.data?.erro || 'Sessão inválida ou expirada.' });
       }
       throw error;
+    } finally {
+      if (!signal.aborted) setAutenticando(false);
     }
   }
 

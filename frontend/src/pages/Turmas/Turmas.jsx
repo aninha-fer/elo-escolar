@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
@@ -11,20 +12,20 @@ import { TurmaItem } from './TurmaItem';
 import { normalizarProfissionais } from '../../utils/formatters';
 import { FormularioTurma } from './FormularioTurma';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
+import { FiltroEstado } from '../../components/FiltroEstado';
 
 export function Turmas() {
+    const { notificar } = useToast();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const tipoTurma = searchParams.get('tipo') === 'OFICINA' ? 'OFICINA' : 'REGULAR';
     const [tentativa, setTentativa] = useState(0);
     const [termoBusca, setTermoBusca] = useState('');
-    const [aviso, setAviso] = useState('');
     const { usuario } = useAuth();
     const podeEditar = usuario?.role === 'admin';
     const [modalAberto, setModalAberto] = useState(false);
     const [operacao, setOperacao] = useState(null);
     const [alterandoStatus, setAlterandoStatus] = useState(false);
-    const [erroStatus, setErroStatus] = useState('');
     const envioStatusEmAndamento = useRef(false);
 
     useEffect(() => {
@@ -40,13 +41,14 @@ export function Turmas() {
     }, []);
 
 
-    const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca }, tentativa);
+    const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
+    const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca, status: statusSelecionado }, tentativa);
+    const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     const { carregando, erro } = listagem;
     const filtrados = listagem.itens.map((turma) => ({ ...turma, profissionais: normalizarProfissionais(turma) }));
 
     function trocarTipo(tipo) {
         setTipoTurma(tipo);
-        setAviso('');
     }
 
     function setTipoTurma(tipo) {
@@ -66,12 +68,10 @@ export function Turmas() {
         setTentativa((atual) => atual + 1);
         setTermoBusca('');
         setModalAberto(false);
-        setAviso(turma.tipo === 'REGULAR' ? 'Turma cadastrada com sucesso.' : 'Oficina cadastrada com sucesso.');
+        notificar(turma.tipo === 'REGULAR' ? 'Turma cadastrada com sucesso.' : 'Oficina cadastrada com sucesso.', 'sucesso');
     }
 
     async function abrirOperacao(tipo, turma) {
-        setAviso('');
-        setErroStatus('');
         setOperacao({ tipo, turma });
         if (tipo === 'editar' || tipo === 'nova-a-partir' || (tipo === 'status' && turma.status === 'INATIVO')) return;
         envioStatusEmAndamento.current = true;
@@ -80,7 +80,7 @@ export function Turmas() {
             const atual = await turmasService.buscarPorId(turma.id);
             setOperacao({ tipo, turma: { ...turma, ...atual }, confirmacao: atual.confirmacao_cancelamentos });
         } catch (error) {
-            setErroStatus(error.response?.data?.erro || 'Não foi possível consultar as matrículas. Feche e tente novamente.');
+            notificar(error.response?.data?.erro || 'Não foi possível consultar as matrículas. Feche e tente novamente.');
         } finally {
             envioStatusEmAndamento.current = false;
             setAlterandoStatus(false);
@@ -91,7 +91,7 @@ export function Turmas() {
         setTipoTurma(turma.tipo);
         setOperacao(null);
         setTentativa((atual) => atual + 1);
-        setAviso(mensagem);
+        notificar(mensagem, 'sucesso');
     }
 
     function fecharConfirmacao() {
@@ -103,14 +103,15 @@ export function Turmas() {
         const ativando = operacao.turma.status === 'INATIVO';
         envioStatusEmAndamento.current = true;
         setAlterandoStatus(true);
-        setErroStatus('');
         try {
-            const atualizada = await turmasService.editar(operacao.turma.id, { status: ativando ? 'ATIVO' : 'INATIVO',
-                ...(!ativando ? { confirmar_cancelamentos: operacao.confirmacao } : {}) });
+            const atualizada = await turmasService.editar(operacao.turma.id, {
+                status: ativando ? 'ATIVO' : 'INATIVO',
+                ...(!ativando ? { confirmar_cancelamentos: operacao.confirmacao } : {})
+            });
             turmaAtualizada(atualizada, ativando ? 'Turma ativada com sucesso.' : 'Turma inativada com sucesso.');
         } catch (error) {
             atualizarConfirmacao(error);
-            setErroStatus(error.response?.data?.erro || 'Não foi possível alterar o status da turma. Tente novamente.');
+            notificar(error.response?.data?.erro || 'Não foi possível alterar o status da turma. Tente novamente.');
         } finally {
             envioStatusEmAndamento.current = false;
             setAlterandoStatus(false);
@@ -119,21 +120,22 @@ export function Turmas() {
 
     function atualizarConfirmacao(error) {
         const dados = error.response?.data;
-        if (dados?.confirmacao) setOperacao((atual) => ({ ...atual, confirmacao: dados.confirmacao,
-            turma: { ...atual.turma, matriculas_ativas: dados.matriculas_ativas } }));
+        if (dados?.confirmacao) setOperacao((atual) => ({
+            ...atual, confirmacao: dados.confirmacao,
+            turma: { ...atual.turma, matriculas_ativas: dados.matriculas_ativas }
+        }));
     }
 
     async function confirmarExclusao() {
         if (envioStatusEmAndamento.current || operacao?.tipo !== 'excluir' || !operacao.confirmacao) return;
         envioStatusEmAndamento.current = true;
         setAlterandoStatus(true);
-        setErroStatus('');
         try {
             await turmasService.excluir(operacao.turma.id, { confirmar_cancelamentos: operacao.confirmacao });
             turmaAtualizada(operacao.turma, 'Turma excluída com sucesso.');
         } catch (error) {
             atualizarConfirmacao(error);
-            setErroStatus(error.response?.data?.erro || 'Não foi possível excluir a turma. Tente novamente.');
+            notificar(error.response?.data?.erro || 'Não foi possível excluir a turma. Tente novamente.');
         } finally {
             envioStatusEmAndamento.current = false;
             setAlterandoStatus(false);
@@ -154,16 +156,44 @@ export function Turmas() {
                             </svg>
                         } />
                     {podeEditar && <Button data-testid="turmas-nova" type="button"
-                        onClick={() => { setAviso(''); setModalAberto(true); }}>
+                        onClick={() => { setModalAberto(true); }}>
                         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
                             <path d="M6.99365 2.914V11.0732M2.91406 6.99361H11.0733" stroke="currentColor" strokeWidth="1.457" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                         {tipoTurma === 'REGULAR' ? 'Nova Turma' : 'Nova Oficina'}
                     </Button>}
                 </div>
-                <AlternadorTipoTurma value={tipoTurma} onChange={trocarTipo} />
+                <div className="flex w-full h-13 flex-col gap-sm sm:flex-row sm:items-stretch">
+                    <AlternadorTipoTurma value={tipoTurma} onChange={trocarTipo} />
+                    <FiltroEstado data-testid="turmas-filtro-ativo"
+                        count={contagemStatus.ATIVO}
+                        tipo="ATIVO"
+                        isSelecionado={statusSelecionado === 'ATIVO'}
+                        aria-pressed={statusSelecionado === 'ATIVO'}
+                        onClick={() => setStatusSelecionado('ATIVO')}
+                    >
+                        Ativas
+                    </FiltroEstado>
+                    <FiltroEstado data-testid="turmas-filtro-inativo"
+                        count={contagemStatus.INATIVO}
+                        tipo="INATIVO"
+                        isSelecionado={statusSelecionado === 'INATIVO'}
+                        aria-pressed={statusSelecionado === 'INATIVO'}
+                        onClick={() => setStatusSelecionado('INATIVO')}
+                    >
+                        Inativas
+                    </FiltroEstado>
+                    <FiltroEstado data-testid="turmas-filtro-todos"
+                        count={contagemStatus.TODOS}
+                        tipo="TODOS"
+                        isSelecionado={statusSelecionado === 'TODOS'}
+                        aria-pressed={statusSelecionado === 'TODOS'}
+                        onClick={() => setStatusSelecionado('TODOS')}
+                    >
+                        Todos
+                    </FiltroEstado>
+                </div>
             </div>
-            {aviso && <p role="status" className="rounded-sm bg-emerald-50 p-md text-sm text-emerald-700">{aviso}</p>}
             {carregando ? <p role="status">Carregando {tipoTurma === 'REGULAR' ? 'turmas regulares' : 'oficinas'}...</p> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
@@ -194,7 +224,6 @@ export function Turmas() {
                 description={<>
                     Deseja {operacao.turma.status === 'INATIVO' ? 'ativar' : 'inativar'} a turma <strong>{operacao.turma.nome}</strong>?
                     {operacao.turma.status !== 'INATIVO' && operacao.confirmacao && <> Essa turma possui {operacao.turma.matriculas_ativas} matrículas ativas que serão canceladas.</>}
-                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}</span>}
                 </>}
                 confirmText={operacao.turma.status === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}
                 onConfirm={confirmarStatus} isConfirmLoading={alterandoStatus}
@@ -204,7 +233,6 @@ export function Turmas() {
                 description={<>
                     Deseja excluir a turma <strong>{operacao.turma.nome}</strong>? Essa turma possui {operacao.turma.matriculas_ativas ?? operacao.turma.vagas_ocupadas ?? 0} matrículas ativas que serão canceladas. Essa ação não pode ser desfeita.
                     {operacao.confirmacao?.matriculas.length > (operacao.turma.matriculas_ativas ?? 0) && <span className="mt-sm block">Os vínculos provisórios também serão encerrados.</span>}
-                    {erroStatus && <span role="alert" className="mt-md block text-sm text-red-700">{erroStatus}</span>}
                 </>}
                 onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus} isConfirmDisabled={!operacao.confirmacao} />}
         </section>

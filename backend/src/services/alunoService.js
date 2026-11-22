@@ -1,10 +1,11 @@
 const { sincronizarTurmasExpiradas } = require('./encerramentoTurmaService');
 const { bloquearCalendarios, inicioMatriculaRegular, diaLetivo, fimLetivo, hojeInstituicao } = require('./calendarioLetivo');
 const prisma = require('../prismaClient');
+const { comNomeModalidade } = require('./modalidadeService');
 const { paginarIds, formatarPagina } = require('./paginacaoService');
 const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
 const { editarAlunoDTO, alterarStatusAlunoDTO } = require('../dtos/alunoDTO');
-const { agoraInstituicao, inicioOcorrencia, dataEncerramento, fimMatricula, DIA_MS } = require('./encerramentoAtividade');
+const { agoraInstituicao, inicioOcorrencia, recorrenciaVencida, filtroMatriculasAtivas, dataEncerramento, fimMatricula, DIA_MS } = require('./encerramentoAtividade');
 const { bloquearProfissionalAtivo } = require('./profissionalService');
 
 const selectResponsavel = {
@@ -92,6 +93,7 @@ async function criarAlunoService(dadosAluno) {
 }
 
 async function listarAlunosService(paginacao) {
+  const hoje = hojeInstituicao();
   const pagina = paginacao ? await paginarIds('alunos', paginacao) : null;
   const alunos = await prisma.aluno.findMany({
     where: { deleted_at: null, ...(pagina ? { id: { in: pagina.ids } } : {}) },
@@ -103,9 +105,9 @@ async function listarAlunosService(paginacao) {
       },
       matriculas_turmas: {
         where: {
-          OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }],
+          OR: [filtroMatriculasAtivas(hoje), { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }],
           turma: {
-            is: { tipo: 'REGULAR', deleted_at: null, ano_letivo: { data_fim: { gte: hojeInstituicao() } } }
+            is: { tipo: 'REGULAR', deleted_at: null, ano_letivo: { data_fim: { gte: hoje } } }
           }
         },
         orderBy: { created_at: 'desc' },
@@ -144,6 +146,7 @@ async function listarAlunosService(paginacao) {
 }
 
 async function obterAlunoService(aluno_id) {
+  const hoje = hojeInstituicao();
   const aluno = await prisma.aluno.findUnique({
     where: { id: aluno_id },
     include: {
@@ -151,7 +154,7 @@ async function obterAlunoService(aluno_id) {
       responsaveis: { orderBy: { id: 'asc' }, select: selectResponsavel },
       dados_medicos: { select: selectDadosMedicos },
       matriculas_turmas: {
-        where: { OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR', deleted_at: null, ano_letivo: { data_fim: { gte: hojeInstituicao() } } } },
+        where: { OR: [filtroMatriculasAtivas(hoje), { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }], turma: { tipo: 'REGULAR', deleted_at: null, ano_letivo: { data_fim: { gte: hoje } } } },
         orderBy: { created_at: 'desc' },
         take: 1,
         select: { id: true, status: true, turma: { select: { id: true, nome: true, turno: true, status: true } } }
@@ -167,14 +170,15 @@ async function obterAlunoService(aluno_id) {
 }
 
 async function obterOficinasService(aluno_id, paginacao) {
+  const hoje = hojeInstituicao();
   const aluno = await prisma.aluno.findUnique({ where: { id: aluno_id }, select: { id: true, deleted_at: true } });
   if (!aluno || aluno.deleted_at) throw Object.assign(new Error('Aluno não encontrado.'), { statusCode: 404 });
-  const pagina = paginacao ? await paginarIds('oficinas_aluno', paginacao, { alunoId: aluno_id }) : null;
+  const pagina = paginacao ? await paginarIds('oficinas_aluno', paginacao, { alunoId: aluno_id, hoje }) : null;
   const oficinas = await prisma.matricula_turma.findMany({
     where: {
       aluno_id: aluno_id,
       ...(pagina ? { id: { in: pagina.ids } } : {}),
-      OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }],
+      OR: [filtroMatriculasAtivas(hoje), { status: 'PROVISORIO', data_fim: null, aluno: { status: 'RASCUNHO' } }],
       turma: {
         tipo: 'OFICINA', deleted_at: null
       }
@@ -215,26 +219,28 @@ async function obterAtendimentosService(aluno_id, paginacao) {
       ]
     },
     include: {
-      profissional: { select: { pessoa: { select: { nome: true } } } }
+      profissional: { select: { pessoa: { select: { nome: true } } } },
+      modalidade_cadastrada: { select: { nome: true } },
     },
     orderBy: [{ data_inicio: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]
   });
-  return formatarPagina(atendimentos, pagina);
+  return formatarPagina(atendimentos.map(comNomeModalidade), pagina);
 }
 
 function conflitoEdicao(mensagem, detalhes) {
   return Object.assign(new Error(mensagem), { isConflict: true, detalhes });
 }
 
-async function lerPlanejamento(tx, aluno_id) {
+async function lerPlanejamento(tx, aluno_id, hoje) {
+  // A edição usa a vigência; o encerramento completo do aluno também precisa ler vínculos antigos.
   const [matriculas, atendimentos] = await Promise.all([
     tx.matricula_turma.findMany({ where: { aluno_id, OR: [
-      { status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null }
+      hoje ? filtroMatriculasAtivas(hoje) : { status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null }
     ] }, include: { turma: { include: { ano_letivo: true, horarios: true } } } }),
     tx.atendimento_clinico.findMany({ where: { aluno_id, status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null },
-      include: { sessoes: { where: { status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null } } } })
+      include: { modalidade_cadastrada: { select: { nome: true } }, sessoes: { where: { status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null } } } })
   ]);
-  return { matriculas, atendimentos };
+  return { matriculas, atendimentos: atendimentos.map(comNomeModalidade) };
 }
 
 function intervalosOficina(matricula, inicio, fim, calendarios) {
@@ -287,7 +293,7 @@ async function validarAtivacao(tx, aluno, planejamento, agora) {
       conflitos.push({ turma_id: turma.id, mensagem: `${turma.nome}: dias incompatíveis com a frequência do aluno.` });
     }
     if (m.status === 'PROVISORIO' && turma.capacidade_maxima != null) {
-      const ocupacao = await tx.matricula_turma.count({ where: { turma_id: turma.id, status: 'ATIVO' } });
+      const ocupacao = await tx.matricula_turma.count({ where: { turma_id: turma.id, ...filtroMatriculasAtivas(agora) } });
       if (ocupacao >= turma.capacidade_maxima) conflitos.push({ turma_id: turma.id, mensagem: `${turma.nome}: sem vagas disponíveis.` });
     }
     if (turmas.some((outra) => outra.id !== m.id && outra.turma_id === m.turma_id)) conflitos.push({ turma_id: turma.id, mensagem: `${turma.nome}: matrícula duplicada.` });
@@ -337,12 +343,14 @@ async function editarAlunoService(id, entrada) {
     }
     const novo = { ...atual, ...dados };
     const mudouTurno = novo.turno !== atual.turno;
-    let planejamento = await lerPlanejamento(tx, id);
+    const hoje = hojeInstituicao();
+    let planejamento = await lerPlanejamento(tx, id, hoje);
     // A mesma ordem de bloqueio é usada pelas matrículas e pela edição de turmas.
     const idsTurmas = [...new Set([...planejamento.matriculas.map((m) => m.turma_id), ...(dados.turma_id ? [dados.turma_id] : [])])].sort((a, b) => a - b);
     for (const turma_id of idsTurmas) await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${turma_id} FOR UPDATE`;
-    planejamento = await lerPlanejamento(tx, id);
+    planejamento = await lerPlanejamento(tx, id, hoje);
     const agora = agoraInstituicao();
+    planejamento.atendimentos = planejamento.atendimentos.filter((a) => !recorrenciaVencida(a, agora));
     const ativando = atual.status === 'RASCUNHO' && dados.status === 'ATIVO';
     if (ativando) {
       const profissionais = [...new Set([
@@ -429,7 +437,7 @@ async function editarAlunoService(id, entrada) {
     }
     if (dados.turma_id && (mudouTurno || trocarRegular)) await matricularTurmaRegularNaTransacao(tx, { aluno_id: id, turma_id: dados.turma_id }, { dataInicio: dataInicioRegular });
     if (ativando) {
-      const vigente = await lerPlanejamento(tx, id);
+      const vigente = await lerPlanejamento(tx, id, hoje);
       const dataInicio = new Date(agora);
       dataInicio.setUTCHours(0, 0, 0, 0);
       // Validação e promoção usam o mesmo recorte; sessões já iniciadas continuam como planejamento.

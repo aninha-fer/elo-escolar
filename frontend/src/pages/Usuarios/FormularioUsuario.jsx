@@ -1,3 +1,4 @@
+import { useToast } from '../../contexts/ToastContext';
 import { useRef, useState } from 'react';
 import { z } from 'zod';
 import { Modal } from '../../components/Modal';
@@ -11,16 +12,15 @@ const formularioInicial = { modo: 'existente', nome: '', pessoa_id: '', email: '
 const emailSchema = z.string().email().max(254);
 
 export function FormularioUsuario({ onClose, onCriado }) {
+    const { notificar } = useToast();
     const [formulario, setFormulario] = useState(formularioInicial);
     const [erros, setErros] = useState({});
-    const [erroEnvio, setErroEnvio] = useState('');
     const [enviando, setEnviando] = useState(false);
     const envioEmAndamento = useRef(false);
 
     function atualizarCampo(campo, valor) {
         setFormulario((atual) => ({ ...atual, [campo]: valor }));
         setErros((atuais) => campo === 'modo' ? {} : { ...atuais, [campo]: undefined, ...(campo === 'senha' ? { confirmacao: undefined } : {}) });
-        setErroEnvio('');
     }
 
     function fecharModal() {
@@ -43,7 +43,6 @@ export function FormularioUsuario({ onClose, onCriado }) {
         if (!formulario.confirmacao || formulario.confirmacao !== formulario.senha) novosErros.confirmacao = 'A confirmação deve ser igual à senha.';
 
         setErros(novosErros);
-        setErroEnvio('');
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
             const campo = form.elements.namedItem(primeiroErro);
@@ -71,7 +70,7 @@ export function FormularioUsuario({ onClose, onCriado }) {
                 if (campo) errosCampos[campo] = item.mensagem;
             }
             setErros(errosCampos);
-            setErroEnvio(error.response?.data?.erro || 'Não foi possível criar o usuário. Tente novamente.');
+            if (!Object.keys(errosCampos).length) notificar(error.response?.data?.erro || 'Não foi possível criar o usuário. Tente novamente.');
         } finally {
             envioEmAndamento.current = false;
             setEnviando(false);
@@ -128,7 +127,6 @@ export function FormularioUsuario({ onClose, onCriado }) {
                             {erroCampo('confirmacao')}
                         </div>
                     </div>
-                    {erroEnvio && <p role="alert" className="mb-md rounded-sm bg-red-50 p-sm text-sm text-red-700">{erroEnvio}</p>}
                 </fieldset>
             </form>
         </Modal>

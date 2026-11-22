@@ -46,7 +46,8 @@ test('usuário ativo continua bloqueado com senha incorreta', async (t) => {
 test('exclusão invalida sessão autenticada mesmo se os status forem restaurados indevidamente', async (t) => {
     simular(t, { ...ativo, deleted_at: new Date() });
     let destruida = false;
-    const req = { session: { usuarioId: 1, autenticadoEm: Date.now(), destroy(callback) { destruida = true; callback(); } } };
+    const req = { session: { usuarioId: 1, autenticadoEm: Date.now(), ultimaAtividadeEm: Date.now(), senha_versao: 1,
+        destroy(callback) { destruida = true; callback(); } } };
     const res = { status(code) { this.code = code; return this; }, json() { return this; }, clearCookie() {} };
     await requireAuth(req, res, () => assert.fail('Conta excluída não pode acessar a API.'));
     assert.equal(destruida, true);
@@ -57,7 +58,7 @@ test('inativação invalida a sessão na próxima requisição e reativação pe
     const usuario = { ...ativo };
     simular(t, usuario);
     let destruicoes = 0, acessos = 0;
-    const req = { session: { usuarioId: 1, autenticadoEm: Date.now(), senha_versao: 1, destroy(callback) { destruicoes++; callback(); } } };
+    const req = { session: { usuarioId: 1, autenticadoEm: Date.now(), ultimaAtividadeEm: Date.now(), senha_versao: 1, destroy(callback) { destruicoes++; callback(); } } };
     const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; },
         clearCookie(nome, options) { this.cookie = { nome, options }; } };
     await requireAuth(req, res, () => acessos++);

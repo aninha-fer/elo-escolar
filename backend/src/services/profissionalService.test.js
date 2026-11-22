@@ -13,6 +13,29 @@ function resposta() {
     };
 }
 
+test('cadastro e edição aceitam somente os quatro cargos disponíveis no formulário', () => {
+    const { criarProfissionalDTO, editarProfissionalDTO } = require('../dtos/profissionalDTO');
+    for (const cargo of ['Professor', 'Clínico', 'Auxiliar', 'Outro']) {
+        assert.equal(criarProfissionalDTO.parse({ nome: 'Profissional', cargo: ` ${cargo} ` }).cargo, cargo);
+        assert.equal(editarProfissionalDTO.parse({ cargo: ` ${cargo} ` }).cargo, cargo);
+    }
+    for (const cargo of ['Cargo inexistente', 'professor', 'Terapeuta', '', null]) {
+        assert.equal(criarProfissionalDTO.safeParse({ nome: 'Profissional', cargo }).success, false);
+        assert.equal(editarProfissionalDTO.safeParse({ cargo }).success, false);
+    }
+});
+
+test('API rejeita cargo desconhecido no cadastro e na edição antes de iniciar transação', async (t) => {
+    const original = prisma.$transaction;
+    t.after(() => { prisma.$transaction = original; });
+    prisma.$transaction = () => assert.fail('Cargo inválido não deve iniciar transação.');
+    const criado = resposta(), editado = resposta();
+    await criarProfissional({ body: { nome: 'Profissional', cargo: 'Cargo inexistente' } }, criado);
+    await editarProfissional({ params: { id: '7' }, body: { cargo: 'Cargo inexistente' } }, editado);
+    assert.equal(criado.statusCode, 400);
+    assert.equal(editado.statusCode, 400);
+});
+
 test('cadastro recebe cargo do DTO e cria pessoa e funcionário na mesma transação', async (t) => {
     const original = prisma.$transaction;
     t.after(() => { prisma.$transaction = original; });
@@ -125,7 +148,7 @@ test('rota oficial lista profissionais com permissão e a rota temporária foi r
     const original = prisma.funcionario.findMany;
     t.after(() => { prisma.funcionario.findMany = original; });
     prisma.funcionario.findMany = async () => [
-        { id: 7, pessoa_id: 50, cargo: 'Terapeuta', pessoa: { nome: 'Ana', telefone: null, status_geral: 'ATIVO' } },
+        { id: 7, pessoa_id: 50, cargo: 'Clínico', pessoa: { nome: 'Ana', telefone: null, status_geral: 'ATIVO' } },
     ];
     const app = express();
     app.use('/api', (req, res, next) => {
@@ -143,7 +166,7 @@ test('rota oficial lista profissionais com permissão e a rota temporária foi r
     const oficial = await fetch(`${baseUrl}/profissionais`);
     assert.equal(oficial.status, 200);
     assert.deepEqual(await oficial.json(), [
-        { id: 7, pessoa_id: 50, nome: 'Ana', telefone: null, funcao: 'Terapeuta', status_geral: 'ATIVO' },
+        { id: 7, pessoa_id: 50, nome: 'Ana', telefone: null, funcao: 'Clínico', status_geral: 'ATIVO' },
     ]);
     const semPermissao = await fetch(`${baseUrl}/profissionais`, { headers: { 'x-test-role': 'professor' } });
     assert.equal(semPermissao.status, 403);
@@ -213,6 +236,23 @@ async function editar(body, id = '7') {
     return res;
 }
 
+test('bloqueio informa nomes de turmas, modalidade e aluno, sem repetir atendimento por sessão', async (t) => {
+    const atendimento = { id: 20, modalidade_cadastrada: { nome: 'Psicologia' }, aluno: { pessoa: { nome: 'Lucas Andrade' } }, status: 'ATIVO' };
+    const banco = simularEdicao(t, {
+        turmas: [{ id: 10, nome: 'Multiplos dias' }, { id: 11, nome: '3A' }],
+        atendimentos: [atendimento, atendimento],
+    });
+    const res = await editar({ status_geral: 'INATIVO' });
+    assert.equal(res.statusCode, 409);
+    assert.deepEqual(res.body.conflitos.filter((c) => c.codigo === 'TURMA_VINCULADA').map((c) => c.turma_nome), ['Multiplos dias', '3A']);
+    const clinicos = res.body.conflitos.filter((c) => c.codigo === 'ATENDIMENTO_VINCULADO');
+    assert.equal(clinicos.length, 1);
+    assert.equal(clinicos[0].modalidade, 'Psicologia');
+    assert.equal(clinicos[0].aluno_nome, 'Lucas Andrade');
+    assert.equal(clinicos[0].mensagem, 'Responsável pelo atendimento Psicologia (aluno Lucas Andrade).');
+    assert.equal(banco.estado.pessoa.status_geral, 'ATIVO');
+});
+
 test('edição altera nome, telefone e cargo atomicamente sem alterar status da conta', async (t) => {
     const banco = simularEdicao(t, { usuarios: [{ id: 3, pessoa_id: 50, status: 'INATIVO' }] });
     const res = await editar({ nome: ' Maria Silva ', telefone: '5133334444', cargo: ' Auxiliar ' });
@@ -255,7 +295,7 @@ test('sem conta vinculada, alteração de status não cria usuário', async (t) 
 
 for (const inicial of [
     { turmas: [{ id: 10, nome: 'Turma A', status: 'ATIVO' }] },
-    { atendimentos: [{ id: 20, modalidade: 'Psicologia', status: 'ATIVO' }] },
+    { atendimentos: [{ id: 20, modalidade_cadastrada: { nome: 'Psicologia' }, status: 'ATIVO' }] },
 ]) {
     test(`vínculo ${JSON.stringify(inicial)} impede inativação sem alterações parciais`, async (t) => {
         const banco = simularEdicao(t, inicial);

@@ -2,7 +2,7 @@ const { sincronizarTurmasExpiradas } = require('./encerramentoTurmaService');
 const { bloquearCalendarios, inicioMatriculaRegular, diaLetivo, fimLetivo } = require('./calendarioLetivo');
 const prisma = require('../prismaClient');
 
-const { fimMatricula, agoraInstituicao } = require('./encerramentoAtividade');
+const { fimMatricula, agoraInstituicao, filtroMatriculasAtivas } = require('./encerramentoAtividade');
 
 const DIA_MS = 86400000;
 
@@ -33,17 +33,18 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }, { d
         throw erro;
     }
     const inicioRegular = inicioMatriculaRegular(turma, dataInicio);
+    const ativas = filtroMatriculasAtivas();
     const detalhes = [];
     if (turma.turno !== aluno.turno) detalhes.push({ codigo: 'TURNO_INCOMPATIVEL', mensagem: 'O turno da turma regular deve coincidir com o turno do aluno.' });
     if (aluno.dias_frequencia.some((dia) => !turma.horarios.some((horario) => horario.dia_semana === dia))) {
         detalhes.push({ codigo: 'FREQUENCIA_INSUFICIENTE', mensagem: 'A turma regular não oferece todos os dias de frequência do aluno.' });
     }
     const existente = await tx.matricula_turma.findFirst({
-        where: { aluno_id, OR: [{ status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null }], turma: { tipo: 'REGULAR' } }
+        where: { aluno_id, OR: [ativas, { status: 'PROVISORIO', data_fim: null }], turma: { tipo: 'REGULAR' } }
     });
     if (existente) detalhes.push({ codigo: 'MATRICULA_DUPLICADA', mensagem: 'O aluno já possui uma turma regular.' });
     if (status === 'ATIVO' && turma.capacidade_maxima != null) {
-        const ocupacao = await tx.matricula_turma.count({ where: { turma_id, status: 'ATIVO' } });
+        const ocupacao = await tx.matricula_turma.count({ where: { turma_id, ...ativas } });
         if (ocupacao >= turma.capacidade_maxima) detalhes.push({ codigo: 'CAPACIDADE_MAXIMA', mensagem: 'Turma regular sem vagas disponíveis.' });
     }
     if (detalhes.length) {
@@ -80,7 +81,7 @@ async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, st
         select: {
             id: true, atendimento_clinico_id: true, data_sessao: true,
             hora_inicio: true, duracao_minutos: true,
-            atendimento_clinico: { select: { modalidade: true } }
+            atendimento_clinico: { select: { modalidade_cadastrada: { select: { nome: true } } } }
         }
     });
     const calendarios = await tx.ano_letivo.findMany();
@@ -114,7 +115,7 @@ async function obterConflitosAtendimentos(tx, aluno_id, oficinas, dataInicio, st
                                 hora_fim_oficina: new Date(fimOficina).toISOString().slice(11, 16),
                                 sessao_id: sessao.id,
                                 atendimento_id: sessao.atendimento_clinico_id,
-                                modalidade: sessao.atendimento_clinico.modalidade,
+                                modalidade: sessao.atendimento_clinico.modalidade_cadastrada.nome,
                                 data_sessao: sessao.data_sessao.toISOString().slice(0, 10),
                                 hora_inicio: sessao.hora_inicio.toISOString().slice(11, 16),
                                 data_fim: new Date(fimSessao).toISOString().slice(0, 10),
@@ -149,6 +150,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
     await bloquearTurmas(tx, oficinas_ids);
 
     const dataInicio = obterDataInicioMatricula();
+    const ativas = filtroMatriculasAtivas(dataInicio);
     const oficinas = await tx.turma.findMany({
         where: {
             id: { in: oficinas_ids },
@@ -168,7 +170,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
         by: ['turma_id'],
         where: {
             turma_id: { in: oficinas_ids },
-            status: 'ATIVO'
+            ...ativas
         },
         _count: { turma_id: true }
     });
@@ -218,7 +220,7 @@ async function matricularOficinasNaTransacao(tx, { aluno_id, oficinas_ids }) {
     const matriculasAtuais = await tx.matricula_turma.findMany({
         where: {
             aluno_id: aluno.id,
-            OR: [{ status: 'ATIVO' }, ...(statusVinculo === 'PROVISORIO' ? [{ status: 'PROVISORIO', data_fim: null }] : [])]
+            OR: [ativas, ...(statusVinculo === 'PROVISORIO' ? [{ status: 'PROVISORIO', data_fim: null }] : [])]
         },
         include: {
             turma: {

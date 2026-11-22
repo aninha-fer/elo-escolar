@@ -48,7 +48,7 @@ async function validarAmpliacao(tx, anteriores, novos) {
     atendimento_clinico: { status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null, aluno: { deleted_at: null, status: { in: ['ATIVO', 'RASCUNHO'] } } },
     // Sem limite inferior: uma sessão iniciada antes pode continuar em andamento.
     data_sessao: { lte: new Date(ultimoDia) },
-  }, include: { atendimento_clinico: { include: { aluno: { include: { pessoa: { select: { nome: true } } } } } } } });
+  }, include: { atendimento_clinico: { include: { modalidade_cadastrada: { select: { nome: true } }, aluno: { include: { pessoa: { select: { nome: true } } } } } } } });
   if (!sessoes.length) return;
   const matriculas = await tx.matricula_turma.findMany({ where: {
     aluno_id: { in: [...new Set(sessoes.map((s) => s.atendimento_clinico.aluno_id))] },
@@ -81,7 +81,7 @@ async function validarAmpliacao(tx, anteriores, novos) {
           const inicioAcrescentado = Math.max(de, fimLetivo(anteriores, dia, ate));
           if (inicioAcrescentado < fim && novoFim > inicio && novoFim > inicioAcrescentado) conflitos.push({ aluno_id: a.aluno_id, aluno_nome: a.aluno.pessoa.nome,
             turma_id: m.turma_id, oficina_nome: m.turma.nome, atendimento_id: a.id, sessao_id: s.id,
-            data: iso(dia), mensagem: `${a.aluno.pessoa.nome}: ${m.turma.nome} conflita com ${a.modalidade} em ${iso(dia)} (${s.hora_inicio.toISOString().slice(11, 16)}).` });
+            data: iso(dia), mensagem: `${a.aluno.pessoa.nome}: ${m.turma.nome} conflita com ${a.modalidade_cadastrada.nome} em ${iso(dia)} (${s.hora_inicio.toISOString().slice(11, 16)}).` });
         }
       }
     }

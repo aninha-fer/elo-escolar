@@ -49,8 +49,6 @@
 .login-form .login-submit:hover { background: var(--login-focus); }
 .login-page button:focus-visible, .login-page input[type='checkbox']:focus-visible { outline: 2px solid var(--login-focus); outline-offset: 3px; }
 .login-error { @apply text-danger; margin: -3px 0 10px; font-size: 12px; line-height: 18px; }
-.login-notice { color: var(--login-muted); font-size: 12px; line-height: 20px; }
-.login-notice:not(:empty) { margin-top: 14px; }
 
 @media (min-width: 768px) {
     .login-page { min-height: max(544px, 100dvh); }

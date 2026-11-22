@@ -1,3 +1,4 @@
+import { useToast } from '../../../contexts/ToastContext';
 import { Input } from "../../../components/Input";
 import { Modal } from "../../../components/Modal";
 import { useEffect, useRef, useState } from "react";
@@ -9,9 +10,12 @@ import { atendimentosService } from "../../../services/atendimentosService";
 import { profissionaisService } from "../../../services/profissionaisService";
 import { formatarDataHoraInstituicao, formatarMensagemConflito } from "../../../utils/formatters";
 import { SaveIcon } from "../../../components/icons/SaveIcon";
+import { SelectComCadastro } from "../../../components/SelectComCadastro";
+import { FormularioProfissional } from "../../Profissionais/FormularioProfissional";
+import { modalidadesService } from "../../../services/modalidadesService";
 
 const formularioInicial = {
-    modalidade: '', profissional_id: '', data_inicio: '', hora_inicio: '', duracao_minutos: '',
+    modalidade_id: '', profissional_id: '', data_inicio: '', hora_inicio: '', duracao_minutos: '',
     tipo_recorrencia: 'SEMANAL', frequencia: '1', dias_semana: [], data_termino: '',
 };
 
@@ -19,16 +23,22 @@ const erroInicioPassado = 'Não é possível agendar um atendimento em uma data 
 const erroInicioMensal = 'A data de início da recorrência mensal deve ser de segunda a sexta-feira.';
 
 export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess }) {
+    const { notificar } = useToast();
     const editando = Boolean(atendimento);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRecorrente, setIsRecorrente] = useState(atendimento ? atendimento.tipo_recorrencia !== 'EVENTUAL' : false);
     const [formulario, setFormulario] = useState(() => atendimento ? {
-        modalidade: atendimento.modalidade, profissional_id: String(atendimento.profissional_id),
+        modalidade_id: String(atendimento.modalidade_id), profissional_id: String(atendimento.profissional_id),
         data_inicio: atendimento.data_inicio.slice(0, 10), hora_inicio: atendimento.hora_inicio.slice(11, 16),
         duracao_minutos: String(atendimento.duracao_minutos), tipo_recorrencia: atendimento.tipo_recorrencia,
         frequencia: String(atendimento.frequencia ?? 1), dias_semana: atendimento.dias_semana ?? [], data_termino: atendimento.data_termino?.slice(0, 10) ?? ''
     } : formularioInicial);
     const [profissionais, setProfissionais] = useState([]);
+    const [novoProfissional, setNovoProfissional] = useState(false);
+    const [modalidades, setModalidades] = useState([]);
+    const [carregandoModalidades, setCarregandoModalidades] = useState(true);
+    const [erroModalidades, setErroModalidades] = useState('');
+    const [tentativaModalidades, setTentativaModalidades] = useState(0);
     const [carregandoProfissionais, setCarregandoProfissionais] = useState(false);
     const [erroProfissionais, setErroProfissionais] = useState('');
     const [tentativaProfissionais, setTentativaProfissionais] = useState(0);
@@ -70,6 +80,33 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         return () => controller.abort();
     }, [tentativaProfissionais, atendimento?.profissional_id]);
 
+    useEffect(() => {
+        const controller = new AbortController();
+        async function carregar() {
+            setCarregandoModalidades(true); setErroModalidades('');
+            try {
+                const dados = await modalidadesService.listarTodos(controller.signal);
+                if (!controller.signal.aborted) setModalidades(dados);
+            } catch (error) {
+                if (!controller.signal.aborted && error.code !== 'ERR_CANCELED') setErroModalidades(error.response?.data?.erro || 'Não foi possível carregar as modalidades.');
+            } finally { if (!controller.signal.aborted) setCarregandoModalidades(false); }
+        }
+        carregar();
+        return () => controller.abort();
+    }, [tentativaModalidades]);
+
+    function fecharProfissional() {
+        setNovoProfissional(false);
+        requestAnimationFrame(() => document.getElementById('atendimento-profissional')?.focus());
+    }
+
+    function profissionalCriado(criado) {
+        setProfissionais((atuais) => [...atuais.filter((item) => item.id !== criado.id), criado].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id - b.id));
+        setFormulario((atual) => ({ ...atual, profissional_id: String(criado.id) }));
+        notificar('Profissional cadastrado com sucesso.', 'sucesso');
+        fecharProfissional();
+    }
+
 
     function atualizarCampo(campo, valor) {
         if (campo === 'tipo_recorrencia' && valor === formulario.tipo_recorrencia) return;
@@ -86,11 +123,11 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         }
     }
 
-    function fecharModal() { if (!enviando.current) onClose(); }
+    function fecharModal() { if (!enviando.current && !novoProfissional) onClose(); }
 
     async function confirmarModal(event) {
         event.preventDefault();
-        if (enviando.current || carregandoProfissionais || erroProfissionais) return;
+        if (enviando.current || novoProfissional || carregandoProfissionais || erroProfissionais || carregandoModalidades || erroModalidades) return;
         setSubmitError('');
         setConflitos([]);
 
@@ -99,15 +136,15 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         const duracao_minutos = Number(formulario.duracao_minutos);
         const frequencia = Number(formulario.frequencia);
         if (!Number.isInteger(aluno_id) || aluno_id < 1) {
-            setSubmitError('Aluno não identificado.');
+            notificar('Aluno não identificado.');
             return;
         }
-        if (!formulario.modalidade || !profissionais.some((profissional) => profissional.id === profissional_id)) {
-            setSubmitError('Selecione a modalidade e um profissional cadastrado.');
+        if (!modalidades.some((item) => item.id === Number(formulario.modalidade_id)) || !profissionais.some((profissional) => profissional.id === profissional_id)) {
+            notificar('Selecione a modalidade e um profissional cadastrado.');
             return;
         }
         if (!formulario.data_inicio || !formulario.hora_inicio || !Number.isInteger(duracao_minutos) || duracao_minutos < 1) {
-            setSubmitError('Informe a data, o horário e uma duração válida.');
+            notificar('Informe a data, o horário e uma duração válida.');
             return;
         }
         const instanteEnvio = new Date();
@@ -117,20 +154,20 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         }
         if (inicioMensalNoFimDeSemana) return;
         if (isRecorrente && (!Number.isInteger(frequencia) || frequencia < 1 || !formulario.data_termino)) {
-            setSubmitError('Informe a frequência e a data de término da recorrência.');
+            notificar('Informe a frequência e a data de término da recorrência.');
             return;
         }
         if (isRecorrente && formulario.data_termino < formulario.data_inicio) {
-            setSubmitError('A data de término não pode ser anterior à data de início.');
+            notificar('A data de término não pode ser anterior à data de início.');
             return;
         }
         if (isRecorrente && formulario.tipo_recorrencia === 'SEMANAL' && formulario.dias_semana.length === 0) {
-            setSubmitError('Selecione ao menos um dia da semana.');
+            notificar('Selecione ao menos um dia da semana.');
             return;
         }
 
         const dadosAtendimento = {
-            aluno_id, profissional_id, modalidade: formulario.modalidade,
+            aluno_id, profissional_id, modalidade_id: Number(formulario.modalidade_id),
             data_inicio: formulario.data_inicio, hora_inicio: formulario.hora_inicio, duracao_minutos,
             tipo_recorrencia: isRecorrente ? formulario.tipo_recorrencia : 'EVENTUAL',
             dias_semana: isRecorrente && formulario.tipo_recorrencia === 'SEMANAL' ? formulario.dias_semana : [],
@@ -147,10 +184,13 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                 if (!Object.keys(alterados).length) { onClose(); return; }
                 await atendimentosService.editar(idAluno, atendimento.id, alterados);
             } else await atendimentosService.criar(dadosAtendimento);
+            notificar(editando ? 'Atendimento atualizado com sucesso.' : 'Atendimento cadastrado com sucesso.', 'sucesso');
             onSuccess();
         } catch (err) {
             const mensagens = err.response?.data?.erros?.map((erro) => erro.message).join(' ');
-            setSubmitError(mensagens || err.response?.data?.erro || 'Não foi possível agendar o atendimento.');
+            const mensagemErro = mensagens || err.response?.data?.erro || 'Não foi possível agendar o atendimento.';
+            if (err.response?.data?.conflitos?.length) setSubmitError(mensagemErro);
+            else notificar(mensagemErro);
             setConflitos(Array.isArray(err.response?.data?.conflitos) ? err.response.data.conflitos : []);
         } finally {
             enviando.current = false;
@@ -158,7 +198,8 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         }
     }
 
-    return (
+    return <>
+        <div inert={novoProfissional} aria-hidden={novoProfissional ? true : undefined}>
         <Modal testId="atendimento-formulario" isOpen
             onClose={fecharModal}
             title={editando ? 'Editar Atendimento Clínico' : 'Novo Atendimento Clínico'}
@@ -172,7 +213,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
             confirmFormId="form-criar-atendimento"
             onConfirm={confirmarModal}
             isConfirmLoading={isSubmitting}
-            isConfirmDisabled={Boolean(erroInicio) || carregandoProfissionais || Boolean(erroProfissionais) || profissionais.length === 0}>
+            isConfirmDisabled={Boolean(erroInicio) || carregandoProfissionais || Boolean(erroProfissionais) || profissionais.length === 0 || carregandoModalidades || Boolean(erroModalidades) || modalidades.length === 0}>
 
             <form id="form-criar-atendimento" onSubmit={confirmarModal} noValidate>
                 <fieldset disabled={isSubmitting} className="min-w-0">
@@ -180,24 +221,20 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                     <div className="flex flex-row justify-between gap-md">
                         <Select data-testid="atendimento-formulario-modalidade"
                             label="Modalidade"
-                            name="modalidade" disabled={bloqueado}
-                            value={formulario.modalidade}
-                            onChange={(event) => atualizarCampo('modalidade', event.target.value)}
+                            name="modalidade_id" disabled={bloqueado || carregandoModalidades || Boolean(erroModalidades)}
+                            value={formulario.modalidade_id}
+                            onChange={(event) => atualizarCampo('modalidade_id', event.target.value)}
                             placeholder="Selecione uma modalidade"
                             required
-                            options={[
-                                { value: 'Psicologia', label: 'Psicologia' },
-                                { value: 'Fonoaudiologia', label: 'Fonoaudiologia' },
-                                ...(atendimento?.modalidade && !['Psicologia', 'Fonoaudiologia'].includes(atendimento.modalidade) ? [{ value: atendimento.modalidade, label: atendimento.modalidade }] : []),
-                            ]}
+                            options={modalidades.map((item) => ({ value: item.id, label: item.nome }))}
                         />
 
-                        <Select data-testid="atendimento-formulario-profissional"
+                        <SelectComCadastro testId="atendimento-formulario-profissional" id="atendimento-profissional"
                             label="Profissional"
-                            name="profissional_id"
                             value={formulario.profissional_id}
-                            onChange={(event) => atualizarCampo('profissional_id', event.target.value)}
-                            disabled={carregandoProfissionais || Boolean(erroProfissionais) || profissionais.length === 0}
+                            onChange={(valor) => atualizarCampo('profissional_id', valor)}
+                            onCadastrar={() => setNovoProfissional(true)} textoCadastro="Adicionar profissional"
+                            disabled={carregandoProfissionais || Boolean(erroProfissionais)}
                             placeholder={carregandoProfissionais ? 'Carregando profissionais...' : 'Selecione um profissional'}
                             required
                             options={profissionais.map((profissional) => ({
@@ -206,6 +243,9 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             }))}
                         />
                     </div>
+                    {carregandoModalidades && <p role="status" className="mb-md text-sm text-text-muted">Carregando modalidades...</p>}
+                    {erroModalidades && <div role="alert" className="mb-md text-sm text-danger"><p>{erroModalidades}</p><button type="button" data-testid="atendimento-modalidades-tentar" onClick={() => setTentativaModalidades((valor) => valor + 1)}>Tentar novamente</button></div>}
+                    {!carregandoModalidades && !erroModalidades && !modalidades.length && <p className="mb-md text-sm text-text-muted">Cadastre uma modalidade nas configurações para agendar um atendimento.</p>}
                     {carregandoProfissionais && <p role="status" className="mb-md text-sm text-text-muted">Carregando profissionais...</p>}
                     {erroProfissionais && (
                         <div className="mb-md text-sm text-red-700" role="alert">
@@ -333,7 +373,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             </div>
                         </div>
                     )}
-                    {(submitError || erroInicio) && (
+                    {(conflitos.length > 0 || erroInicio) && (
                         <div role="alert" className="mt-md rounded-sm border border-red-200 bg-red-50 p-md text-sm text-red-700">
                             <p>{erroInicio || submitError}</p>
                             {!erroInicio && conflitos.length > 0 && (
@@ -346,5 +386,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                 </fieldset>
             </form>
         </Modal>
-    );
+        </div>
+        {novoProfissional && <FormularioProfissional trapFocus onClose={fecharProfissional} onCriado={profissionalCriado} />}
+    </>;
 }

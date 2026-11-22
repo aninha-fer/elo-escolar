@@ -5,9 +5,9 @@ import { TrashIcon } from '../../components/icons/TrashIcon';
 
 const coresFuncao = {
     Professor: 'bg-blue-50 text-blue-600',
-    Oficineiro: 'bg-emerald-50 text-emerald-600',
-    Terapeuta: 'bg-violet-50 text-violet-600',
+    Clínico: 'bg-violet-50 text-violet-600',
     Auxiliar: 'bg-amber-50 text-amber-600',
+    Outro: 'bg-slate-100 text-slate-500',
 };
 const coresStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600 before:bg-emerald-600',

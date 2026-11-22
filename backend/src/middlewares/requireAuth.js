@@ -1,28 +1,24 @@
-const { promisify } = require('node:util');
 const { buscarIdentidadePorId } = require('../services/authService');
+const { sessaoDentroDoPrazo } = require('../config/prazosSessao');
+const { encerrarSessao } = require('../services/sessaoService');
 
-const DURACAO_MAXIMA_MS = 8 * 60 * 60 * 1000;
 const SEM_SESSAO = { erro: 'Sessão inválida ou expirada.' };
 
 async function requireAuth(req, res, next) {
-  const { usuarioId, autenticadoEm } = req.session ?? {};
+  const { usuarioId } = req.session ?? {};
 
   if (!Number.isInteger(usuarioId)) {
     return res.status(401).json(SEM_SESSAO);
   }
 
-  const dentroDoPrazo =
-    Number.isFinite(autenticadoEm) &&
-    Date.now() - autenticadoEm < DURACAO_MAXIMA_MS;
+  const dentroDoPrazo = sessaoDentroDoPrazo(req.session);
 
   const usuario = dentroDoPrazo
     ? await buscarIdentidadePorId(usuarioId)
     : null;
 
   if (!usuario || !Number.isInteger(req.session.senha_versao) || req.session.senha_versao !== usuario.senha_versao) {
-    await promisify(req.session.destroy).call(req.session);
-    res.clearCookie('elo.sid', { path: '/api' });
-    return res.status(401).json(SEM_SESSAO);
+    return encerrarSessao(req, res);
   }
 
   req.usuario = usuario;

@@ -1,6 +1,19 @@
-const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO, prepararNovaTurmaQueryDTO, criarTurmaAPartirDTO, detalheTurmaQueryDTO } = require('../dtos/turmaDTO');
-const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService } = require('../services/turmaService');
+const { listarTurmasQueryDTO, listarTurmasRegularesQueryDTO, criarTurmaDTO, getTurmaDTO, editarTurmaDTO, excluirTurmaDTO, prepararNovaTurmaQueryDTO, criarTurmaAPartirDTO, detalheTurmaQueryDTO, diarioTurmaQueryDTO } = require('../dtos/turmaDTO');
+const { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService, obterDiarioTurmaService } = require('../services/turmaService');
 const { lerPaginacao } = require('../dtos/paginacaoDTO');
+
+async function obterDiarioTurma(req, res) {
+  try {
+    const { id } = getTurmaDTO.parse(req.params);
+    const { mes } = diarioTurmaQueryDTO.parse(req.query);
+    return res.status(200).json(await obterDiarioTurmaService(id, mes));
+  } catch (error) {
+    if (error.name === 'ZodError') return res.status(400).json({ erros: error.issues });
+    if ([400, 404, 409].includes(error.statusCode)) return res.status(error.statusCode).json({ erro: error.message });
+    console.error('Erro ao consultar diário de classe.', { nome: error.name, codigo: error.code });
+    return res.status(500).json({ erro: 'Não foi possível carregar o diário de classe.' });
+  }
+}
 
 async function listarTurmas(req, res) {
   try {
@@ -119,4 +132,4 @@ async function listarAlunosTurma(req, res) {
   }
 }
 
-module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma, excluirTurma, prepararNovaTurma, criarTurmaAPartir, listarAlunosTurma };
+module.exports = { listarTurmas, listarTurmasRegularesPorTurno, criarTurma, obterTurma, editarTurma, excluirTurma, prepararNovaTurma, criarTurmaAPartir, listarAlunosTurma, obterDiarioTurma };

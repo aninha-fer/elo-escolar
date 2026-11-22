@@ -2,9 +2,10 @@ const { bloquearCalendarios, diaLetivo, fimLetivo } = require('./calendarioLetiv
 const prisma = require('../prismaClient');
 const { obterStatusVinculo } = require('./matriculaService');
 
-const { agoraInstituicao } = require('./encerramentoAtividade');
+const { agoraInstituicao, recorrenciaVencida } = require('./encerramentoAtividade');
 const { criarAtendimentoDTO, editarAtendimentoDTO } = require('../dtos/atendimentoDTO');
 const { bloquearProfissionalAtivo } = require('./profissionalService');
+const { validarModalidade, comNomeModalidade } = require('./modalidadeService');
 
 const DIAS_DA_SEMANA = new Set([1, 2, 3, 4, 5, 6, 7]);
 
@@ -191,7 +192,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
     select: {
       id: true, atendimento_clinico_id: true, data_sessao: true,
       hora_inicio: true, duracao_minutos: true,
-      atendimento_clinico: { select: { modalidade: true } }
+      atendimento_clinico: { select: { modalidade_cadastrada: { select: { nome: true } } } }
     }
   });
   const compromissos = sessoes.map((sessao) => {
@@ -228,7 +229,7 @@ async function validarDisponibilidade(tx, { aluno_id, datasSessoes, hora_inicio,
           detalhes: {
             sessao_id: compromisso.sessao.id,
             atendimento_id: compromisso.sessao.atendimento_clinico_id,
-            modalidade: compromisso.sessao.atendimento_clinico.modalidade,
+            modalidade: compromisso.sessao.atendimento_clinico.modalidade_cadastrada.nome,
             ...formatarIntervalo(compromisso.inicio, compromisso.fim)
           }
         });
@@ -289,7 +290,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
   const {
     profissional_id,
     aluno_id,
-    modalidade,
+    modalidade_id,
     tipo_recorrencia,
     data_inicio,
     hora_inicio,
@@ -305,7 +306,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
   if (!Number.isInteger(profissional_id) || profissional_id < 1) {
     throw criarErroValidacao('Profissional não identificado.');
   }
-  if (typeof modalidade !== 'string' || !modalidade.trim()) {
+  if (!Number.isInteger(modalidade_id) || modalidade_id < 1) {
     throw criarErroValidacao('Modalidade não identificada.');
   }
   if (!['EVENTUAL', 'SEMANAL', 'MENSAL'].includes(tipo_recorrencia)) {
@@ -332,6 +333,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
     const statusVinculo = await validarDisponibilidade(tx, {
       aluno_id, datasSessoes, hora_inicio: horaInicioConvertida, duracao_minutos
     });
+    await validarModalidade(tx, modalidade_id);
     await bloquearProfissionalAtivo(tx, profissional_id);
 
     validarInicioNaoPassado(data_inicio, hora_inicio);
@@ -339,7 +341,7 @@ async function agendarAtendimentoService(dadosAtendimento) {
       data: {
         aluno_id,
         profissional_id,
-        modalidade: modalidade.trim(),
+        modalidade_id,
         tipo_recorrencia,
         data_inicio: dataInicioConvertida,
         hora_inicio: horaInicioConvertida,
@@ -362,10 +364,10 @@ async function agendarAtendimentoService(dadosAtendimento) {
       }))
     });
 
-    return tx.atendimento_clinico.findUnique({
+    return comNomeModalidade(await tx.atendimento_clinico.findUnique({
       where: { id: atendimento.id },
-      include: { sessoes: true }
-    });
+      include: { sessoes: true, modalidade_cadastrada: { select: { nome: true } } }
+    }));
   }, { isolationLevel: 'ReadCommitted' });
 }
 
@@ -410,20 +412,20 @@ function restricoesAtendimento(atendimento, agora) {
   const iniciou = primeiroInicio !== null && primeiroInicio <= agora.getTime();
   return { possui_sessoes_iniciadas: iniciou,
     inicio_primeira_sessao: primeiroInicio === null ? null : new Date(primeiroInicio).toISOString().slice(0, -1),
-    pode_editar: !atendimento.data_cancelamento && atendimento.status !== 'INATIVO'
+    pode_editar: !atendimento.data_cancelamento && atendimento.status !== 'INATIVO' && !recorrenciaVencida(atendimento, agora)
       && (atendimento.tipo_recorrencia !== 'EVENTUAL' || (!iniciou && obterInicioSessao(atendimento.data_inicio, atendimento.hora_inicio) > agora.getTime())) };
 }
 
 async function buscarAtendimento(tx, aluno_id, atendimento_id) {
   const atendimento = await tx.atendimento_clinico.findFirst({ where: { id: atendimento_id, aluno_id, aluno: { deleted_at: null } },
-    include: { sessoes: true, profissional: { select: { id: true, pessoa: { select: { nome: true } } } } } });
+    include: { sessoes: true, modalidade_cadastrada: { select: { nome: true } }, profissional: { select: { id: true, pessoa: { select: { nome: true } } } } } });
   if (!atendimento) throw Object.assign(new Error('Atendimento não encontrado para este aluno.'), { statusCode: 404 });
   return atendimento;
 }
 
 function respostaAtendimento(atendimento, agora) {
   const { sessoes, ...dados } = atendimento;
-  return { ...dados, ...restricoesAtendimento(atendimento, agora) };
+  return { ...comNomeModalidade(dados), ...restricoesAtendimento(atendimento, agora) };
 }
 
 async function obterAtendimentoService({ aluno_id, atendimento_id }) {
@@ -455,12 +457,14 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
     await bloquearCalendarios(tx);
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
     const referencia = await buscarAtendimento(tx, aluno_id, atendimento_id);
-    const agora = agoraInstituicao();
+    const instanteReferencia = agoraInstituicao();
     const profissionais = [...new Set([referencia.profissional_id, dados.profissional_id,
-      ...referencia.sessoes.filter((s) => !s.data_cancelamento && inicioSessao(s) > agora.getTime()).map((s) => s.profissional_id),
+      ...referencia.sessoes.filter((s) => !s.data_cancelamento && inicioSessao(s) > instanteReferencia.getTime()).map((s) => s.profissional_id),
     ].filter(Number.isInteger))].sort((a, b) => a - b);
     for (const profissionalId of profissionais) await tx.$queryRaw`SELECT "id" FROM "funcionario" WHERE "id" = ${profissionalId} FOR UPDATE`;
     const atual = await buscarAtendimento(tx, aluno_id, atendimento_id);
+    const agora = agoraInstituicao();
+    if (recorrenciaVencida(atual, agora)) throw Object.assign(new Error('Não é possível editar uma recorrência encerrada.'), { statusCode: 409 });
     const restricoes = restricoesAtendimento(atual, agora);
     if (!restricoes.pode_editar) throw Object.assign(new Error('Este atendimento já foi cancelado ou não permite edição após seu início.'), { statusCode: 409 });
     const eventual = atual.tipo_recorrencia === 'EVENTUAL';
@@ -470,7 +474,7 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
     const base = { ...atual, data_inicio: atual.data_inicio.toISOString().slice(0, 10),
       hora_inicio: atual.hora_inicio.toISOString().slice(11, 16), data_termino: atual.data_termino?.toISOString().slice(0, 10),
       frequencia: atual.frequencia ?? undefined };
-    if (restricoes.possui_sessoes_iniciadas && ['data_inicio', 'modalidade', 'tipo_recorrencia'].some((c) => dados[c] !== undefined && dados[c] !== base[c])) {
+    if (restricoes.possui_sessoes_iniciadas && ['data_inicio', 'modalidade_id', 'tipo_recorrencia'].some((c) => dados[c] !== undefined && dados[c] !== base[c])) {
       throw Object.assign(new Error('Após o início de uma sessão, não é permitido alterar modalidade, data inicial ou tipo de recorrência.'), { statusCode: 409 });
     }
     if (dados.tipo_recorrencia && dados.tipo_recorrencia !== atual.tipo_recorrencia &&
@@ -478,6 +482,7 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
       throw criarErroValidacao('Ao mudar o tipo de recorrência, informe novamente a frequência e os dias exigidos pelo novo tipo.');
     }
     const completos = criarAtendimentoDTO.parse({ ...base, ...dados });
+    await validarModalidade(tx, completos.modalidade_id);
     const campos = Object.keys(dados).filter((campo) => JSON.stringify(campo === 'dias_semana' ? [...new Set(dados[campo])].sort() : completos[campo])
       !== JSON.stringify(campo === 'dias_semana' ? [...new Set(base[campo])].sort() : base[campo]));
     if (eventual && ['frequencia', 'dias_semana', 'data_termino'].some((c) => c in dados)) throw criarErroValidacao('Atendimentos eventuais não possuem configuração de recorrência.');
@@ -509,7 +514,7 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
     await tx.atendimento_sessao.updateMany({ where: { id: { in: futuras.filter((s) => !usados.has(s.id)).map((s) => s.id) }, data_cancelamento: null },
       data: { data_cancelamento: obterDia(agora.getTime()), ...(status === 'PROVISORIO' ? {} : { status: 'INATIVO' }) } });
     await tx.atendimento_clinico.update({ where: { id: atendimento_id }, data: {
-      profissional_id: completos.profissional_id, modalidade: completos.modalidade, tipo_recorrencia: completos.tipo_recorrencia,
+      profissional_id: completos.profissional_id, modalidade_id: completos.modalidade_id, tipo_recorrencia: completos.tipo_recorrencia,
       data_inicio: converterData(completos.data_inicio), hora_inicio: hora, duracao_minutos: completos.duracao_minutos,
       frequencia: eventual ? null : completos.frequencia, dias_semana: completos.tipo_recorrencia === 'SEMANAL' ? [...new Set(completos.dias_semana)].sort((a,b) => a-b) : [],
       data_termino: eventual ? null : converterData(completos.data_termino), status

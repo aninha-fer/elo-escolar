@@ -5,14 +5,14 @@ function normalizarTexto(valor) {
     return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
 }
 
-export function SeletorProfissional({ profissionais, value, onChange, tipo, carregando, erroCarga, onTentarNovamente, error }) {
+export function SeletorProfissional({ profissionais, value, onChange, carregando, erroCarga, onTentarNovamente, error }) {
     const [busca, setBusca] = useState('');
     const filtrados = profissionais.filter((profissional) => normalizarTexto(profissional.nome).includes(normalizarTexto(busca)));
 
     return (
         <fieldset className="mb-md min-w-0" aria-describedby={error ? 'turma-profissional-erro' : undefined}>
             <legend className="mb-sm font-mono text-xs font-semibold uppercase tracking-wider text-slate-600">
-                {tipo === 'REGULAR' ? 'Professores e auxiliares' : 'Professores e oficineiros'} <span className="text-danger">*</span>
+                Professores e auxiliares <span className="text-danger">*</span>
             </legend>
             <p className="mb-sm text-xs text-text-muted">Selecione um profissional responsável.</p>
             <div className="overflow-hidden rounded-sm border border-slate-200">

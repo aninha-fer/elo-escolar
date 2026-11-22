@@ -16,7 +16,9 @@ const criarProfissionalBaseDTO = z.object({
         (valor) => typeof valor === 'string' ? valor.trim().toLowerCase() || undefined : valor === null ? undefined : valor,
         z.string().max(254).pipe(z.email()).optional()
     ),
-    cargo: z.string({ required_error: "Cargo é obrigatório" }).trim().min(2, "Cargo muito curto")
+    cargo: z.string({ required_error: "Cargo é obrigatório" }).trim().pipe(
+        z.enum(['Professor', 'Clínico', 'Auxiliar', 'Outro'], { error: 'Selecione Professor, Clínico, Auxiliar ou Outro.' })
+    )
 });
 
 const editarProfissionalDTO = criarProfissionalBaseDTO.pick({ nome: true, cargo: true }).extend({

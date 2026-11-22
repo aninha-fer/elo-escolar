@@ -5,10 +5,13 @@ const { criarTurmaDTO, editarTurmaDTO, excluirTurmaDTO, criarTurmaAPartirDTO } =
 const { bloquearProfissionalAtivo } = require('./profissionalService');
 const { filtroMatriculasParaEncerrar, bloquearTurmaParaEncerramento, encerrarMatriculasTurma, sincronizarTurmasExpiradas } = require('./encerramentoTurmaService');
 const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
+const { filtroMatriculasAtivas, matriculaVigente } = require('./encerramentoAtividade');
 
 function validarConfirmacao(matriculas, confirmacao, obrigatoria = false) {
-    const ids = matriculas.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b);
-    const ativas = matriculas.filter((m) => m.status === 'ATIVO').length;
+    const hoje = hojeInstituicao();
+    const vigentes = matriculas.filter((m) => matriculaVigente(m, hoje));
+    const ids = vigentes.map((m) => m.id).sort((a, b) => a - b);
+    const ativas = vigentes.filter((m) => m.status === 'ATIVO').length;
     if ((obrigatoria || ids.length || confirmacao) && (JSON.stringify(ids) !== JSON.stringify(confirmacao?.matriculas) || ativas !== confirmacao?.matriculas_ativas)) {
         throw Object.assign(new Error('Confirme o cancelamento das matrículas atuais da turma.'), {
             statusCode: 409, confirmacao: { matriculas: ids, matriculas_ativas: ativas },
@@ -32,6 +35,7 @@ function gerarHorariosTurma({ tipo, turno, hora_inicio, hora_fim, dias_semana })
 
 async function listarTurmasService(tipo, paginacao, filtros = {}) {
     if (tipo !== 'OFICINA') await sincronizarTurmasExpiradas();
+    const hoje = hojeInstituicao();
     const status = filtros.status ?? paginacao?.status ?? 'TODOS';
     const ano = filtros.ano ?? paginacao?.ano;
     const pagina = paginacao ? await paginarIds('turmas', { ...paginacao, tipo, status, ano }) : null;
@@ -49,7 +53,7 @@ async function listarTurmasService(tipo, paginacao, filtros = {}) {
             _count: {
                 select: {
                     matriculas: {
-                        where: { status: 'ATIVO' }
+                        where: filtroMatriculasAtivas(hoje)
                     }
                 }
             },
@@ -67,13 +71,14 @@ async function listarTurmasService(tipo, paginacao, filtros = {}) {
 }
 
 async function listarTurmasRegularesPorTurnoService(turno) {
+    const hoje = hojeInstituicao();
     const turmas = await prisma.turma.findMany({
         where: {
             tipo: 'REGULAR',
             deleted_at: null,
             ...(turno ? { turno } : {}),
             status: 'ATIVO',
-            ano_letivo: { data_fim: { gte: hojeInstituicao() } },
+            ano_letivo: { data_fim: { gte: hoje } },
         },
         include: {
             ano_letivo: true, horarios: true,
@@ -84,7 +89,7 @@ async function listarTurmasRegularesPorTurnoService(turno) {
             _count: {
                 select: {
                     matriculas: {
-                        where: { status: 'ATIVO' }
+                        where: filtroMatriculasAtivas(hoje)
                     }
                 }
             },
@@ -120,11 +125,11 @@ async function criarTurmaNaTransacao(tx, dados) {
     }
 
     const profissional = await bloquearProfissionalAtivo(tx, profissional_id);
-    const cargosPermitidos = tipo === 'REGULAR' ? ['professor', 'auxiliar'] : ['professor', 'oficineiro'];
+    const cargosPermitidos = ['professor', 'auxiliar'];
     if (!cargosPermitidos.includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'))) {
         throw Object.assign(new Error(tipo === 'REGULAR'
             ? 'Selecione um professor ou auxiliar para a turma regular.'
-            : 'Selecione um professor ou oficineiro para a oficina.'), { statusCode: 400 });
+            : 'Selecione um professor ou auxiliar para a oficina.'), { statusCode: 400 });
     }
     if (ambiente_id !== undefined) {
         const ambiente = await tx.ambiente.findUnique({ where: { id: ambiente_id }, select: { id: true } });
@@ -164,7 +169,7 @@ async function obterOrigemNovaTurma(cliente, id) {
 async function consultarCandidatosNovaTurma(cliente, turno, ids) {
     return cliente.aluno.findMany({
         where: { status: 'ATIVO', deleted_at: null, turno, ...(ids ? { id: { in: ids } } : {}),
-            matriculas_turmas: { none: { status: 'ATIVO', turma: { tipo: 'REGULAR', status: 'ATIVO', deleted_at: null } } },
+            matriculas_turmas: { none: { ...filtroMatriculasAtivas(), turma: { tipo: 'REGULAR', status: 'ATIVO', deleted_at: null } } },
         },
         select: { id: true, participa_procan: true, pessoa: { select: { nome: true } } },
         orderBy: [{ pessoa: { nome: 'asc' } }, { id: 'asc' }],
@@ -212,6 +217,7 @@ async function criarTurmaAPartirService(id, entrada) {
 
 async function obterTurmaService(turma_id, incluirAlunos = true) {
   await sincronizarTurmasExpiradas({ turmaIds: [turma_id] });
+  const hoje = hojeInstituicao();
   const turma = await prisma.turma.findUnique({
     where: { id: turma_id, deleted_at: null },
     select: {
@@ -232,7 +238,7 @@ async function obterTurmaService(turma_id, incluirAlunos = true) {
         orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]
       },
       ...(incluirAlunos ? { matriculas: {
-        where: { status: 'ATIVO', aluno: { deleted_at: null } },
+        where: { ...filtroMatriculasAtivas(hoje), aluno: { deleted_at: null } },
         orderBy: [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }],
         select: {
           aluno: {
@@ -247,26 +253,61 @@ async function obterTurmaService(turma_id, incluirAlunos = true) {
   });
   if (!turma) return null;
   const cancelamentos = incluirAlunos ? await prisma.matricula_turma.findMany({
-    where: { turma_id, ...filtroMatriculasParaEncerrar }, select: { id: true, status: true },
+    where: { turma_id, ...filtroMatriculasParaEncerrar }, select: { id: true, status: true, data_fim: true },
   }) : [];
   const { matriculas = [], _count, ...dados } = turma;
-  const quantidadeAtivas = incluirAlunos ? cancelamentos.filter((m) => m.status === 'ATIVO').length
-    : await prisma.matricula_turma.count({ where: { turma_id, status: 'ATIVO' } });
+  const vigentes = cancelamentos.filter((m) => matriculaVigente(m, hoje));
+  const quantidadeAtivas = incluirAlunos ? vigentes.filter((m) => m.status === 'ATIVO').length
+    : await prisma.matricula_turma.count({ where: { turma_id, ...filtroMatriculasAtivas(hoje) } });
   return { ...comExpiracao(dados), possui_matriculas: (_count?.matriculas ?? matriculas.length) > 0, alunos: matriculas.map((matricula) => matricula.aluno),
     matriculas_ativas: quantidadeAtivas,
-    ...(incluirAlunos ? { confirmacao_cancelamentos: { matriculas: cancelamentos.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b),
+    ...(incluirAlunos ? { confirmacao_cancelamentos: { matriculas: vigentes.map((m) => m.id).sort((a, b) => a - b),
       matriculas_ativas: quantidadeAtivas } } : {}) };
 }
 
 async function listarAlunosTurmaService(turmaId, paginacao) {
     await sincronizarTurmasExpiradas({ turmaIds: [turmaId] });
+    const hoje = hojeInstituicao();
     const turma = await prisma.turma.findUnique({ where: { id: turmaId, deleted_at: null }, select: { id: true } });
     if (!turma) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
-    const pagina = await paginarIds('alunos_turma', paginacao, { turmaId });
-    const matriculas = await prisma.matricula_turma.findMany({ where: { id: { in: pagina.ids }, turma_id: turmaId },
+    const pagina = await paginarIds('alunos_turma', paginacao, { turmaId, hoje });
+    const matriculas = await prisma.matricula_turma.findMany({ where: { id: { in: pagina.ids }, turma_id: turmaId, ...filtroMatriculasAtivas(hoje) },
         select: { id: true, aluno: { select: { id: true, dias_frequencia: true, pessoa: { select: { nome: true } } } } } });
     const resultado = formatarPagina(matriculas, pagina);
     return { ...resultado, itens: resultado.itens.map((m) => m.aluno) };
+}
+
+async function obterDiarioTurmaService(id, mes) {
+    const hoje = hojeInstituicao();
+    const turma = await prisma.turma.findUnique({ where: { id, deleted_at: null }, select: {
+        nome: true, tipo: true, status: true,
+        ano_letivo: { select: { ano: true, data_inicio: true, data_fim: true } },
+        matriculas: { where: { ...filtroMatriculasAtivas(hoje), aluno: { deleted_at: null } },
+            orderBy: [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }],
+            select: { aluno: { select: { id: true, dias_frequencia: true, pessoa: { select: { nome: true } } } } } },
+    } });
+    if (!turma) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
+    if (turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
+        throw Object.assign(new Error('O diário de classe está disponível somente para turmas regulares ativas.'), { statusCode: 409 });
+    }
+    const calendario = turma.ano_letivo;
+    if (!calendario) throw Object.assign(new Error('A turma não possui calendário letivo cadastrado.'), { statusCode: 409 });
+    const inicioMes = new Date(0); inicioMes.setUTCFullYear(calendario.ano, mes - 1, 1);
+    if (calendario.ano < hoje.getUTCFullYear() || (calendario.ano === hoje.getUTCFullYear() && mes < hoje.getUTCMonth() + 1)) {
+        throw Object.assign(new Error('Selecione o mês atual ou um mês futuro.'), { statusCode: 400 });
+    }
+    const fimMes = new Date(inicioMes); fimMes.setUTCMonth(mes, 0);
+    const inicio = new Date(Math.max(+inicioMes, +calendario.data_inicio));
+    const fim = new Date(Math.min(+fimMes, +calendario.data_fim));
+    let possuiDiaUtil = false;
+    for (const dia = new Date(inicio); dia <= fim; dia.setUTCDate(dia.getUTCDate() + 1)) {
+        if (dia.getUTCDay() !== 0 && dia.getUTCDay() !== 6) { possuiDiaUtil = true; break; }
+    }
+    if (!possuiDiaUtil) throw Object.assign(new Error('O mês selecionado não possui dias úteis dentro do calendário letivo.'), { statusCode: 400 });
+    const alunos = [...new Map(turma.matriculas.map(({ aluno }) => [aluno.id, {
+        nome: aluno.pessoa.nome, dias_frequencia: [...aluno.dias_frequencia].sort((a, b) => a - b),
+    }])).values()];
+    return { nome: turma.nome, calendario, alunos };
 }
 
 async function editarTurmaService(id, entrada) {
@@ -281,7 +322,8 @@ async function editarTurmaService(id, entrada) {
         if (!turma || turma.deleted_at) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
         const matriculas = await tx.matricula_turma.groupBy({ by: ['status', 'data_fim'], where: { turma_id: id }, _count: { _all: true } });
         const possuiMatriculas = matriculas.some((grupo) => grupo._count._all > 0);
-        const ocupacao = matriculas.filter((grupo) => grupo.status === 'ATIVO').reduce((total, grupo) => total + grupo._count._all, 0);
+        const hoje = hojeInstituicao();
+        const ocupacao = matriculas.filter((grupo) => grupo.status === 'ATIVO' && matriculaVigente(grupo, hoje)).reduce((total, grupo) => total + grupo._count._all, 0);
         const regular = turma.tipo === 'REGULAR';
         if (regular && ['hora_inicio', 'hora_fim', 'dias_semana'].some((campo) => dados[campo] !== undefined)) {
             throw Object.assign(new Error('O cronograma de turmas regulares é definido pelo turno.'), { statusCode: 400 });
@@ -310,7 +352,7 @@ async function editarTurmaService(id, entrada) {
         }
         if (dados.profissional_id !== undefined || dados.status === 'ATIVO') {
             const profissional = await bloquearProfissionalAtivo(tx, dados.profissional_id ?? turma.profissional_id);
-            const permitido = (regular ? ['professor', 'auxiliar'] : ['professor', 'oficineiro']).includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'));
+            const permitido = ['professor', 'auxiliar'].includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'));
             if (!permitido || profissional.pessoa.status_geral !== 'ATIVO') {
                 throw Object.assign(new Error('Selecione um profissional ativo com função compatível com a turma.'), { statusCode: 400 });
             }
@@ -362,4 +404,4 @@ async function excluirTurmaService(id, entrada = {}) {
     }, { isolationLevel: 'ReadCommitted' });
 }
 
-module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService };
+module.exports = { listarTurmasService, listarTurmasRegularesPorTurnoService, criarTurmaService, obterTurmaService, editarTurmaService, excluirTurmaService, prepararNovaTurmaService, criarTurmaAPartirService, listarAlunosTurmaService, obterDiarioTurmaService };

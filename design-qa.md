@@ -60,3 +60,15 @@ Validação complementar: 572 testes de backend aprovados; cinco testes da trans
 Não foram encontrados problemas bloqueantes na Home nos tamanhos inspecionados. A comparação formal com o arquivo original continua limitada à imagem disponível na conversa; isso não modifica a limitação registrada para o login acima.
 
 Resultado da Home: aprovado nas verificações funcionais e visuais descritas.
+
+## Cards de turmas regulares e oficinas — 21/11/2026
+
+Referências: os dois protótipos anexados à conversa, com aproximadamente 1940 × 250 px. A comparação considerou a composição dos cards na escala de aproximadamente 2/3, preservando a tipografia e os tokens do projeto. Não foram necessários novos assets.
+
+Implementação verificada na listagem `/turmas`, com dados fictícios correspondentes aos protótipos, viewport 1640 × 1000 CSS px e DPR 1. Os cards capturados medem 1294 × 166 px. Evidências: `C:/Users/anafe/AppData/Local/Temp/elo-turma-cards-0r0kVX/regular.png` e `oficina.png` no mesmo diretório.
+
+A primeira comparação identificou excesso de altura e deslocamento das colunas da turma regular. Foram ajustadas a altura do cabeçalho, a margem interna vertical e as proporções das colunas. As capturas finais foram abertas e conferidas com as referências: título e status no cabeçalho, divisor, rótulos em maiúsculas, valores, tags de professores e descrição.
+
+Verificações automatizadas no navegador: ordem dos campos e dos dias, horário da oficina, vários professores, conteúdo extenso, valores ausentes, ações sem navegação indevida, navegação ao selecionar o card e bloqueio de ativação da turma expirada. Em 1280, 1024 e 768 px, os cards se reorganizam sem overflow horizontal. O estilo original do `CampoInformacao` na tela de detalhes foi preservado. Não houve exceções de execução. Lint dos componentes alterados e build aprovados.
+
+final result: passed

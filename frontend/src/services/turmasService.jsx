@@ -1,6 +1,9 @@
 import { api } from './api';
 
 export const turmasService = {
+  async buscarDiario(id, mes, signal) {
+    return (await api.get(`/turmas/${id}/diario`, { params: { mes }, signal })).data;
+  },
   async listarOficinasAtivas(signal) {
     const { data } = await api.get('/turmas', { params: { tipo: 'OFICINA', status: 'ATIVO' }, signal });
     return data;
