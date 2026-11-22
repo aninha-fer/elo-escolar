@@ -56,7 +56,7 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
     }
 
     return (
-        <li data-testid={`oficina-inscricao-${oficina.id}`} className="flex items-center justify-between gap-lg border-t border-gray-300 px-lg py-md first:border-t-0">
+        <li data-testid={`oficina-inscricao-${oficina.turma_id ?? oficina.id}`} className="flex items-center justify-between gap-lg border-t border-gray-300 px-lg py-md first:border-t-0">
             <div>
                 <h3 className="text-base font-bold text-text-main">{oficina.turma_nome ?? oficina.nome}
                     {avisoInativa}
@@ -67,7 +67,7 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
                     {' · '}{dias}
                 </p>
             </div>
-            {permissao && <button data-testid={`oficina-inscricao-${oficina.matricula_id ?? oficina.id}-cancelar`}
+            {permissao && <button data-testid={`oficina-inscricao-${oficina.turma_id ?? oficina.id}-cancelar`}
                 type="button"
                 className="shrink-0 rounded-sm border-1 border-danger bg-danger/20 px-md py-xs text-sm font-semibold text-danger transition-colors hover:bg-danger/30 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={cancelando || !onCancelar}
