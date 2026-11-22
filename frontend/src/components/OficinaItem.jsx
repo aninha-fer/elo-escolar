@@ -56,7 +56,7 @@ export function OficinaItem({ oficina, turno, modo = 'ativa', selecionada = fals
     }
 
     return (
-        <li data-testid={`oficina-inscricao-${oficina.matricula_id ?? oficina.id}`} className="flex items-center justify-between gap-lg border-t border-gray-300 px-lg py-md first:border-t-0">
+        <li data-testid={`oficina-inscricao-${oficina.id}`} className="flex items-center justify-between gap-lg border-t border-gray-300 px-lg py-md first:border-t-0">
             <div>
                 <h3 className="text-base font-bold text-text-main">{oficina.turma_nome ?? oficina.nome}
                     {avisoInativa}
