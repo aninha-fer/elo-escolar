@@ -720,9 +720,9 @@ A documentação prevê gestão dos profissionais da instituição.
 Os profissionais podem possuir funções como:
 
 - Professor;
-- Oficineiro;
-- Terapeuta;
-- Auxiliar.
+- Clínico;
+- Auxiliar;
+- Outro.
 
 Dados previstos incluem:
 

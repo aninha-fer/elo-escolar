@@ -125,11 +125,11 @@ async function criarTurmaNaTransacao(tx, dados) {
     }
 
     const profissional = await bloquearProfissionalAtivo(tx, profissional_id);
-    const cargosPermitidos = tipo === 'REGULAR' ? ['professor', 'auxiliar'] : ['professor', 'oficineiro'];
+    const cargosPermitidos = ['professor', 'auxiliar'];
     if (!cargosPermitidos.includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'))) {
         throw Object.assign(new Error(tipo === 'REGULAR'
             ? 'Selecione um professor ou auxiliar para a turma regular.'
-            : 'Selecione um professor ou oficineiro para a oficina.'), { statusCode: 400 });
+            : 'Selecione um professor ou auxiliar para a oficina.'), { statusCode: 400 });
     }
     if (ambiente_id !== undefined) {
         const ambiente = await tx.ambiente.findUnique({ where: { id: ambiente_id }, select: { id: true } });
@@ -352,7 +352,7 @@ async function editarTurmaService(id, entrada) {
         }
         if (dados.profissional_id !== undefined || dados.status === 'ATIVO') {
             const profissional = await bloquearProfissionalAtivo(tx, dados.profissional_id ?? turma.profissional_id);
-            const permitido = (regular ? ['professor', 'auxiliar'] : ['professor', 'oficineiro']).includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'));
+            const permitido = ['professor', 'auxiliar'].includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'));
             if (!permitido || profissional.pessoa.status_geral !== 'ATIVO') {
                 throw Object.assign(new Error('Selecione um profissional ativo com função compatível com a turma.'), { statusCode: 400 });
             }

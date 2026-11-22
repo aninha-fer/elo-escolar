@@ -5,7 +5,7 @@ import { Input } from '../../components/Input';
 import { profissionaisService } from '../../services/profissionaisService';
 import { SaveIcon } from '../../components/icons/SaveIcon';
 
-const funcoes = ['Professor', 'Terapeuta', 'Auxiliar'];
+const funcoes = ['Professor', 'Clínico', 'Auxiliar', 'Outro'];
 
 export function FormularioProfissional({ profissional, onClose, onCriado, onSalvo, trapFocus = false }) {
     const { notificar } = useToast();
@@ -14,7 +14,6 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
     const [erros, setErros] = useState({});
     const [enviando, setEnviando] = useState(false);
     const envioEmAndamento = useRef(false);
-    const funcoesDisponiveis = [...new Set([...funcoes, ...(profissional?.funcao ? [profissional.funcao] : [])])];
     const dadosAlterados = {
         ...(editando && formulario.nome.trim() !== profissional.nome ? { nome: formulario.nome.trim() } : {}),
         ...(editando && (formulario.telefone.replace(/\D/g, '') || null) !== profissional.telefone ? { telefone: formulario.telefone.replace(/\D/g, '') || null } : {}),
@@ -40,7 +39,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
         if (nome.length < 2) novosErros.nome = 'Informe o nome completo, com pelo menos 2 caracteres.';
         if (telefone && !/^\d{10,11}$/.test(telefone)) novosErros.telefone = 'Informe um telefone com DDD e 10 ou 11 dígitos.';
         if (formulario.telefone.trim() && !telefone) novosErros.telefone = 'Informe um telefone válido ou deixe o campo vazio.';
-        if (!funcoesDisponiveis.includes(formulario.cargo)) novosErros.cargo = 'Selecione uma função.';
+        if (!funcoes.includes(formulario.cargo)) novosErros.cargo = 'Selecione uma função.';
         setErros(novosErros);
         const primeiroErro = Object.keys(novosErros)[0];
         if (primeiroErro) {
@@ -98,7 +97,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
                         <fieldset className="mb-md" {...acessibilidadeCampo('cargo')}>
                             <legend className="mb-sm font-mono text-xs font-semibold uppercase tracking-wider text-slate-600">Função <span className="text-danger">*</span></legend>
                             <div className="flex flex-wrap gap-sm">
-                                {funcoesDisponiveis.map((funcao) => (
+                                {funcoes.map((funcao) => (
                                     <label key={funcao} className="cursor-pointer">
                                         <input data-testid={`profissional-formulario-funcao-${funcao.toLowerCase()}`} type="radio" name="cargo" value={funcao} checked={formulario.cargo === funcao} required
                                             onChange={(event) => atualizarCampo('cargo', event.target.value)} className="peer sr-only" />

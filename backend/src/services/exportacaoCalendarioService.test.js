@@ -17,7 +17,7 @@ function matricula(id, tipo = 'OFICINA', status = 'ATIVO') {
 }
 function sessao(data = '2026-11-20', inicio = '13:00', status = 'ATIVO') {
     return { data_sessao: dia(data), hora_inicio: hora(inicio), status, data_cancelamento: null, profissional_id: 2,
-        profissional: { pessoa: { nome: 'Terapeuta da sessão' } }, duracao_minutos: 40 };
+        profissional: { pessoa: { nome: 'Clínico da sessão' } }, duracao_minutos: 40 };
 }
 function atendimento(tipo = 'SEMANAL', status = 'ATIVO') {
     return { id: 3, tipo_recorrencia: tipo, frequencia: 1, status, data_cancelamento: null,

@@ -187,10 +187,17 @@ test('horários fora das faixas e campos específicos do tipo errado são recusa
     assert.equal((await editar({ ambiente_id: 2, ano_letivo_id: 2027 })).code, 400);
 });
 
+for (const cargo of ['Professor', 'Auxiliar']) {
+    test(`oficina aceita ${cargo} como responsável na edição`, async (t) => {
+        simular(t, { tipo: 'OFICINA', cargo });
+        assert.equal((await editar({ profissional_id: 9 })).code, 200);
+    });
+}
+
 for (const [opcoes, body, esperado] of [
     [{ salaInexistente: true }, { ambiente_id: 99 }, 404],
     [{ profissionalInexistente: true }, { ambiente_id: 2, profissional_id: 9 }, 404],
-    [{ cargo: 'Terapeuta' }, { ambiente_id: 2, profissional_id: 9 }, 400],
+    [{ cargo: 'Clínico' }, { ambiente_id: 2, profissional_id: 9 }, 400],
     [{ statusProfissional: 'INATIVO' }, { ambiente_id: 2, profissional_id: 9 }, 400],
     [{ estado: { turma: null } }, { status: 'ATIVO' }, 404],
 ]) {

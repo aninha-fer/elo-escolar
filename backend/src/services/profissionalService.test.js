@@ -13,6 +13,29 @@ function resposta() {
     };
 }
 
+test('cadastro e edição aceitam somente os quatro cargos disponíveis no formulário', () => {
+    const { criarProfissionalDTO, editarProfissionalDTO } = require('../dtos/profissionalDTO');
+    for (const cargo of ['Professor', 'Clínico', 'Auxiliar', 'Outro']) {
+        assert.equal(criarProfissionalDTO.parse({ nome: 'Profissional', cargo: ` ${cargo} ` }).cargo, cargo);
+        assert.equal(editarProfissionalDTO.parse({ cargo: ` ${cargo} ` }).cargo, cargo);
+    }
+    for (const cargo of ['Cargo inexistente', 'professor', 'Terapeuta', '', null]) {
+        assert.equal(criarProfissionalDTO.safeParse({ nome: 'Profissional', cargo }).success, false);
+        assert.equal(editarProfissionalDTO.safeParse({ cargo }).success, false);
+    }
+});
+
+test('API rejeita cargo desconhecido no cadastro e na edição antes de iniciar transação', async (t) => {
+    const original = prisma.$transaction;
+    t.after(() => { prisma.$transaction = original; });
+    prisma.$transaction = () => assert.fail('Cargo inválido não deve iniciar transação.');
+    const criado = resposta(), editado = resposta();
+    await criarProfissional({ body: { nome: 'Profissional', cargo: 'Cargo inexistente' } }, criado);
+    await editarProfissional({ params: { id: '7' }, body: { cargo: 'Cargo inexistente' } }, editado);
+    assert.equal(criado.statusCode, 400);
+    assert.equal(editado.statusCode, 400);
+});
+
 test('cadastro recebe cargo do DTO e cria pessoa e funcionário na mesma transação', async (t) => {
     const original = prisma.$transaction;
     t.after(() => { prisma.$transaction = original; });
@@ -125,7 +148,7 @@ test('rota oficial lista profissionais com permissão e a rota temporária foi r
     const original = prisma.funcionario.findMany;
     t.after(() => { prisma.funcionario.findMany = original; });
     prisma.funcionario.findMany = async () => [
-        { id: 7, pessoa_id: 50, cargo: 'Terapeuta', pessoa: { nome: 'Ana', telefone: null, status_geral: 'ATIVO' } },
+        { id: 7, pessoa_id: 50, cargo: 'Clínico', pessoa: { nome: 'Ana', telefone: null, status_geral: 'ATIVO' } },
     ];
     const app = express();
     app.use('/api', (req, res, next) => {
@@ -143,7 +166,7 @@ test('rota oficial lista profissionais com permissão e a rota temporária foi r
     const oficial = await fetch(`${baseUrl}/profissionais`);
     assert.equal(oficial.status, 200);
     assert.deepEqual(await oficial.json(), [
-        { id: 7, pessoa_id: 50, nome: 'Ana', telefone: null, funcao: 'Terapeuta', status_geral: 'ATIVO' },
+        { id: 7, pessoa_id: 50, nome: 'Ana', telefone: null, funcao: 'Clínico', status_geral: 'ATIVO' },
     ]);
     const semPermissao = await fetch(`${baseUrl}/profissionais`, { headers: { 'x-test-role': 'professor' } });
     assert.equal(semPermissao.status, 403);

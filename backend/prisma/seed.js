@@ -33,14 +33,14 @@ async function main() {
 
   console.log('Populando Profissionais...');
   const profissionaisNomes = [
-    { nome: 'Adriane', cargo: 'Regente' }, { nome: 'Karine', cargo: 'Regente' },
-    { nome: 'Sara', cargo: 'Regente' }, { nome: 'Ana', cargo: 'Regente' },
-    { nome: 'Magali', cargo: 'Regente' }, { nome: 'Rodrigo', cargo: 'Oficineiro' },
-    { nome: 'Gabriel', cargo: 'Oficineiro' }, { nome: 'Pâmela', cargo: 'Oficineiro' },
-    { nome: 'Elisete', cargo: 'Oficineiro' }, { nome: 'Ivanice', cargo: 'Oficineiro' },
-    { nome: 'Nair', cargo: 'Oficineiro' }, { nome: 'Isac', cargo: 'Oficineiro' },
-    { nome: 'Gunter', cargo: 'Oficineiro' }, { nome: 'Michele', cargo: 'Oficineiro' },
-    { nome: 'Claudia', cargo: 'Oficineiro' }
+    { nome: 'Adriane', cargo: 'Professor' }, { nome: 'Karine', cargo: 'Professor' },
+    { nome: 'Sara', cargo: 'Professor' }, { nome: 'Ana', cargo: 'Professor' },
+    { nome: 'Magali', cargo: 'Professor' }, { nome: 'Rodrigo', cargo: 'Professor' },
+    { nome: 'Gabriel', cargo: 'Professor' }, { nome: 'Pâmela', cargo: 'Professor' },
+    { nome: 'Elisete', cargo: 'Professor' }, { nome: 'Ivanice', cargo: 'Professor' },
+    { nome: 'Nair', cargo: 'Professor' }, { nome: 'Isac', cargo: 'Professor' },
+    { nome: 'Gunter', cargo: 'Professor' }, { nome: 'Michele', cargo: 'Professor' },
+    { nome: 'Claudia', cargo: 'Professor' }
   ];
 
   const profMap = {};

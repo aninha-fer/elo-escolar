@@ -10,7 +10,7 @@ function calendario(id = 1, nome = 'Aluno teste') {
             horarios: [1, 3].map((dia_semana) => ({ dia_semana, inicio: '08:15', fim: '09:15' })) }],
         turmas_regulares: [{ id: 2, nome: 'Girassol', profissional: 'Professor regular', sala: 'Sala 01', provisorio: false,
             horarios: [1, 2, 3, 4, 5].map((dia_semana) => ({ dia_semana, inicio: '07:30', fim: '11:30' })) }],
-        atendimentos: [{ id: 3, modalidade: 'Psicologia', profissional: 'Terapeuta teste', dias_semana: [2], hora_inicio: '10:00',
+        atendimentos: [{ id: 3, modalidade: 'Psicologia', profissional: 'Clínico teste', dias_semana: [2], hora_inicio: '10:00',
             duracao_minutos: 40, tipo_recorrencia: 'SEMANAL', frequencia: 2, proxima_data: '2026-11-24', provisorio: false }] };
 }
 
@@ -21,7 +21,7 @@ test('PDF individual compacto é A4 retrato, preserva os dados e inclui todas as
     assert.ok(Math.abs(pdf.internal.pageSize.getHeight() - 297) < 0.1);
     assert.ok(Math.abs(pdf.internal.pageSize.getWidth() - 210) < 0.1);
     const conteudo = pdf.output();
-    for (const texto of ['Aluno teste', 'Artes', '08:15', 'Professor das artes', 'Girassol', 'Sala 01', 'Professor regular', 'Psicologia', 'Terapeuta teste', '40 minutos', '20/11/2026']) assert.ok(conteudo.includes(texto), texto);
+    for (const texto of ['Aluno teste', 'Artes', '08:15', 'Professor das artes', 'Girassol', 'Sala 01', 'Professor regular', 'Psicologia', 'Clínico teste', '40 minutos', '20/11/2026']) assert.ok(conteudo.includes(texto), texto);
     assert.deepEqual(dados, antes);
 });
 

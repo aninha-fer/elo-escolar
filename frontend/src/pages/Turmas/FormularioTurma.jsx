@@ -127,7 +127,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
     const regular = formulario.tipo === 'REGULAR';
     const carregandoAlunos = !candidatos || candidatos.turno !== formulario.turno || candidatos.tentativa !== tentativa;
     const excedeuVagas = formulario.capacidade_maxima !== '' && selecionados.length > Number(formulario.capacidade_maxima);
-    const cargosPermitidos = regular ? ['professor', 'auxiliar'] : ['professor', 'oficineiro'];
+    const cargosPermitidos = ['professor', 'auxiliar'];
     const elegiveis = profissionais.dados.filter((profissional) => (editando && profissional.id === profissionalInicial)
         || (profissional.status_geral === 'ATIVO' && cargosPermitidos.includes(profissional.funcao?.trim().toLocaleLowerCase('pt-BR'))));
     const faixa = faixasOficina.find((opcao) => opcao.value === formulario.horario);
@@ -355,7 +355,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                             value={formulario.descricao} onChange={(event) => atualizarCampo('descricao', event.target.value)} {...acessibilidadeCampo('descricao')} />
                         {erroCampo('descricao')}
                     </div>
-                    <SeletorProfissional key={formulario.tipo} tipo={formulario.tipo} profissionais={elegiveis} value={formulario.profissional_id}
+                    <SeletorProfissional key={formulario.tipo} profissionais={elegiveis} value={formulario.profissional_id}
                         onChange={(valor) => atualizarCampo('profissional_id', valor)} carregando={profissionais.status === 'carregando'}
                         erroCarga={profissionais.erro} onTentarNovamente={tentarNovamente} error={erros.profissional_id} />
                     {criandoAPartir && profissionais.status === 'sucesso' && !profissionalValido && <p role="alert" className="mb-md text-sm text-amber-800">O profissional da turma anterior não está disponível. Selecione um profissional ativo com função compatível.</p>}
