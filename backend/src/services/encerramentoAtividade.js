@@ -13,6 +13,26 @@ function inicioOcorrencia(data, hora) {
   return data.getTime() + hora.getUTCHours() * 3600000 + hora.getUTCMinutes() * 60000;
 }
 
+function recorrenciaVencida(atendimento, agora = agoraInstituicao()) {
+  const hoje = new Date(agora);
+  hoje.setUTCHours(0, 0, 0, 0);
+  return ['SEMANAL', 'MENSAL'].includes(atendimento.tipo_recorrencia)
+    && Boolean(atendimento.data_termino && atendimento.data_termino < hoje);
+}
+
+function filtroMatriculasAtivas(agora = agoraInstituicao()) {
+  const hoje = new Date(agora);
+  hoje.setUTCHours(0, 0, 0, 0);
+  return { status: 'ATIVO', OR: [{ data_fim: null }, { data_fim: { gte: hoje } }] };
+}
+
+function matriculaVigente(matricula, agora = agoraInstituicao()) {
+  const hoje = new Date(agora);
+  hoje.setUTCHours(0, 0, 0, 0);
+  return matricula.status === 'PROVISORIO' ? !matricula.data_fim
+    : matricula.status === 'ATIVO' && (!matricula.data_fim || matricula.data_fim >= hoje);
+}
+
 function dataEncerramento(ocorrencias, agora = agoraInstituicao()) {
   const hoje = new Date(agora);
   hoje.setUTCHours(0, 0, 0, 0);
@@ -30,4 +50,4 @@ function fimMatricula(matricula, agora = agoraInstituicao(), limite) {
   return new Date(Math.min(fim.getTime(), matricula.data_fim?.getTime() ?? Infinity, limite?.getTime() ?? Infinity));
 }
 
-module.exports = { agoraInstituicao, inicioOcorrencia, dataEncerramento, fimMatricula, DIA_MS };
+module.exports = { agoraInstituicao, inicioOcorrencia, recorrenciaVencida, filtroMatriculasAtivas, matriculaVigente, dataEncerramento, fimMatricula, DIA_MS };

@@ -188,3 +188,27 @@ Remove-Item Env:TESTAR_SESSAO_POSTGRES
 Esse teste usa somente tabelas temporárias, removidas ao final da transação,
 sem modificar registros do sistema. Em `frontend`, execute os testes do monitor
 e da conexão com `node --test src/services/*.test.js`.
+
+## Vigência das matrículas
+
+Matrículas `ATIVO` com `data_fim` anterior ao dia atual em `America/Sao_Paulo`
+não ocupam vagas, não aparecem nos vínculos atuais e não impedem novas matrículas,
+troca de turno, redução de frequência ou ativação de rascunhos. O término é inclusivo:
+uma matrícula com término hoje permanece vigente até a virada do dia. Matrículas
+com início futuro continuam reservando vagas. Provisórias só participam do planejamento
+enquanto não possuem `data_fim`, sem ocupar vagas efetivas.
+
+O critério vale também para paginação, candidatos a nova turma, capacidade e diário.
+A reinscrição cria outro registro; a agenda histórica preserva a matrícula anterior.
+No encerramento da turma, vencidas não entram na confirmação de cancelamentos e
+suas datas anteriores são preservadas. A sincronização de turmas regulares cujo ano
+letivo terminou continua sob demanda.
+
+O teste de paginação no PostgreSQL usa tabelas temporárias, sem alterar os registros
+do sistema. Para executá-lo em `backend`, com o banco configurado no `.env`:
+
+```powershell
+$env:TESTAR_MATRICULAS_POSTGRES = '1'
+node --test src/services/paginacaoService.test.js
+Remove-Item Env:TESTAR_MATRICULAS_POSTGRES
+```

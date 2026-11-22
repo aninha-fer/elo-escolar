@@ -150,7 +150,11 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
             status: 'ATIVO', created_at: new Date('2026-01-01T00:00:00.000Z'), horarios: [horario] };
         simularConsultaTurma(t, async ({ where, select }) => {
             assert.deepEqual(where, { id: 10, deleted_at: null });
-            assert.deepEqual(select.matriculas.where, { status: 'ATIVO', aluno: { deleted_at: null } });
+            assert.equal(select.matriculas.where.status, 'ATIVO');
+            assert.deepEqual(select.matriculas.where.aluno, { deleted_at: null });
+            assert.deepEqual(select.matriculas.where.OR.map((f) => Object.keys(f)), [['data_fim'], ['data_fim']]);
+            assert.equal(select.matriculas.where.OR[0].data_fim, null);
+            assert.ok(select.matriculas.where.OR[1].data_fim.gte instanceof Date);
             assert.deepEqual(select.matriculas.orderBy, [{ aluno: { pessoa: { nome: 'asc' } } }, { aluno_id: 'asc' }, { id: 'asc' }]);
             assert.deepEqual(select.matriculas.select, { aluno: { select: {
                 id: true, dias_frequencia: true, pessoa: { select: { nome: true } }

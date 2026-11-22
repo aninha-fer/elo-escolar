@@ -26,7 +26,8 @@ test('diário retorna todos os alunos ativos, mesmo além de vinte, sem dados pe
     assert.equal(diario.alunos.length, 27);
     assert.deepEqual(diario.alunos[0], { nome: 'Aluno 01', dias_frequencia: [1, 3, 5] });
     assert.equal(consulta().where.deleted_at, null);
-    assert.deepEqual(consulta().select.matriculas.where, { status: 'ATIVO', aluno: { deleted_at: null } });
+    assert.deepEqual(consulta().select.matriculas.where, { status: 'ATIVO', aluno: { deleted_at: null },
+        OR: [{ data_fim: null }, { data_fim: { gte: new Date('2026-11-21T00:00:00Z') } }] });
     assert.equal(consulta().select.matriculas.take, undefined);
     assert.deepEqual(consulta().select.matriculas.select.aluno.select.pessoa, { select: { nome: true } });
 });

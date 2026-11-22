@@ -6,7 +6,7 @@ const { criarOcorrenciaService, listarOcorrenciasService, editarOcorrenciaServic
 const { matricularOficinasService, matricularTurmaRegularService, removerMatriculaProvisoriaService, cancelarOficinaService } = require('./matriculaService');
 const { agendarAtendimentoService, removerAtendimentoProvisorioService, editarAtendimentoService, cancelarAtendimentoService, obterAtendimentoService } = require('./atendimentoService');
 const { obterAgendaAlunoService } = require('./agendaService');
-const { editarTurmaService, listarTurmasService, listarTurmasRegularesPorTurnoService, excluirTurmaService, obterTurmaService } = require('./turmaService');
+const { editarTurmaService, listarTurmasService, listarTurmasRegularesPorTurnoService, excluirTurmaService, obterTurmaService, obterDiarioTurmaService } = require('./turmaService');
 const { removerMatriculaProvisoria } = require('../controllers/matriculaController');
 const { removerAtendimentoProvisorio } = require('../controllers/atendimentoController');
 const { editarProfissionalService, excluirProfissionalService, listarProfissionaisService } = require('./profissionalService');
@@ -1006,6 +1006,7 @@ function simularBanco(t, inicial = {}) {
     const ler = (nome) => [...estado[nome], ...pendentes[nome]].filter((item) => !removidos[nome].has(item.id))
       .map((item) => ({ ...(['aluno', 'funcionario', 'usuario', 'turma'].includes(nome) ? { deleted_at: null } : {}), ...item, ...atualizados[nome].get(item.id) }));
     function hidratar(nome, item) {
+      if (!item) return item;
       if (nome === 'usuario') return { ...item, pessoa: hidratar('pessoa', ler('pessoa').find((p) => p.id === item.pessoa_id)) };
       if (nome === 'funcionario') return { ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id) ?? { nome: item.nome, status_geral: 'ATIVO' } };
       if (nome === 'aluno') return { deleted_at: null, ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id),
@@ -1018,7 +1019,7 @@ function simularBanco(t, inicial = {}) {
         usuario: estado.usuario ? ler('usuario').find((u) => u.pessoa_id === item.id) ?? null : null,
         alunos_responsavel: ler('aluno_responsavel').filter((r) => r.pessoa_id === item.id) };
       if (nome === 'matricula_turma') return { ...item,
-        aluno: ler('aluno').find((outro) => outro.id === item.aluno_id),
+        aluno: hidratar('aluno', ler('aluno').find((outro) => outro.id === item.aluno_id)),
         turma: hidratar('turma', ler('turma').find((outro) => outro.id === item.turma_id)) };
       if (nome === 'atendimento_clinico') return { ...item,
         modalidade_cadastrada: ler('modalidade').find((m) => m.id === item.modalidade_id),
@@ -1033,18 +1034,22 @@ function simularBanco(t, inicial = {}) {
     for (const nome of Object.keys(estado)) {
       const buscar = (where = {}) => ler(nome).map((item) => hidratar(nome, item)).filter((item) => corresponde(item, where));
       resultado[nome] = {
-        async findUnique({ where, include }) {
+        async findUnique({ where, include, select }) {
           const item = buscar(where)[0] ?? null;
           if (item && nome === 'aluno' && include?.matriculas_turmas) {
             item.matriculas_turmas = await resultado.matricula_turma.findMany({ where: { aluno_id: item.id, ...include.matriculas_turmas.where } });
           }
+          if (item && nome === 'turma' && select?.matriculas) {
+            item.matriculas = await resultado.matricula_turma.findMany({ where: { turma_id: item.id, ...select.matriculas.where } });
+          }
           return item;
         },
         async findFirst({ where }) { return buscar(where)[0] ?? null; },
-        async findMany({ where = {} } = {}) {
+        async findMany({ where = {}, include } = {}) {
           const itens = buscar(where);
           if (nome === 'turma') for (const item of itens) item._count = {
-            matriculas: ler('matricula_turma').filter((m) => m.turma_id === item.id && m.status === 'ATIVO').length
+            matriculas: ler('matricula_turma').filter((m) => m.turma_id === item.id
+              && corresponde(hidratar('matricula_turma', m), include?._count?.select?.matriculas?.where ?? { status: 'ATIVO' })).length
           };
           return itens;
         },
@@ -1734,6 +1739,208 @@ async function prepararEdicaoAtendimento(t, status = 'ATIVO', configuracao = {})
   const atendimento = await agendarAtendimentoService({ ...pedidoClinico, tipo_recorrencia: 'SEMANAL', frequencia: 1,
     dias_semana: [1, 3], data_termino: '2026-11-16', ...configuracao });
   return { banco, atendimento, params: { aluno_id: 1, atendimento_id: atendimento.id } };
+}
+
+function matriculaVencidaTeste(turma_id = 10) {
+  return { id: 50, aluno_id: 2, turma_id, status: 'ATIVO', data_inicio: data('2026-10-01'), data_fim: data('2026-11-01') };
+}
+
+test('matrícula vencida libera vaga e reinscrição na mesma oficina sem apagar o histórico', async (t) => {
+  const banco = simularBanco(t, { turma: [turma(10, 'OFICINA', 1)], matricula_turma: [matriculaVencidaTeste()] });
+  const antiga = structuredClone(banco.matricula_turma[0]);
+  assert.equal((await obterOficinasService(2)).length, 0);
+  assert.equal((await listarTurmasService('OFICINA'))[0].vagas_ocupadas, 0);
+  await matricularOficinasService({ aluno_id: 2, oficinas_ids: [10] });
+  assert.deepEqual(banco.matricula_turma[0], antiga);
+  assert.equal(banco.matricula_turma.length, 2);
+  assert.notEqual(banco.matricula_turma[1].id, antiga.id);
+  assert.equal((await obterOficinasService(2)).length, 1);
+  assert.equal((await listarTurmasService('OFICINA'))[0].vagas_ocupadas, 1);
+  assert.ok((await obterAgendaAlunoService(2, '2026-10-26')).eventos.some((e) => e.matricula_id === antiga.id));
+  assert.equal((await obterAgendaAlunoService(2, '2026-11-02')).eventos.some((e) => e.matricula_id === antiga.id), false);
+});
+
+test('matrícula vencida não gera choque com outra oficina nem ocupa vaga para outro aluno', async (t) => {
+  const banco = simularBanco(t, { turma: [turma(10, 'OFICINA', 1), turma(11, 'OFICINA', 1)], matricula_turma: [matriculaVencidaTeste()] });
+  await matricularOficinasService({ aluno_id: 2, oficinas_ids: [11] });
+  await matricularOficinasService({ aluno_id: 3, oficinas_ids: [10] });
+  assert.equal(banco.matricula_turma.length, 3);
+});
+
+test('duas inscrições concorrentes disputam apenas a vaga liberada pela matrícula vencida', async (t) => {
+  const banco = simularBanco(t, { turma: [turma(10, 'OFICINA', 1)], matricula_turma: [matriculaVencidaTeste()] });
+  const resultados = await Promise.allSettled([
+    matricularOficinasService({ aluno_id: 2, oficinas_ids: [10] }),
+    matricularOficinasService({ aluno_id: 3, oficinas_ids: [10] }),
+  ]);
+  assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
+  assert.equal(banco.matricula_turma.length, 2);
+  assert.equal((await listarTurmasService('OFICINA'))[0].vagas_ocupadas, 1);
+});
+
+for (const alteracao of [{ turno: 'TARDE' }, { dias_frequencia: [2, 3, 4, 5] }]) {
+  test(`matrícula vencida não interfere em ${Object.keys(alteracao)[0]} nem é alterada`, async (t) => {
+    const banco = simularBanco(t, { turma: [turma(10)], matricula_turma: [matriculaVencidaTeste()] });
+    const antiga = structuredClone(banco.matricula_turma[0]);
+    await editarAlunoService(2, alteracao);
+    assert.deepEqual(banco.matricula_turma[0], antiga);
+    for (const [campo, valor] of Object.entries(alteracao)) assert.deepEqual(banco.aluno.find((a) => a.id === 2)[campo], valor);
+  });
+}
+
+for (const destino of [20, 30]) {
+  test(`regular vencida não impede matrícula na turma ${destino} e não aparece no detalhe`, async (t) => {
+    const banco = simularBanco(t, { turma: [turma(20, 'REGULAR', 1), turma(30, 'REGULAR', 1)],
+      matricula_turma: [matriculaVencidaTeste(20)] });
+    const antiga = structuredClone(banco.matricula_turma[0]);
+    assert.equal((await obterAlunoService(2)).turma_regular, null);
+    await matricularTurmaRegularService({ aluno_id: 2, turma_id: destino });
+    assert.deepEqual(banco.matricula_turma[0], antiga);
+    assert.equal(banco.matricula_turma.length, 2);
+    assert.equal(banco.matricula_turma[1].turma_id, destino);
+  });
+}
+
+for (const fim of ['2026-11-02', '2026-11-03', null]) {
+  test(`matrícula com término ${fim} continua reservando vaga e impedindo duplicidade`, async (t) => {
+    simularBanco(t, { turma: [turma(10, 'OFICINA', 1)],
+      matricula_turma: [{ ...matriculaVencidaTeste(), data_fim: fim ? data(fim) : null }] });
+    const [oficina] = await listarTurmasService('OFICINA');
+    assert.equal(oficina.vagas_ocupadas, 1);
+    await assert.rejects(() => matricularOficinasService({ aluno_id: 2, oficinas_ids: [10] }),
+      (e) => e.isConflict && e.detalhes.some((d) => d.codigo === 'MATRICULA_DUPLICADA'));
+    await assert.rejects(() => matricularOficinasService({ aluno_id: 3, oficinas_ids: [10] }),
+      (e) => e.isConflict && e.detalhes.some((d) => d.codigo === 'CAPACIDADE_MAXIMA'));
+  });
+}
+
+test('regular com início futuro reserva vaga, enquanto matrícula vencida não reserva', async (t) => {
+  simularBanco(t, { turma: [turma(20, 'REGULAR', 1)], matricula_turma: [matriculaVencidaTeste(20),
+    { id: 51, aluno_id: 3, turma_id: 20, status: 'ATIVO', data_inicio: data('2026-11-09'), data_fim: null }] });
+  assert.equal((await listarTurmasRegularesPorTurnoService('MANHA'))[0].vagas_ocupadas, 1);
+  await assert.rejects(() => matricularTurmaRegularService({ aluno_id: 2, turma_id: 20 }),
+    (e) => e.isConflict && e.detalhes.some((d) => d.codigo === 'CAPACIDADE_MAXIMA'));
+});
+
+test('ativação ignora matrícula vencida e conta apenas vagas ainda reservadas', async (t) => {
+  const banco = simularBanco(t, { pessoa: [pessoaEdicao], turma: [turma(10, 'OFICINA', 1)],
+    matricula_turma: [matriculaVencidaTeste(),
+      { id: 51, aluno_id: 1, turma_id: 10, status: 'PROVISORIO', data_inicio: null, data_fim: null }] });
+  const antiga = structuredClone(banco.matricula_turma[0]);
+  await editarAlunoService(1, { status: 'ATIVO' });
+  assert.equal(banco.matricula_turma[1].status, 'ATIVO');
+  assert.deepEqual(banco.matricula_turma[0], antiga);
+});
+
+test('capacidade pode diminuir sem contar vencidas, mas histórico continua protegendo o cronograma', async (t) => {
+  const banco = simularBanco(t, { turma: [turma(10, 'OFICINA', 5)],
+    matricula_turma: [matriculaVencidaTeste(), { ...matriculaVencidaTeste(), id: 51, aluno_id: 3 }] });
+  await editarTurmaService(10, { capacidade_maxima: 1 });
+  assert.equal(banco.turma[0].capacidade_maxima, 1);
+  await assert.rejects(() => editarTurmaService(10, { hora_inicio: '11:00' }), { statusCode: 409 });
+});
+
+test('inativação manual da turma não exige confirmar vencidas e preserva suas datas e agenda histórica', async (t) => {
+  const banco = simularBanco(t, { turma: [turma(10, 'OFICINA', 5)], matricula_turma: [matriculaVencidaTeste()] });
+  const antiga = structuredClone(banco.matricula_turma[0]);
+  await editarTurmaService(10, { status: 'INATIVO', confirmar_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  assert.deepEqual(banco.matricula_turma[0], { ...antiga, status: 'INATIVO' });
+  assert.ok((await obterAgendaAlunoService(2, '2026-10-26')).eventos.some((e) => e.matricula_id === antiga.id));
+});
+
+test('candidatos para nova turma incluem alunos cuja matrícula regular venceu', async (t) => {
+  simularBanco(t, { pessoa: [{ ...pessoaEdicao, id: 2 }, { ...pessoaEdicao, id: 3 }],
+    turma: [{ ...turma(20, 'REGULAR', 5), status: 'INATIVO' }, turma(30, 'REGULAR', 5)],
+    matricula_turma: [matriculaVencidaTeste(30)] });
+  const resultado = await prepararNovaTurmaService(20);
+  assert.ok(resultado.alunos.some((a) => a.id === 2));
+});
+
+test('diário exclui vínculos vencidos sem perder alunos com matrícula futura', async (t) => {
+  simularBanco(t, { pessoa: [{ ...pessoaEdicao, id: 2, nome: 'Aluno vencido' }, { ...pessoaEdicao, id: 3, nome: 'Aluno reservado' }],
+    turma: [turma(20, 'REGULAR', 5)], matricula_turma: [matriculaVencidaTeste(20),
+      { id: 51, aluno_id: 3, turma_id: 20, status: 'ATIVO', data_inicio: data('2026-11-09'), data_fim: null }] });
+  assert.deepEqual((await obterDiarioTurmaService(20, 11)).alunos.map((a) => a.nome), ['Aluno reservado']);
+});
+
+for (const tipo_recorrencia of ['SEMANAL', 'MENSAL']) {
+  for (const status of ['ATIVO', 'RASCUNHO']) {
+    for (const alteracao of [{ turno: 'TARDE' }, { dias_frequencia: [2, 4, 5] }]) {
+      test(`${tipo_recorrencia} vencida de ${status} não interfere na alteração de ${Object.keys(alteracao)[0]}`, async (t) => {
+        const { banco } = await prepararEdicaoAtendimento(t, status, { tipo_recorrencia, data_termino: '2026-11-09' });
+        t.mock.timers.setTime(new Date('2026-11-20T15:00:00Z').getTime());
+        const historico = structuredClone({ atendimentos: banco.atendimento_clinico, sessoes: banco.atendimento_sessao });
+        await editarAlunoService(1, alteracao);
+        assert.deepEqual({ atendimentos: banco.atendimento_clinico, sessoes: banco.atendimento_sessao }, historico);
+        for (const [campo, valor] of Object.entries(alteracao)) assert.deepEqual(banco.aluno[0][campo], valor);
+        assert.ok((await obterAgendaAlunoService(1, '2026-11-02')).eventos.some((e) => e.tipo === 'ATENDIMENTO'));
+      });
+    }
+
+    test(`${tipo_recorrencia} vencida de ${status} não pode ser editada nem prorrogada pela API`, async (t) => {
+      const { banco, params } = await prepararEdicaoAtendimento(t, status, { tipo_recorrencia, data_termino: '2026-11-09' });
+      t.mock.timers.setTime(new Date('2026-11-20T15:00:00Z').getTime());
+      const antes = structuredClone(banco);
+      assert.equal((await obterAtendimentoService(params)).pode_editar, false);
+      for (const dados of [{ data_termino: '2026-12-31' }, { hora_inicio: '11:00' }, { profissional_id: 2 }]) {
+        await assert.rejects(() => editarAtendimentoService(params, dados), {
+          statusCode: 409, message: 'Não é possível editar uma recorrência encerrada.'
+        });
+        assert.deepEqual(banco, antes);
+      }
+    });
+  }
+}
+
+test('troca de turno exige confirmação apenas de atendimentos vigentes e preserva vencidos', async (t) => {
+  const { banco, atendimento } = await prepararEdicaoAtendimento(t, 'ATIVO', { data_termino: '2026-11-09' });
+  const vigente = await agendarAtendimentoService({ ...pedidoClinico, tipo_recorrencia: 'SEMANAL', frequencia: 1,
+    dias_semana: [1, 3], hora_inicio: '11:00', data_termino: '2026-11-30' });
+  t.mock.timers.setTime(new Date('2026-11-20T15:00:00Z').getTime());
+  const vencido = structuredClone(banco.atendimento_clinico.find((a) => a.id === atendimento.id));
+  const sessoesVencidas = structuredClone(banco.atendimento_sessao.filter((s) => s.atendimento_clinico_id === atendimento.id));
+  let confirmar_cancelamentos;
+  await assert.rejects(() => editarAlunoService(1, { turno: 'TARDE' }), (erro) => {
+    confirmar_cancelamentos = erro.confirmacao;
+    assert.deepEqual(confirmar_cancelamentos, { matriculas: [], atendimentos: [vigente.id] });
+    return erro.statusCode === 409;
+  });
+  await editarAlunoService(1, { turno: 'TARDE', confirmar_cancelamentos });
+  assert.deepEqual(banco.atendimento_clinico.find((a) => a.id === atendimento.id), vencido);
+  assert.deepEqual(banco.atendimento_sessao.filter((s) => s.atendimento_clinico_id === atendimento.id), sessoesVencidas);
+  assert.equal(banco.atendimento_clinico.find((a) => a.id === vigente.id).status, 'INATIVO');
+});
+
+test('redução da frequência continua bloqueada por sessões de atendimentos vigentes', async (t) => {
+  const { banco } = await prepararEdicaoAtendimento(t, 'ATIVO', { data_termino: '2026-11-09' });
+  const vigente = await agendarAtendimentoService({ ...pedidoClinico, tipo_recorrencia: 'SEMANAL', frequencia: 1,
+    dias_semana: [1, 3], hora_inicio: '11:00', data_termino: '2026-11-30' });
+  t.mock.timers.setTime(new Date('2026-11-20T15:00:00Z').getTime());
+  const antes = structuredClone(banco);
+  await assert.rejects(() => editarAlunoService(1, { dias_frequencia: [2, 4, 5] }), (erro) => {
+    assert.deepEqual(erro.detalhes.map((d) => d.atendimento_id), [vigente.id]);
+    return erro.isConflict;
+  });
+  assert.deepEqual(banco, antes);
+});
+
+for (const [instante, editavel] of [
+  ['2026-11-09T15:00:00Z', true],
+  ['2026-11-10T02:59:59Z', true],
+  ['2026-11-10T03:00:00Z', false],
+]) {
+  test(`edição de recorrência com término hoje respeita São Paulo em ${instante}`, async (t) => {
+    const { banco, params } = await prepararEdicaoAtendimento(t, 'ATIVO', { data_termino: '2026-11-09' });
+    t.mock.timers.setTime(new Date(instante).getTime());
+    assert.equal((await obterAtendimentoService(params)).pode_editar, editavel);
+    if (editavel) await editarAtendimentoService(params, { data_termino: '2026-11-16' });
+    else {
+      const antes = structuredClone(banco);
+      await assert.rejects(() => editarAtendimentoService(params, { data_termino: '2026-11-16' }), { statusCode: 409 });
+      assert.deepEqual(banco, antes);
+    }
+  });
 }
 
 test('editar eventual antes do início atualiza sessão e profissional sem conflito consigo mesmo', async (t) => {

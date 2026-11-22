@@ -2,6 +2,7 @@ const { Prisma } = require('@prisma/client');
 const { createHash } = require('node:crypto');
 const prisma = require('../prismaClient');
 const { cursorDTO } = require('../dtos/paginacaoDTO');
+const { hojeInstituicao } = require('./calendarioLetivo');
 
 function normalizarBusca(valor = '') {
   return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
@@ -12,7 +13,7 @@ function contem(coluna, busca) {
   return Prisma.sql`strpos(regexp_replace(normalize(lower(${coluna}), NFD), '[̀-ͯ]', '', 'g'), ${busca}) > 0`;
 }
 
-function configurarConsulta(recurso, parametros, alunoId, turmaId) {
+function configurarConsulta(recurso, parametros, alunoId, turmaId, hoje = hojeInstituicao()) {
   const busca = normalizarBusca(parametros.busca);
   const filtros = [];
   let origem, chave, id, decrescente = false;
@@ -48,16 +49,17 @@ function configurarConsulta(recurso, parametros, alunoId, turmaId) {
     if (parametros.ano) filtros.push(Prisma.sql`EXISTS (SELECT 1 FROM ano_letivo al WHERE al.id = t.ano_letivo_id AND al.ano = ${parametros.ano})`);
     if (busca) filtros.push(contem(chave, busca));
   } else if (['oficinas_aluno', 'alunos_turma'].includes(recurso)) {
+    const ativa = Prisma.sql`(m.status = 'ATIVO' AND (m.data_fim IS NULL OR m.data_fim >= ${hoje.toISOString().slice(0, 10)}::date))`;
     origem = Prisma.sql`matricula_turma m JOIN turma t ON t.id = m.turma_id JOIN aluno a ON a.id = m.aluno_id JOIN pessoa p ON p.id = a.pessoa_id`;
     id = Prisma.sql`m.id`;
     filtros.push(Prisma.sql`a.deleted_at IS NULL`, Prisma.sql`t.deleted_at IS NULL`);
     if (recurso === 'oficinas_aluno') {
       chave = Prisma.sql`t.nome`;
       filtros.push(Prisma.sql`m.aluno_id = ${alunoId}`, Prisma.sql`t.tipo = 'OFICINA'`,
-        Prisma.sql`(m.status = 'ATIVO' OR (m.status = 'PROVISORIO' AND m.data_fim IS NULL AND a.status = 'RASCUNHO'))`);
+        Prisma.sql`(${ativa} OR (m.status = 'PROVISORIO' AND m.data_fim IS NULL AND a.status = 'RASCUNHO'))`);
     } else {
       chave = Prisma.sql`p.nome`;
-      filtros.push(Prisma.sql`m.turma_id = ${turmaId}`, Prisma.sql`m.status = 'ATIVO'`);
+      filtros.push(Prisma.sql`m.turma_id = ${turmaId}`, ativa);
     }
     if (busca) filtros.push(contem(chave, busca));
   } else if (recurso === 'atendimentos_aluno') {
@@ -78,8 +80,9 @@ function configurarConsulta(recurso, parametros, alunoId, turmaId) {
 }
 
 async function paginarIds(recurso, parametros, contexto = {}) {
-  const { origem, chave, id, decrescente, filtro } = configurarConsulta(recurso, parametros, contexto.alunoId, contexto.turmaId);
-  const assinatura = createHash('sha256').update(JSON.stringify([recurso, normalizarBusca(parametros.busca), parametros.status, parametros.tipo, contexto,
+  const { hoje = hojeInstituicao(), ...contextoCursor } = contexto;
+  const { origem, chave, id, decrescente, filtro } = configurarConsulta(recurso, parametros, contexto.alunoId, contexto.turmaId, hoje);
+  const assinatura = createHash('sha256').update(JSON.stringify([recurso, normalizarBusca(parametros.busca), parametros.status, parametros.tipo, contextoCursor,
     ...(parametros.ano ? [parametros.ano] : [])])).digest('hex');
   let depois = Prisma.sql`TRUE`;
   if (parametros.cursor) {

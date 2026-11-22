@@ -11,7 +11,7 @@ function corresponde(registro, filtro) {
     return Object.entries(filtro).every(([campo, esperado]) => {
         if (campo === 'AND') return esperado.every((item) => corresponde(registro, item));
         if (campo === 'OR') return esperado.some((item) => corresponde(registro, item));
-    const atual = campo === 'deleted_at' ? registro[campo] ?? null : registro[campo];
+        const atual = ['deleted_at', 'data_fim'].includes(campo) ? registro[campo] ?? null : registro[campo];
         if (esperado === null || typeof esperado !== 'object') return atual === esperado;
         if ('not' in esperado) return atual != null && atual !== esperado.not;
         if ('in' in esperado) return esperado.in.includes(atual);

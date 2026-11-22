@@ -2,7 +2,7 @@ const { bloquearCalendarios, diaLetivo, fimLetivo } = require('./calendarioLetiv
 const prisma = require('../prismaClient');
 const { obterStatusVinculo } = require('./matriculaService');
 
-const { agoraInstituicao } = require('./encerramentoAtividade');
+const { agoraInstituicao, recorrenciaVencida } = require('./encerramentoAtividade');
 const { criarAtendimentoDTO, editarAtendimentoDTO } = require('../dtos/atendimentoDTO');
 const { bloquearProfissionalAtivo } = require('./profissionalService');
 const { validarModalidade, comNomeModalidade } = require('./modalidadeService');
@@ -412,7 +412,7 @@ function restricoesAtendimento(atendimento, agora) {
   const iniciou = primeiroInicio !== null && primeiroInicio <= agora.getTime();
   return { possui_sessoes_iniciadas: iniciou,
     inicio_primeira_sessao: primeiroInicio === null ? null : new Date(primeiroInicio).toISOString().slice(0, -1),
-    pode_editar: !atendimento.data_cancelamento && atendimento.status !== 'INATIVO'
+    pode_editar: !atendimento.data_cancelamento && atendimento.status !== 'INATIVO' && !recorrenciaVencida(atendimento, agora)
       && (atendimento.tipo_recorrencia !== 'EVENTUAL' || (!iniciou && obterInicioSessao(atendimento.data_inicio, atendimento.hora_inicio) > agora.getTime())) };
 }
 
@@ -457,12 +457,14 @@ async function editarAtendimentoService({ aluno_id, atendimento_id }, entrada) {
     await bloquearCalendarios(tx);
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
     const referencia = await buscarAtendimento(tx, aluno_id, atendimento_id);
-    const agora = agoraInstituicao();
+    const instanteReferencia = agoraInstituicao();
     const profissionais = [...new Set([referencia.profissional_id, dados.profissional_id,
-      ...referencia.sessoes.filter((s) => !s.data_cancelamento && inicioSessao(s) > agora.getTime()).map((s) => s.profissional_id),
+      ...referencia.sessoes.filter((s) => !s.data_cancelamento && inicioSessao(s) > instanteReferencia.getTime()).map((s) => s.profissional_id),
     ].filter(Number.isInteger))].sort((a, b) => a - b);
     for (const profissionalId of profissionais) await tx.$queryRaw`SELECT "id" FROM "funcionario" WHERE "id" = ${profissionalId} FOR UPDATE`;
     const atual = await buscarAtendimento(tx, aluno_id, atendimento_id);
+    const agora = agoraInstituicao();
+    if (recorrenciaVencida(atual, agora)) throw Object.assign(new Error('Não é possível editar uma recorrência encerrada.'), { statusCode: 409 });
     const restricoes = restricoesAtendimento(atual, agora);
     if (!restricoes.pode_editar) throw Object.assign(new Error('Este atendimento já foi cancelado ou não permite edição após seu início.'), { statusCode: 409 });
     const eventual = atual.tipo_recorrencia === 'EVENTUAL';

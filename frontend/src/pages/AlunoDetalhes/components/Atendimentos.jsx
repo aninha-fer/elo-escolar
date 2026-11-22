@@ -19,7 +19,7 @@ export function Atendimentos({ atendimentos = [], total = atendimentos.length, i
         setCarregando(true);
         try {
             const dados = await atendimentosService.buscarPorId(idAluno, atendimento.id);
-            if (!dados.pode_editar) { notificar('Este atendimento não permite edição após o início ou cancelamento.'); return; }
+            if (!dados.pode_editar) { notificar('Este atendimento está encerrado ou não permite edição.'); return; }
             setOperacao({ tipo: 'editar', atendimento: dados });
         } catch (error) {
             notificar(error.response?.data?.erro || 'Não foi possível carregar o atendimento.');

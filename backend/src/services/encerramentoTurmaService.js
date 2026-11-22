@@ -1,5 +1,5 @@
 const prisma = require('../prismaClient');
-const { agoraInstituicao, fimMatricula } = require('./encerramentoAtividade');
+const { agoraInstituicao, fimMatricula, matriculaVigente } = require('./encerramentoAtividade');
 const { bloquearCalendarios, hojeInstituicao, turmaExpirada } = require('./calendarioLetivo');
 
 const filtroMatriculasParaEncerrar = {
@@ -14,11 +14,13 @@ async function bloquearTurmaParaEncerramento(tx, id, automatico = false) {
     await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${id} FOR UPDATE`;
     const atuais = await tx.matricula_turma.findMany({ where: { turma_id: id, ...filtroMatriculasParaEncerrar } });
     if (atuais.some((m) => !alunos.has(m.aluno_id))) {
+        const hoje = hojeInstituicao();
+        const vigentes = atuais.filter((m) => matriculaVigente(m, hoje));
         if (automatico) throw Object.assign(new Error('As matrículas mudaram durante o encerramento automático. Tente novamente.'), { statusCode: 409, repetirEncerramento: true });
         throw Object.assign(new Error('As matrículas da turma mudaram. Confira os vínculos e confirme novamente.'), {
-            statusCode: 409, confirmacao: { matriculas: atuais.filter((m) => m.status !== 'INATIVO').map((m) => m.id).sort((a, b) => a - b),
-                matriculas_ativas: atuais.filter((m) => m.status === 'ATIVO').length },
-            matriculas_ativas: atuais.filter((m) => m.status === 'ATIVO').length,
+            statusCode: 409, confirmacao: { matriculas: vigentes.map((m) => m.id).sort((a, b) => a - b),
+                matriculas_ativas: vigentes.filter((m) => m.status === 'ATIVO').length },
+            matriculas_ativas: vigentes.filter((m) => m.status === 'ATIVO').length,
         });
     }
     return atuais;
