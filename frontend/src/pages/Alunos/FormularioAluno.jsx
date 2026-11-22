@@ -302,7 +302,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             name="telefone"
                             type="tel"
                             label="Telefone"
-                            placeholder="(11) 1 1111-1111"
+                            placeholder="(00) 0 0000-0000"
                             value={formulario.telefone}
                             onChange={(event) => atualizarCampo('telefone', event.target.value)}
                             {...acessibilidadeCampo('telefone')} />))}
@@ -340,7 +340,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                                     label="Parentesco" placeholder="Ex: Mãe" maxLength={30}
                                     value={responsavel.parentesco} onChange={(event) => atualizarResponsavel(responsavel.chave, 'parentesco', event.target.value)} {...acessibilidadeCampo(`responsaveis.${responsavel.chave}.parentesco`)} />))}
                                 {campoComErro(`responsaveis.${responsavel.chave}.telefone`, (<Input data-testid={`aluno-formulario-responsavel-${responsavel.chave}-telefone`} id={`responsavel-${responsavel.chave}-telefone`} name={`responsaveis.${responsavel.chave}.telefone`}
-                                    label="Telefone" type="tel" placeholder="(11) 99999-9999"
+                                    label="Telefone" type="tel" placeholder="(00) 0 0000-0000"
                                     value={responsavel.telefone} onChange={(event) => atualizarResponsavel(responsavel.chave, 'telefone', event.target.value)} {...acessibilidadeCampo(`responsaveis.${responsavel.chave}.telefone`)} />))}
                             </div>
                             <button data-testid={`aluno-formulario-responsavel-${responsavel.chave}-remover`} type="button" aria-label={`Remover responsável ${indice + 1}`} onClick={() => removerResponsavel(responsavel.chave)}

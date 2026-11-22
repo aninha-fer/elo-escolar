@@ -92,7 +92,7 @@ export function FormularioProfissional({ profissional, onClose, onCriado, onSalv
                         <Input data-testid="profissional-formulario-nome" id="profissional-nome" name="nome" label="Nome completo" placeholder="Ex: João Silva" autoComplete="name" autoFocus={trapFocus} required
                             labelClassName="font-mono" value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} {...acessibilidadeCampo('nome')} />
                         {erros.nome && <p id="profissional-nome-erro" className="mb-md text-sm text-red-700">{erros.nome}</p>}
-                        <Input data-testid="profissional-formulario-telefone" id="profissional-telefone" name="telefone" label="Telefone" type="tel" placeholder="(11) 99999-9999" autoComplete="tel-national" maxLength={20}
+                        <Input data-testid="profissional-formulario-telefone" id="profissional-telefone" name="telefone" label="Telefone" type="tel" placeholder="(00) 0 0000-0000" autoComplete="tel-national" maxLength={20}
                             labelClassName="font-mono" value={formulario.telefone} onChange={(event) => atualizarCampo('telefone', event.target.value)} {...acessibilidadeCampo('telefone')} />
                         {erros.telefone && <p id="profissional-telefone-erro" className="mb-md text-sm text-red-700">{erros.telefone}</p>}
                         <fieldset className="mb-md" {...acessibilidadeCampo('cargo')}>

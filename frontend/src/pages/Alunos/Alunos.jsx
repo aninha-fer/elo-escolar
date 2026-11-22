@@ -150,7 +150,7 @@ export function Alunos() {
                     <p className="text-sm text-text-muted">{listagem.total} alunos na seleção atual</p>
                     <BotaoExportarCalendario testId="alunos-exportar-calendarios" total={listagem.total} disabled={listagem.carregando || Boolean(listagem.erro)} filtros={{ busca: termoBusca, status: statusSelecionado }} />
                 </div>
-                {!listagem.carregando && !listagem.erro && <TabelaAlunos semBorda alunos={listagem.itens} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
+                {!listagem.carregando && !listagem.erro && <TabelaAlunos semBorda podeEditar={podeEditar} alunos={listagem.itens} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
                     onAlterarStatus={podeEditar && !carregandoEdicao ? abrirStatus : undefined}
                     onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />}
             </div>

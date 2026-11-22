@@ -74,6 +74,16 @@ export function formatarAutorizacaoAnalgesico(valor) {
     return rotulos[valor] ?? 'Não informado';
 }
 
+export function mascararTelefone(telefone) {
+    const numeros = String(telefone ?? '').replace(/\D/g, '').slice(0, 11);
+    if (!numeros) return '';
+    if (numeros.length <= 2) return `(${numeros}`;
+    const ddd = numeros.slice(0, 2);
+    const local = numeros.slice(2);
+    if (numeros.length === 11) return `(${ddd}) ${local[0]} ${local.slice(1, 5)}-${local.slice(5)}`;
+    return `(${ddd}) ${local.slice(0, 4)}${local.length > 4 ? `-${local.slice(4)}` : ''}`;
+}
+
 export function formatarTelefone(telefone) {
     if (!telefone) return null;
 

@@ -47,6 +47,11 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                         <span className={`rounded-full px-3 py-1 text-sm font-semibold ${estilosStatus[turma.status] ?? 'bg-slate-100 text-slate-500'}`}>
                             {rotulosStatus[turma.status] ?? formatarStatus(turma.status)}
                         </span>
+                        {turma.tipo === 'REGULAR' && turma.ano_letivo?.ano && <span
+                            className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600"
+                            aria-label={`Ano letivo ${turma.ano_letivo.ano}`}>
+                            {turma.ano_letivo.ano}
+                        </span>}
                         <TagExpiradaTurma expirada={turma.expirada} testId={`turma-${turma.id}-expirada`} />
                     </div>
                     {podeEditar && <div className="relative z-10 shrink-0"><BotaoAcoes testId={`turma-${turma.id}-acoes`} label={`Ações para ${nome}`} options={[
