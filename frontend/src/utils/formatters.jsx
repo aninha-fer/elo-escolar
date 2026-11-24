@@ -182,6 +182,7 @@ export function normalizarProfissionais(turma) {
     return profissionais.filter(Boolean).map((profissional) => ({
         id: profissional.id,
         nome: profissional.pessoa?.nome || profissional.nome || 'Profissional não informado',
+        cargo: profissional.cargo ?? profissional.funcao,
     }));
 }
 

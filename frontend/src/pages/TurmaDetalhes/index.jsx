@@ -1,5 +1,4 @@
 import { ProfissionaisTurma } from '../../components/ProfissionaisTurma';
-import { HistoricoProfissionais } from './components/HistoricoProfissionais';
 import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
@@ -120,7 +119,6 @@ export function TurmaDetalhes() {
                     <div className="mt-sm border-t border-gray-200 pt-md">
                         <h4 className="mb-sm text-[10px] font-semibold uppercase tracking-wider text-text-muted">Professores e auxiliares</h4>
                         <ProfissionaisTurma profissionais={turma.profissionais} mostrarCargo />
-                        <HistoricoProfissionais historico={turma.historico_profissionais} />
                     </div>
                 </DivInformacoes>
                 <div className="min-w-0">
