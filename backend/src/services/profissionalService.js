@@ -14,7 +14,7 @@ async function bloquearProfissionalAtivo(tx, id) {
 async function validarEncerramentoProfissional(tx, id, acao) {
     const agora = agoraInstituicao();
     const [turmas, sessoes] = await Promise.all([
-        tx.turma.findMany({ where: { profissional_id: id, status: 'ATIVO' }, select: { id: true, nome: true } }),
+        tx.turma.findMany({ where: { profissionais: { some: { profissional_id: id, data_fim: null } }, status: 'ATIVO', deleted_at: null }, select: { id: true, nome: true } }),
         tx.atendimento_sessao.findMany({ where: {
             status: 'ATIVO', data_cancelamento: null,
             atendimento_clinico: { status: 'ATIVO', data_cancelamento: null },

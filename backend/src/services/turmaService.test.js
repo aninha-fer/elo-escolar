@@ -16,13 +16,14 @@ test('filtros opcionais da Home validam status e ano sem exigir alterações nos
     for (const dados of [{ status: 'RASCUNHO' }, { ano: 'abc' }, { ano: '0' }, { ano: '2026.5' }, { ano: '10000' }]) assert.equal(listarTurmasQueryDTO.safeParse(dados).success, false);
 });
 
-const regular = { tipo: 'REGULAR', nome: ' Turma A ', turno: 'MANHA', profissional_id: 1, ambiente_id: 2, ano_letivo_id: 2026 };
-const oficina = { tipo: 'OFICINA', nome: 'Artes', turno: 'MANHA', profissional_id: 1, ambiente_id: 2,
+const regular = { tipo: 'REGULAR', nome: ' Turma A ', turno: 'MANHA', profissionais_ids: [1], ambiente_id: 2, ano_letivo_id: 2026 };
+const oficina = { tipo: 'OFICINA', nome: 'Artes', turno: 'MANHA', profissionais_ids: [1], ambiente_id: 2,
     hora_inicio: '08:15', hora_fim: '09:15', dias_semana: [2, 4] };
 
 function simularTransacao(t, { cargo = 'Professor', profissionalExiste = true, salaExiste = true, falhaHorarios } = {}) {
     let pendente;
     let horarios;
+    const vinculos = [];
     const estado = { confirmado: null, gravacoes: 0 };
     const original = prisma.$transaction;
     t.after(() => { prisma.$transaction = original; });
@@ -35,8 +36,10 @@ function simularTransacao(t, { cargo = 'Professor', profissionalExiste = true, s
             ambiente: { findUnique: async () => salaExiste ? { id: 2 } : null },
             turma: {
                 create: async ({ data }) => { estado.gravacoes++; pendente = { id: 10, ...data }; return pendente; },
-                findUnique: async () => ({ ...pendente, horarios })
+                findUnique: async () => ({ ...pendente, horarios, profissionais: vinculos })
             },
+            turma_profissional: { createMany: async ({ data }) => { vinculos.push(...data.map((v, i) => ({ ...v, id: i + 1, data_fim: null,
+                profissional: { id: v.profissional_id, cargo, pessoa: { nome: 'Professor teste', status_geral: 'ATIVO' } } }))); } },
             turma_horario: { createMany: async ({ data }) => {
                 if (falhaHorarios) throw falhaHorarios;
                 horarios = data;
@@ -54,7 +57,7 @@ for (const turno of ['MANHA', 'TARDE']) {
         simularTransacao(t, { cargo: 'Auxiliar' });
         const turma = await criarTurmaService({ ...regular, turno, hora_inicio: '00:00', dias_semana: [7], capacidade_maxima: 0 });
         assert.equal(turma.nome, 'Turma A');
-        assert.equal(turma.profissional_id, 1);
+        assert.deepEqual(turma.profissionais.map((p) => p.id), [1]);
         assert.equal(turma.ambiente_id, 2);
         assert.equal(turma.capacidade_maxima, 0);
         assert.equal(turma.descricao, null);
@@ -90,7 +93,7 @@ test('entradas inválidas são recusadas antes da transação', async (t) => {
     prisma.$transaction = () => assert.fail('Não deve iniciar transação.');
     for (const dados of [
         { ...regular, ano_letivo_id: undefined }, { ...regular, nome: ' ' }, { ...regular, tipo: 'INVALIDO' },
-        { ...regular, turno: 'NOITE' }, { ...regular, profissional_id: [1, 2] },
+        { ...regular, turno: 'NOITE' }, { ...regular, profissionais_ids: 1 },
         { ...regular, capacidade_maxima: -1 }, { ...regular, capacidade_maxima: 1.5 },
         { ...regular, ano_letivo_id: 2026.5 }, { ...regular, ambiente_id: 0 }, { ...regular, ambiente_id: undefined }, { ...regular, ambiente_id: null },
         { ...oficina, dias_semana: [] }, { ...oficina, dias_semana: [0] }, { ...oficina, dias_semana: [8] },
@@ -102,7 +105,7 @@ test('entradas inválidas são recusadas antes da transação', async (t) => {
 for (const cargo of ['Professor', 'Auxiliar']) {
     test(`oficina aceita ${cargo} como responsável no cadastro`, async (t) => {
         simularTransacao(t, { cargo });
-        assert.equal((await criarTurmaService(oficina)).profissional_id, oficina.profissional_id);
+        assert.deepEqual((await criarTurmaService(oficina)).profissionais.map((p) => p.id), oficina.profissionais_ids);
     });
 }
 
@@ -152,8 +155,7 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
         const horario = { id: 1, dia_semana: 2, hora_inicio: new Date('1970-01-01T08:15:00.000Z'), hora_fim: new Date('1970-01-01T09:15:00.000Z') };
         const aluno = { id: 5, dias_frequencia: [2], pessoa: { nome: 'Ana' } };
         const dados = { id: 10, nome: 'Turma A', tipo, capacidade_maxima: 12, turno: 'MANHA',
-            ambiente_id: 1, ambiente: { id: 1, nome: 'Sala A' }, descricao: 'Descrição', profissional_id: 2,
-            profissional: { id: 2, cargo: 'Professor', pessoa: { nome: 'Maria' } }, ano_letivo_id: 2026,
+            ambiente_id: 1, ambiente: { id: 1, nome: 'Sala A' }, descricao: 'Descrição', ano_letivo_id: 2026,
             status: 'ATIVO', created_at: new Date('2026-01-01T00:00:00.000Z'), horarios: [horario] };
         simularConsultaTurma(t, async ({ where, select }) => {
             assert.deepEqual(where, { id: 10, deleted_at: null });
@@ -167,11 +169,12 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
                 id: true, dias_frequencia: true, pessoa: { select: { nome: true } }
             } } });
             assert.deepEqual(select.horarios.orderBy, [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }, { id: 'asc' }]);
-            assert.deepEqual(select.profissional, { select: { id: true, cargo: true, pessoa: { select: { nome: true } } } });
+            assert.equal(select.profissionais.select.profissional.select.pessoa.select.nome, true);
             assert.deepEqual(select.ambiente, { select: { id: true, nome: true } });
-            return { ...dados, matriculas: [{ aluno }] };
+            return { ...dados, profissionais: [{ id: 1, profissional_id: 2, data_inicio: null, data_fim: null, profissional: { id: 2, cargo: 'Professor', pessoa: { nome: 'Maria', status_geral: 'ATIVO' } } }], matriculas: [{ aluno }] };
         });
-        assert.deepEqual(await obterTurmaService(10), { ...dados, expirada: false, possui_matriculas: true, alunos: [aluno],
+        const profissional = { id: 2, cargo: 'Professor', pessoa: { nome: 'Maria' }, status_geral: 'ATIVO', excluido: false };
+        assert.deepEqual(await obterTurmaService(10), { ...dados, profissionais: [profissional], historico_profissionais: [{ id: 1, profissional, data_inicio: null, data_fim: null }], expirada: false, possui_matriculas: true, alunos: [aluno],
             matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
     });
 }
@@ -231,7 +234,7 @@ test('controller responde 200 convertendo o ID da URL para número', async (t) =
     const res = resposta();
     await obterTurma({ params: { id: '12' } }, res);
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, { id: 12, horarios: [], expirada: false, possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
+    assert.deepEqual(res.body, { id: 12, horarios: [], profissionais: [], historico_profissionais: [], expirada: false, possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
 });
 
 test('erro do banco retorna 500 sem expor detalhes internos', async (t) => {
@@ -266,7 +269,7 @@ test('GET /api/turmas/:id respeita permissão de leitura e não captura /turmas/
     for (const [role, codigo] of [[null, 401], ['outro', 403], ['professor', 200], ['admin', 200]]) {
         const response = await fetch(`${base}/1`, { headers: role ? { 'x-test-role': role } : {} });
         assert.equal(response.status, codigo);
-        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], expirada: false, possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
+        if (codigo === 200) assert.deepEqual(await response.json(), { id: 1, horarios: [], profissionais: [], historico_profissionais: [], expirada: false, possui_matriculas: false, alunos: [], matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
     }
     assert.equal(consultar.mock.callCount(), 2);
     const regulares = await fetch(`${base}/regulares`, { headers: { 'x-test-role': 'professor' } });

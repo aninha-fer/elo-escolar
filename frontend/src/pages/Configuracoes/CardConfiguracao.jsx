@@ -1,8 +1,11 @@
-export function CardConfiguracao({ titulo, descricao, children, conteudoComPadding = true }) {
+export function CardConfiguracao({ titulo, descricao, acao, children, conteudoComPadding = true }) {
     return <section className="overflow-hidden rounded-lg border border-slate-200 bg-bg-surface shadow-sm">
-        <header className="border-t-4 border-t-tertiary border-b border-b-slate-200 p-lg">
-            <h2 className="text-lg font-bold text-text-main">{titulo}</h2>
-            <p className="mt-xs text-sm text-text-muted">{descricao}</p>
+        <header className="flex flex-wrap items-center justify-between gap-md border-t-4 border-t-tertiary border-b border-b-slate-200 p-lg">
+            <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-bold text-text-main">{titulo}</h2>
+                <p className="mt-xs text-sm text-text-muted">{descricao}</p>
+            </div>
+            {acao}
         </header>
         <div className={conteudoComPadding ? 'p-lg' : ''}>{children}</div>
     </section>;

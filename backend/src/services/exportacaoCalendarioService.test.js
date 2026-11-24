@@ -12,7 +12,7 @@ function aluno(status = 'ATIVO') {
 }
 function matricula(id, tipo = 'OFICINA', status = 'ATIVO') {
     return { status, data_fim: null, turma: { id, tipo, nome: `Turma ${id}`, turno: 'MANHA', status: 'ATIVO', deleted_at: null,
-        ano_letivo: { ano: 2026 }, profissional: { pessoa: { nome: 'Professor teste' } }, ambiente: { nome: 'Sala teste' },
+        ano_letivo: { ano: 2026 }, profissionais: [{ profissional: { id: 1, pessoa: { nome: 'Professor teste' } }, data_inicio: null, data_fim: null }], ambiente: { nome: 'Sala teste' },
         horarios: [5, 2, 1, 3].map((dia_semana) => ({ dia_semana, hora_inicio: hora('08:15'), hora_fim: hora('09:15') })) } };
 }
 function sessao(data = '2026-11-20', inicio = '13:00', status = 'ATIVO') {
@@ -23,6 +23,21 @@ function atendimento(tipo = 'SEMANAL', status = 'ATIVO') {
     return { id: 3, tipo_recorrencia: tipo, frequencia: 1, status, data_cancelamento: null,
         data_termino: tipo === 'EVENTUAL' ? null : dia('2026-12-31'), modalidade_cadastrada: { nome: 'Psicologia' }, sessoes: [sessao()] };
 }
+
+test('exportação reúne os responsáveis atuais sem duplicar turma ou horários', () => {
+    const registro = aluno();
+    const m = matricula(1);
+    m.turma.profissionais = [
+        { data_fim: dia('2026-11-19'), profissional: { id: 1, pessoa: { nome: 'Anterior' } } },
+        { data_fim: null, profissional: { id: 2, pessoa: { nome: 'Professor' } } },
+        { data_fim: null, profissional: { id: 3, pessoa: { nome: 'Auxiliar' } } },
+    ];
+    registro.matriculas_turmas = [m];
+    const grade = formatarCalendarioAluno(registro, referencia);
+    assert.equal(grade.oficinas.length, 1);
+    assert.equal(grade.oficinas[0].profissional, 'Auxiliar, Professor');
+    assert.equal(grade.oficinas[0].horarios.length, 3);
+});
 
 test('grade fixa mantém oficinas nas férias, filtra ano regular e ordena a frequência do aluno', () => {
     const registro = aluno();

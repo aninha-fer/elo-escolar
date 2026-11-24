@@ -343,7 +343,7 @@ test('ativação verifica oficinas sobrepostas mesmo quando o próximo período 
 const aluno = (id, status = 'RASCUNHO') => ({ id, pessoa_id: id, status, turno: 'MANHA', dias_frequencia: [1, 2, 3, 4, 5] });
 const turma = (id, tipo = 'OFICINA', capacidade_maxima = 1) => ({
   ano_letivo_id: tipo === 'REGULAR' ? 2026 : null,
-  id, tipo, capacidade_maxima, status: 'ATIVO', nome: `Turma ${id}`, turno: 'MANHA', profissional_id: 1,
+  id, tipo, capacidade_maxima, status: 'ATIVO', nome: `Turma ${id}`, turno: 'MANHA',
   horarios: (tipo === 'REGULAR' ? [1, 2, 3, 4, 5] : [1]).map((dia_semana) => ({
     id: dia_semana, dia_semana, hora_inicio: hora(tipo === 'REGULAR' ? '08:00' : '09:00'),
     hora_fim: hora(tipo === 'REGULAR' ? '12:00' : '10:00')
@@ -897,7 +897,7 @@ test('excluído não pode ser editado ou reativado, receber conta, turma ou aten
   await assert.rejects(() => editarUsuario(7, { status: 'ATIVO' }), { statusCode: 404 });
   await assert.rejects(() => editarUsuario(7, { senha: 'nova-senha-teste' }), { statusCode: 404 });
   await assert.rejects(() => criarUsuario({ modo: 'existente', pessoa_id: 10, email: 'nova@example.invalid', senha: 'senha-de-teste', role: 'professor' }), { statusCode: 409 });
-  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026, profissional_id: 1, ambiente_id: 2 }), { statusCode: 404 });
+  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026, profissionais_ids: [1], ambiente_id: 2 }), { statusCode: 404 });
   await assert.rejects(() => editarTurmaService(10, { status: 'ATIVO' }), { statusCode: 404 });
   await assert.rejects(() => agendarAtendimentoService(pedidoClinico), { statusCode: 404 });
   assert.equal(await buscarIdentidadePorId(7), null);
@@ -907,7 +907,7 @@ test('excluído não pode ser editado ou reativado, receber conta, turma ou aten
 test('criar turma e atendimento exige profissional ativo, e reativação do rascunho ignora provisórios cancelados', async (t) => {
   const banco = simularBanco(t, planejamentoProfissional());
   await editarProfissionalService(1, { status_geral: 'INATIVO' });
-  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026, profissional_id: 1, ambiente_id: 2 }), { statusCode: 400 });
+  await assert.rejects(() => criarTurmaService({ nome: 'Nova', tipo: 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026, profissionais_ids: [1], ambiente_id: 2 }), { statusCode: 400 });
   await assert.rejects(() => agendarAtendimentoService(pedidoClinico), { statusCode: 400 });
   banco.atendimento_clinico.find((a) => a.id === 61).status = 'INATIVO';
   await editarAlunoService(1, { status: 'ATIVO' });
@@ -992,6 +992,9 @@ function simularBanco(t, inicial = {}) {
   const estado = { ano_letivo: [{ id: 2026, ano: 2026, data_inicio: data('2026-02-03'), data_fim: data('2026-12-19') }, { id: 2027, ano: 2027, data_inicio: data('2027-02-08'), data_fim: data('2027-12-18') }], aluno: [aluno(1), aluno(2, 'ATIVO'), aluno(3, 'ATIVO')], pessoa: [],
     turma: [turma(10), turma(20, 'REGULAR')], matricula_turma: [], atendimento_clinico: [], atendimento_sessao: [],
     aluno_responsavel: [], aluno_dados_medicos: [], usuario: [], funcionario: [{ id: 1, pessoa_id: 10, nome: 'Ana', cargo: 'Professor' }, { id: 2, pessoa_id: 11, nome: 'Bruno', cargo: 'Professor' }], ...inicial };
+  estado.turma_profissional = inicial.turma_profissional ?? estado.turma.map((turma) => ({
+    id: turma.id, turma_id: turma.id, profissional_id: 1, data_inicio: null, data_fim: null,
+  }));
   estado.modalidade = [{ id: 1, nome: 'Psicologia' }, { id: 2, nome: 'Outra' }];
   estado.atendimento_clinico = estado.atendimento_clinico.map(({ modalidade, ...registro }) => {
     if (!modalidade) return registro;
@@ -1012,7 +1015,8 @@ function simularBanco(t, inicial = {}) {
       if (nome === 'aluno') return { deleted_at: null, ...item, pessoa: ler('pessoa').find((p) => p.id === item.pessoa_id),
         matriculas_turmas: ler('matricula_turma').filter((m) => m.aluno_id === item.id).map((m) => ({ ...m, turma: hidratar('turma', ler('turma').find((t) => t.id === m.turma_id)) })),
         responsaveis: ler('aluno_responsavel').filter((r) => r.aluno_id === item.id) };
-      if (nome === 'turma') return { ...item, matriculas: ler('matricula_turma').filter((m) => m.turma_id === item.id), ano_letivo: ler('ano_letivo').find((c) => c.id === item.ano_letivo_id) ?? null, ...(estado.turma_horario ? { horarios: ler('turma_horario').filter((h) => h.turma_id === item.id) } : {}) };
+      if (nome === 'turma_profissional') return { ...item, profissional: hidratar('funcionario', ler('funcionario').find((p) => p.id === item.profissional_id) ?? { id: item.profissional_id, cargo: 'Professor', nome: 'Ana' }) };
+      if (nome === 'turma') return { ...item, profissionais: ler('turma_profissional').filter((v) => v.turma_id === item.id).map((v) => hidratar('turma_profissional', v)), matriculas: ler('matricula_turma').filter((m) => m.turma_id === item.id), ano_letivo: ler('ano_letivo').find((c) => c.id === item.ano_letivo_id) ?? null, ...(estado.turma_horario ? { horarios: ler('turma_horario').filter((h) => h.turma_id === item.id) } : {}) };
       if (nome === 'pessoa') return { ...item,
         aluno: ler('aluno').find((a) => a.pessoa_id === item.id) ?? null,
         funcionario: ler('funcionario').find((f) => f.pessoa_id === item.id) ?? null,
@@ -1149,6 +1153,147 @@ function simularBanco(t, inicial = {}) {
   });
   return estado;
 }
+
+function simularEquipe(t, inicial = {}) {
+  return simularBanco(t, { pessoa: [{ id: 10, nome: 'Ana', status_geral: 'ATIVO' }, { id: 11, nome: 'Bruno', status_geral: 'ATIVO' }], ambiente: [{ id: 2, nome: 'Sala' }], ...inicial });
+}
+
+for (const tipo of ['REGULAR', 'OFICINA']) {
+  test(`${tipo}: cadastro e listagem retornam todos os profissionais sem multiplicar vagas`, async (t) => {
+    const banco = simularEquipe(t, { turma_horario: [] });
+    const nova = await criarTurmaService({ tipo, nome: 'Equipe', turno: 'MANHA', ambiente_id: 2,
+      profissionais_ids: [2, 1], capacidade_maxima: 5, ano_letivo_id: tipo === 'REGULAR' ? 2026 : undefined,
+      hora_inicio: '08:15', hora_fim: '09:15', dias_semana: [1, 2] });
+    assert.deepEqual(nova.profissionais.map((p) => p.id), [1, 2]);
+    assert.equal(nova.profissional_id, undefined);
+    assert.equal(banco.turma_profissional.filter((v) => v.turma_id === nova.id).length, 2);
+    const lista = await listarTurmasService(tipo);
+    const item = lista.find((t) => t.id === nova.id);
+    assert.equal(lista.filter((t) => t.id === nova.id).length, 1);
+    assert.equal(item.vagas_ocupadas, 0);
+    assert.equal(item.vagas_disponiveis, 5);
+    assert.equal(item.profissionais.length, 2);
+  });
+
+  test(`${tipo}: edição preserva períodos e retorno cria outro vínculo sem apagar o anterior`, async (t) => {
+    const banco = simularEquipe(t, { turma: [turma(10, tipo, 5)] });
+    await editarTurmaService(10, { profissionais_ids: [1, 2] });
+    const inicial = structuredClone(banco.turma_profissional);
+    await editarTurmaService(10, { profissionais_ids: [2, 1] });
+    assert.deepEqual(banco.turma_profissional, inicial);
+    t.mock.timers.setTime(new Date('2026-11-03T12:00:00Z').getTime());
+    await editarTurmaService(10, { profissionais_ids: [2] });
+    assert.deepEqual(banco.turma_profissional.find((v) => v.profissional_id === 1).data_fim, data('2026-11-02'));
+    t.mock.timers.setTime(new Date('2026-11-04T12:00:00Z').getTime());
+    const editada = await editarTurmaService(10, { profissionais_ids: [1, 2] });
+    assert.equal(banco.turma_profissional.length, 3);
+    assert.equal(banco.turma_profissional.filter((v) => v.profissional_id === 1 && !v.data_fim).length, 1);
+    assert.deepEqual(banco.turma_profissional.at(-1).data_inicio, data('2026-11-04'));
+    assert.deepEqual(editada.profissionais.map((p) => p.id), [1, 2]);
+    const detalhe = await obterTurmaService(10);
+    assert.equal(detalhe.historico_profissionais.length, 3);
+    assert.equal(detalhe.profissionais.length, 2);
+  });
+}
+
+test('seleção vazia, duplicada ou inválida é rejeitada no cadastro e na edição', async (t) => {
+  const banco = simularEquipe(t), antes = structuredClone(banco);
+  for (const profissionais_ids of [[], [1, 1], [0], [1.2], ['1'], [2147483648], null]) {
+    await assert.rejects(() => criarTurmaService({ tipo: 'REGULAR', nome: 'Equipe', turno: 'MANHA', ambiente_id: 2,
+      ano_letivo_id: 2026, profissionais_ids }), { name: 'ZodError' });
+    await assert.rejects(() => editarTurmaService(10, { profissionais_ids }), { name: 'ZodError' });
+  }
+  assert.deepEqual(banco, antes);
+});
+
+test('qualquer profissional novo indisponível impede toda a alteração da equipe', async (t) => {
+  const banco = simularEquipe(t), antes = structuredClone(banco);
+  for (const profissionais_ids of [[1, 999], [999, 2]]) {
+    await assert.rejects(() => editarTurmaService(10, { nome: 'Não gravar', profissionais_ids }), { statusCode: 404 });
+    assert.deepEqual(banco, antes);
+  }
+});
+
+test('falha ao gravar novos vínculos reverte nome e encerramentos da equipe', async (t) => {
+  const banco = simularEquipe(t), antes = structuredClone(banco), original = prisma.$transaction;
+  prisma.$transaction = (callback, options) => original(async (tx) => {
+    tx.turma_profissional.createMany = async () => { throw new Error('Falha simulada no vínculo'); };
+    return callback(tx);
+  }, options);
+  await assert.rejects(() => editarTurmaService(10, { nome: 'Não gravar', profissionais_ids: [2] }), /Falha simulada/);
+  assert.deepEqual(banco, antes);
+});
+
+for (const acao of ['inativar', 'excluir']) {
+  test(`${acao}: segundo responsável também é bloqueado e a retirada explícita libera a operação`, async (t) => {
+    const banco = simularEquipe(t);
+    await editarTurmaService(10, { profissionais_ids: [1, 2] });
+    const operar = () => acao === 'excluir' ? excluirProfissionalService(2) : editarProfissionalService(2, { status_geral: 'INATIVO' });
+    await assert.rejects(operar, (erro) => erro.isConflict && erro.detalhes.some((d) => d.turma_id === 10));
+    await editarTurmaService(10, { profissionais_ids: [1] });
+    await operar();
+    assert.equal(banco.turma_profissional.filter((v) => v.profissional_id === 2).length, 1);
+    const detalhe = await obterTurmaService(10);
+    assert.deepEqual(detalhe.profissionais.map((p) => p.id), [1]);
+    assert.equal(detalhe.historico_profissionais.length, 2);
+  });
+}
+
+test('reativação da turma verifica todos os responsáveis e permite retirar o indisponível', async (t) => {
+  const banco = simularEquipe(t);
+  await editarTurmaService(10, { profissionais_ids: [1, 2] });
+  await editarTurmaService(10, { status: 'INATIVO' });
+  await editarProfissionalService(2, { status_geral: 'INATIVO' });
+  await assert.rejects(() => editarTurmaService(10, { status: 'ATIVO' }), { statusCode: 400 });
+  assert.equal(banco.turma[0].status, 'INATIVO');
+  const ativa = await editarTurmaService(10, { status: 'ATIVO', profissionais_ids: [1] });
+  assert.deepEqual(ativa.profissionais.map((p) => p.id), [1]);
+});
+
+test('cargo pode mudar com turma ativa e edição da equipe mantém o vínculo existente', async (t) => {
+  const banco = simularEquipe(t);
+  await editarProfissionalService(1, { cargo: 'Outro' });
+  await editarTurmaService(10, { nome: 'Equipe revisada', profissionais_ids: [1, 2] });
+  assert.equal(banco.funcionario[0].cargo, 'Outro');
+  assert.equal((await obterTurmaService(10)).profissionais.length, 2);
+});
+
+test('ativação de rascunho revalida também o segundo profissional da turma', async (t) => {
+  const banco = simularEquipe(t);
+  await editarTurmaService(10, { profissionais_ids: [1, 2] });
+  await matricularOficinasService({ aluno_id: 1, oficinas_ids: [10] });
+  banco.pessoa.find((p) => p.id === 11).status_geral = 'INATIVO';
+  const antes = structuredClone(banco);
+  await assert.rejects(() => editarAlunoService(1, { status: 'ATIVO' }), { statusCode: 400 });
+  assert.deepEqual(banco, antes);
+});
+
+test('edições concorrentes de equipe não deixam vínculos atuais duplicados', async (t) => {
+  const banco = simularEquipe(t);
+  await Promise.all([editarTurmaService(10, { profissionais_ids: [1, 2] }), editarTurmaService(10, { profissionais_ids: [2, 1] })]);
+  assert.equal(banco.turma_profissional.filter((v) => v.turma_id === 10 && !v.data_fim).length, 2);
+});
+
+test('inativação concorrente com vínculo de segundo responsável preserva a integridade', async (t) => {
+  const banco = simularEquipe(t);
+  await Promise.allSettled([editarProfissionalService(2, { status_geral: 'INATIVO' }), editarTurmaService(10, { profissionais_ids: [1, 2] })]);
+  const inativo = banco.pessoa.find((p) => p.id === 11)?.status_geral === 'INATIVO';
+  const vinculado = banco.turma_profissional.some((v) => v.turma_id === 10 && v.profissional_id === 2 && !v.data_fim);
+  assert.ok(!inativo || !vinculado);
+});
+
+test('inativar, reativar e excluir turma preserva sua equipe e todo o histórico', async (t) => {
+  const banco = simularEquipe(t);
+  await editarTurmaService(10, { profissionais_ids: [1, 2] });
+  const antes = structuredClone(banco.turma_profissional);
+  await editarTurmaService(10, { status: 'INATIVO' });
+  assert.deepEqual(banco.turma_profissional, antes);
+  await editarTurmaService(10, { status: 'ATIVO' });
+  assert.deepEqual(banco.turma_profissional, antes);
+  await excluirTurmaService(10, { confirmar_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
+  assert.deepEqual(banco.turma_profissional, antes);
+  assert.ok(banco.turma[0].deleted_at);
+});
 
 for (const tipo of ['REGULAR', 'OFICINA']) {
   test(`${tipo}: matrícula provisória aguarda o bloqueio da turma e revalida seu status`, async (t) => {
@@ -2394,7 +2539,18 @@ function planejamentoNovaTurma() {
 }
 
 const pedidoNovaTurma = { turma: { tipo: 'REGULAR', nome: 'Girassol 2027', turno: 'MANHA', ano_letivo_id: 2027,
-  ambiente_id: 2, profissional_id: 1, capacidade_maxima: 3, descricao: 'Nova descrição' }, alunos_ids: [1, 3] };
+  ambiente_id: 2, profissionais_ids: [1], capacidade_maxima: 3, descricao: 'Nova descrição' }, alunos_ids: [1, 3] };
+
+test('criação a partir de turma preserva a equipe da origem e aceita vários responsáveis na nova', async (t) => {
+  const banco = simularBanco(t, planejamentoNovaTurma());
+  await editarTurmaService(10, { profissionais_ids: [1, 2] });
+  const preparacao = await prepararNovaTurmaService(10);
+  assert.deepEqual(preparacao.origem.profissionais.map((p) => p.id), [1, 2]);
+  const anteriores = structuredClone(banco.turma_profissional);
+  const nova = await criarTurmaAPartirService(10, { ...pedidoNovaTurma, turma: { ...pedidoNovaTurma.turma, profissionais_ids: [1, 2] } });
+  assert.deepEqual(nova.profissionais.map((p) => p.id), [1, 2]);
+  assert.deepEqual(banco.turma_profissional.filter((v) => v.turma_id !== nova.id), anteriores);
+});
 
 test('preparação não grava, filtra turno/status/vínculo ativo e sinaliza somente antigos alunos efetivados', async (t) => {
   const banco = simularBanco(t, planejamentoNovaTurma());

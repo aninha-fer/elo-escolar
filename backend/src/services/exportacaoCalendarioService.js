@@ -1,6 +1,7 @@
 const prisma = require('../prismaClient');
 const { selecionarAlunosFiltrados } = require('./paginacaoService');
 const { agoraInstituicao, inicioOcorrencia } = require('./encerramentoAtividade');
+const { selectVinculosProfissionais, profissionaisDaTurma } = require('./turmaProfissionalService');
 
 const hora = (valor) => valor.toISOString().slice(11, 16);
 const data = (valor) => valor?.toISOString().slice(0, 10) ?? null;
@@ -30,7 +31,7 @@ function formatarCalendarioAluno(aluno, referencia) {
             || (matricula.data_fim && matricula.data_fim < hoje)) continue;
         if (turma.tipo === 'REGULAR' && turma.ano_letivo?.ano !== resultado.ano) continue;
         const item = { id: turma.id, nome: turma.nome, turno: turma.turno, provisorio: matricula.status === 'PROVISORIO',
-            profissional: turma.profissional.pessoa.nome, sala: turma.ambiente?.nome ?? 'Não informada',
+            profissional: profissionaisDaTurma(turma.profissionais).map((p) => p.pessoa.nome).join(', ') || 'Não informado', sala: turma.ambiente?.nome ?? 'Não informada',
             horarios: turma.horarios.filter((h) => frequencia.has(h.dia_semana)).map((h) => ({ dia_semana: h.dia_semana,
                 inicio: hora(h.hora_inicio), fim: hora(h.hora_fim) })).sort((a, b) => a.dia_semana - b.dia_semana || a.inicio.localeCompare(b.inicio)) };
         if (!item.horarios.length) continue;
@@ -69,7 +70,7 @@ async function obterCalendariosExportacaoService(ids, referencia = new Date().to
             matriculas_turmas: { where: { status: { in: ['ATIVO', 'PROVISORIO'] } }, select: {
                 status: true, data_fim: true, turma: { select: { id: true, nome: true, tipo: true, turno: true, status: true, deleted_at: true,
                     ano_letivo: { select: { ano: true } }, ambiente: { select: { nome: true } },
-                    profissional: { select: { pessoa: { select: { nome: true } } } },
+                    profissionais: selectVinculosProfissionais,
                     horarios: { select: { dia_semana: true, hora_inicio: true, hora_fim: true } },
                 } },
             } },

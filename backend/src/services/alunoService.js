@@ -236,7 +236,7 @@ async function lerPlanejamento(tx, aluno_id, hoje) {
   const [matriculas, atendimentos] = await Promise.all([
     tx.matricula_turma.findMany({ where: { aluno_id, OR: [
       hoje ? filtroMatriculasAtivas(hoje) : { status: 'ATIVO' }, { status: 'PROVISORIO', data_fim: null }
-    ] }, include: { turma: { include: { ano_letivo: true, horarios: true } } } }),
+    ] }, include: { turma: { include: { ano_letivo: true, horarios: true, profissionais: { where: { data_fim: null }, select: { profissional_id: true } } } } } }),
     tx.atendimento_clinico.findMany({ where: { aluno_id, status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null },
       include: { modalidade_cadastrada: { select: { nome: true } }, sessoes: { where: { status: { in: ['ATIVO', 'PROVISORIO'] }, data_cancelamento: null } } } })
   ]);
@@ -354,7 +354,7 @@ async function editarAlunoService(id, entrada) {
     const ativando = atual.status === 'RASCUNHO' && dados.status === 'ATIVO';
     if (ativando) {
       const profissionais = [...new Set([
-        ...planejamento.matriculas.map((m) => m.turma.profissional_id),
+        ...planejamento.matriculas.flatMap((m) => m.turma.profissionais.map((vinculo) => vinculo.profissional_id)),
         ...planejamento.atendimentos.flatMap((a) => a.sessoes.filter((s) => inicioOcorrencia(s.data_sessao, s.hora_inicio) >= agora.getTime())
           .flatMap((s) => [a.profissional_id, s.profissional_id])),
       ].filter(Number.isInteger))].sort((a, b) => a - b);

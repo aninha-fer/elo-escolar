@@ -205,7 +205,7 @@ function simularEdicao(t, inicial = {}) {
                 assert.deepEqual(where, { id: 50 }); chamadas.push('pessoa'); Object.assign(pendente.pessoa, data);
             } },
             turma: { findMany: async ({ where }) => {
-                assert.deepEqual(where, { profissional_id: 7, status: 'ATIVO' }); chamadas.push('turmas');
+                assert.deepEqual(where, { profissionais: { some: { profissional_id: 7, data_fim: null } }, status: 'ATIVO', deleted_at: null }); chamadas.push('turmas');
                 return pendente.turmas.filter((t) => (t.status ?? 'ATIVO') === 'ATIVO');
             } },
             atendimento_sessao: {

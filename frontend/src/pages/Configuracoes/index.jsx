@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
+import { Button } from '../../components/Button';
 import { CarregarMais } from '../../components/CarregarMais';
 import EditIcon from '../../components/icons/EditIcon';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
@@ -12,6 +13,7 @@ import { modalidadesService } from '../../services/modalidadesService';
 
 export function Configuracoes() {
     const [editando, setEditando] = useState(null);
+    const [cadastro, setCadastro] = useState(null);
     const listagem = useListagemInfinita(anosLetivosService.listarPagina);
     const modalidades = useListagemInfinita(modalidadesService.listarPagina);
     const hoje = hojeInstituicao();
@@ -20,16 +22,9 @@ export function Configuracoes() {
         <header>
             <h1 id="alunos-titulo" className="text-xl font-bold text-text-main">Configurações</h1>
         </header>
-        <div className='flex flex-row gap-lg'>
-            <div className='flex flex-col gap-lg w-[50%]'>
-                <CardConfiguracao titulo="Cadastrar ano letivo" descricao="Registre as datas oficiais de início e encerramento.">
-                    <FormularioAnoLetivo onSalvo={listagem.recarregar} />
-                </CardConfiguracao>
-                <section className="overflow-hidden rounded-lg border border-slate-200 bg-bg-surface shadow-sm">
-                    <header className="border-b border-slate-200 p-lg border-t-4 border-t-tertiary">
-                        <h2 className="text-lg font-bold text-text-main">Calendários cadastrados</h2>
-                        <p className="mt-xs text-sm text-text-muted">Histórico dos períodos letivos da instituição.</p>
-                    </header>
+        <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2">
+                <CardConfiguracao titulo="Calendários cadastrados" descricao="Histórico dos períodos letivos da instituição." conteudoComPadding={false}
+                    acao={<Button data-testid="calendario-cadastrar" type="button" aria-haspopup="dialog" onClick={() => setCadastro('calendario')}>Cadastrar calendário</Button>}>
                     <ul className="divide-y divide-slate-200">{listagem.itens.map((calendario) => {
                         const encerrado = calendario.data_fim.slice(0, 10) < hoje;
                         const futuro = calendario.data_inicio.slice(0, 10) > hoje;
@@ -48,19 +43,22 @@ export function Configuracoes() {
                     })}</ul>
                     {!listagem.carregando && !listagem.erro && !listagem.total && <p className="p-lg text-sm text-text-muted">Nenhum calendário cadastrado.</p>}
                     <CarregarMais listagem={listagem} testId="calendarios-listagem" />
-                </section>
-            </div>
-            <div className='flex flex-col gap-lg w-[50%]'>
-                <CardConfiguracao titulo="Cadastrar modalidade" descricao="Cadastre as modalidades dos atendimentos clínicos.">
-                    <FormularioModalidade onSalvo={modalidades.recarregar} />
                 </CardConfiguracao>
-                <CardConfiguracao titulo="Modalidades cadastradas" descricao="As modalidades cadastradas não podem ser editadas." conteudoComPadding={false}>
+                <CardConfiguracao titulo="Modalidades cadastradas" descricao="As modalidades cadastradas não podem ser editadas." conteudoComPadding={false}
+                    acao={<Button data-testid="modalidade-cadastrar" type="button" aria-haspopup="dialog" onClick={() => setCadastro('modalidade')}>Cadastrar modalidade</Button>}>
                     <ul className="divide-y divide-slate-200">{modalidades.itens.map((modalidade) => <li key={modalidade.id} className="p-lg text-sm font-semibold text-text-main">{modalidade.nome}</li>)}</ul>
                     {!modalidades.carregando && !modalidades.erro && !modalidades.total && <p className="p-lg text-sm text-text-muted">Nenhuma modalidade cadastrada.</p>}
                     <CarregarMais listagem={modalidades} testId="modalidades-listagem" />
                 </CardConfiguracao>
-            </div>
         </div>
+        <Modal testId="calendario-cadastro" isOpen={cadastro === 'calendario'} onClose={() => setCadastro(null)} title="Cadastrar ano letivo"
+            subtitle="Registre as datas oficiais de início e encerramento." showFooter={false} trapFocus>
+            <FormularioAnoLetivo onSalvo={() => { setCadastro(null); listagem.recarregar(); }} />
+        </Modal>
+        <Modal testId="modalidade-cadastro" isOpen={cadastro === 'modalidade'} onClose={() => setCadastro(null)} title="Cadastrar modalidade"
+            subtitle="Cadastre as modalidades dos atendimentos clínicos." showFooter={false} trapFocus>
+            <FormularioModalidade onSalvo={() => { setCadastro(null); modalidades.recarregar(); }} />
+        </Modal>
         <Modal testId="calendario-editar" isOpen={Boolean(editando)} onClose={() => setEditando(null)} title="Editar ano letivo" showFooter={false}>
             {editando && <FormularioAnoLetivo key={editando.id} calendario={editando} onSalvo={() => { setEditando(null); listagem.recarregar(); }} />}
         </Modal>

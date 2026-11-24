@@ -37,6 +37,15 @@ test('PDF multipágina não perde oficinas nem nomes longos e identifica provis�
     assert.ok(conteudo.includes('Psicologia'));
 });
 
+test('PDF preserva todos os profissionais de turmas e oficinas, inclusive em equipes extensas', async () => {
+    const dados = calendario();
+    const nomes = Array.from({ length: 80 }, (_, i) => `Docente${i}`);
+    dados.oficinas[0].profissional = nomes.join(', ');
+    dados.turmas_regulares[0].profissional = 'AuxiliarEquipe, ProfessorEquipe';
+    const pdf = await criarPdfCalendarioAluno(dados), conteudo = pdf.output();
+    for (const nome of [...nomes, 'AuxiliarEquipe', 'ProfessorEquipe']) assert.ok(conteudo.includes(nome), nome);
+});
+
 test('nomes de arquivo são seguros, compactos e únicos mesmo com homônimos', () => {
     const usados = new Set();
     assert.equal(nomeArquivoAluno('Ana', 1, usados), 'Ana.pdf');

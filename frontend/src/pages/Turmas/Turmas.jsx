@@ -45,7 +45,7 @@ export function Turmas() {
     const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca, status: statusSelecionado }, tentativa);
     const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0 };
     const { carregando, erro } = listagem;
-    const filtrados = listagem.itens.map((turma) => ({ ...turma, profissionais: normalizarProfissionais(turma) }));
+    const filtrados = listagem.itens;
 
     function trocarTipo(tipo) {
         setTipoTurma(tipo);
@@ -205,7 +205,7 @@ export function Turmas() {
                 </p>
             ) : (
                 <ul aria-label={tipoTurma === 'REGULAR' ? 'Turmas regulares' : 'Oficinas'} className="flex min-w-0 flex-col gap-sm">
-                    {filtrados.map((turma) => <TurmaItem key={turma.id} turma={turma} profissionais={turma.profissionais} podeEditar={podeEditar}
+                    {filtrados.map((turma) => <TurmaItem key={turma.id} turma={turma} profissionais={normalizarProfissionais(turma)} podeEditar={podeEditar}
                         onEditar={(selecionada) => abrirOperacao('editar', selecionada)} onAlterarStatus={(selecionada) => abrirOperacao('status', selecionada)}
                         onExcluir={(selecionada) => abrirOperacao('excluir', selecionada)}
                         onCriarAPartir={(selecionada) => abrirOperacao('nova-a-partir', selecionada)}

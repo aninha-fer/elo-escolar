@@ -5,7 +5,7 @@ function normalizarTexto(valor) {
     return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
 }
 
-export function SeletorProfissional({ profissionais, value, onChange, carregando, erroCarga, onTentarNovamente, error }) {
+export function SeletorProfissional({ profissionais, value = [], onChange, carregando, erroCarga, onTentarNovamente, error }) {
     const [busca, setBusca] = useState('');
     const filtrados = profissionais.filter((profissional) => normalizarTexto(profissional.nome).includes(normalizarTexto(busca)));
 
@@ -14,7 +14,7 @@ export function SeletorProfissional({ profissionais, value, onChange, carregando
             <legend className="mb-sm font-mono text-xs font-semibold uppercase tracking-wider text-slate-600">
                 Professores e auxiliares <span className="text-danger">*</span>
             </legend>
-            <p className="mb-sm text-xs text-text-muted">Selecione um profissional responsável.</p>
+            <p className="mb-sm text-xs text-text-muted">Selecione um ou mais profissionais responsáveis. {value.length} selecionado(s).</p>
             <div className="overflow-hidden rounded-sm border border-slate-200">
                 <Input data-testid="turma-formulario-busca-profissional" id="turma-busca-profissional" aria-label="Buscar profissional" placeholder="Buscar profissional..."
                     wrapperClassName="mb-0!" inputClassName="rounded-none! border-0! bg-bg-main!"
@@ -35,9 +35,11 @@ export function SeletorProfissional({ profissionais, value, onChange, carregando
                                 <span className="min-w-0 flex-1">
                                     <span className="block break-words text-sm font-semibold text-text-main">{profissional.nome}</span>
                                     <span className="block text-xs text-text-muted">{profissional.funcao}</span>
+                                    {profissional.indisponivel && <span className="block text-xs text-amber-800">Indisponível para novos vínculos</span>}
                                 </span>
-                                <input data-testid={`turma-formulario-profissional-${profissional.id}`} type="radio" name="profissional_id" value={profissional.id} checked={String(value) === String(profissional.id)}
-                                    onChange={(event) => onChange(event.target.value)} required aria-invalid={Boolean(error)}
+                                <input data-testid={`turma-formulario-profissional-${profissional.id}`} type="checkbox" name="profissionais_ids" value={profissional.id} checked={value.includes(profissional.id)}
+                                    disabled={profissional.indisponivel && !value.includes(profissional.id)}
+                                    onChange={() => onChange(value.includes(profissional.id) ? value.filter((id) => id !== profissional.id) : [...value, profissional.id].sort((a, b) => a - b))} aria-invalid={Boolean(error)}
                                     aria-describedby={error ? 'turma-profissional-erro' : undefined} className="size-4 shrink-0 accent-blue-600" />
                             </label>
                         ))}

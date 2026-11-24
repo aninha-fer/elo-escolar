@@ -1,5 +1,6 @@
 const { diaLetivo, contemData, fimLetivo } = require('./calendarioLetivo');
 const prisma = require('../prismaClient');
+const { selectVinculosProfissionais, profissionaisDaTurma } = require('./turmaProfissionalService');
 
 const DIA_MS = 86400000;
 
@@ -50,7 +51,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
         ]
       },
       include: {
-        turma: { include: { ano_letivo: true, horarios: true, ambiente: true, profissional: { include: { pessoa: true } } } }
+        turma: { include: { ano_letivo: true, horarios: true, ambiente: true, profissionais: selectVinculosProfissionais } }
       }
     }),
     prisma.atendimento_sessao.findMany({
@@ -71,7 +72,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
   ]);
 
   const eventos = [];
-  function adicionarEvento(evento, inicio, fim) {
+  function adicionarEvento(evento, inicio, fim, vinculosProfissionais) {
     // Segmentos por dia permitem exibir eventos que atravessam meia-noite e limites da semana.
     let cursor = Math.max(inicio, inicioSemana.getTime());
     const limite = Math.min(fim, fimSemana.getTime());
@@ -83,6 +84,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
       const data = dia.toISOString().slice(0, 10);
       eventos.push({
         ...evento,
+        ...(vinculosProfissionais ? { profissional: profissionaisDaTurma(vinculosProfissionais, dia).map((p) => p.pessoa.nome).join(', ') || 'Não definido' } : {}),
         id: `${evento.id}-${data}`,
         data,
         dia_semana: dia.getUTCDay() || 7,
@@ -115,8 +117,7 @@ async function obterAgendaAlunoService(aluno_id, dataReferencia) {
           titulo: turma.nome, tipo: turma.tipo,
           status: matricula.status,
           ambiente: turma.ambiente?.nome || 'Não definido',
-          profissional: turma.profissional?.pessoa?.nome || 'Não definido'
-        }, inicio, fim);
+        }, inicio, fim, turma.profissionais);
       }
     }
   }

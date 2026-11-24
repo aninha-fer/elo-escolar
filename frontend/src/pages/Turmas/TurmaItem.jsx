@@ -4,6 +4,7 @@ import { CampoInformacao } from '../../components/CampoInformacao';
 import EditIcon from '../../components/icons/EditIcon';
 import { TrashIcon } from '../../components/icons/TrashIcon';
 import { TagExpiradaTurma } from '../../components/TagExpiradaTurma';
+import { ProfissionaisTurma } from '../../components/ProfissionaisTurma';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600',
@@ -17,16 +18,6 @@ function CampoTurma({ titulo, valor, descricao = false, className }) {
         className={`min-w-0 space-y-sm ${descricao ? 'sm:col-span-2 md:col-span-3 xl:col-span-1' : ''} ${className}`}
         tituloClassName="break-words font-mono text-xs uppercase tracking-widest text-slate-500"
         valorClassName={`whitespace-pre-wrap break-words text-sm leading-relaxed text-text-main ${descricao ? '' : 'font-semibold'}`} />;
-}
-
-function ProfessoresTurma({ profissionais }) {
-    if (!profissionais.length) return 'Profissional não informado';
-    return <ul aria-label="Profissionais responsáveis" className="flex flex-wrap gap-sm">
-        {profissionais.map((profissional, indice) => <li key={profissional.id ?? `${profissional.nome}-${indice}`}
-            className="inline-flex max-w-full items-center rounded-full bg-amber-50 px-sm py-xs text-xs font-semibold text-amber-600">
-            <span className="min-w-0 break-words">{profissional.nome}</span>
-        </li>)}
-    </ul>;
 }
 
 export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar = false, onEditar, onAlterarStatus, onExcluir, onCriarAPartir }) {
@@ -68,7 +59,7 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                     </> : <CampoTurma titulo="Período" valor={formatarTurno(turma.turno)} />}
                     <CampoTurma titulo="Sala" valor={turma.ambiente?.nome || 'Ambiente não informado'} />
                     <CampoTurma titulo="Vagas" valor={capacidade} />
-                    <CampoTurma titulo="Professores" valor={<ProfessoresTurma profissionais={profissionais} />} />
+                    <CampoTurma titulo="Professores" valor={<ProfissionaisTurma profissionais={profissionais} />} />
                     <CampoTurma titulo="Descrição" valor={turma.descricao || '-'} descricao className="w-70"/>
                 </dl>
                 <button data-testid={`turma-${turma.id}-abrir`} type="button" className="absolute inset-0 size-full cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2"

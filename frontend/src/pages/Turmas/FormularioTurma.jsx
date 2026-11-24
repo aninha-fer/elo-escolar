@@ -33,14 +33,15 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
     const idTurma = turma?.id;
     const gruposIniciais = agruparHorarios(base?.horarios);
     const diasIniciais = [...new Set(gruposIniciais.flatMap((grupo) => grupo.dias))].sort((a, b) => a - b);
-    const profissionalInicial = base?.profissional_id ?? base?.profissional?.id;
+    const profissionaisIniciais = base?.profissionais ?? [];
+    const idsIniciais = profissionaisIniciais.map((profissional) => profissional.id).sort((a, b) => a - b);
     const salaInicial = base?.ambiente_id ?? base?.ambiente?.id;
     const envioEmAndamento = useRef(false);
     const [enviando, setEnviando] = useState(false);
     const [formulario, setFormulario] = useState(() => ({
         tipo: base?.tipo ?? tipoInicial, nome: base?.nome ?? '', turno: base?.turno ?? 'MANHA',
         horario: gruposIniciais[0]?.inicio ?? '', dias_semana: diasIniciais, ambiente_id: String(salaInicial ?? ''),
-        capacidade_maxima: base?.capacidade_maxima ?? '', descricao: base?.descricao ?? '', profissional_id: String(profissionalInicial ?? ''),
+        capacidade_maxima: base?.capacidade_maxima ?? '', descricao: base?.descricao ?? '', profissionais_ids: idsIniciais,
         ano_letivo_id: criandoAPartir ? '' : String(turma?.ano_letivo_id ?? ''),
     }));
     const [erros, setErros] = useState({});
@@ -71,7 +72,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                     setFormulario((atual) => ({ ...atual, nome: dados.origem.nome, turno: dados.origem.turno,
                         ambiente_id: String(dados.origem.ambiente_id ?? dados.origem.ambiente?.id ?? ''),
                         capacidade_maxima: dados.origem.capacidade_maxima ?? '', descricao: dados.origem.descricao ?? '',
-                        profissional_id: String(dados.origem.profissional_id ?? dados.origem.profissional?.id ?? ''), ano_letivo_id: '' }));
+                        profissionais_ids: dados.origem.profissionais.map((profissional) => profissional.id).sort((a, b) => a - b), ano_letivo_id: '' }));
                 }
                 const ids = new Set(dados.alunos.map((aluno) => aluno.id));
                 const anteriores = !turnosPreparados.current.has(turno) ? dados.alunos.filter((aluno) => aluno.ano_anterior).map((aluno) => aluno.id) : [];
@@ -128,21 +129,31 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
     const carregandoAlunos = !candidatos || candidatos.turno !== formulario.turno || candidatos.tentativa !== tentativa;
     const excedeuVagas = formulario.capacidade_maxima !== '' && selecionados.length > Number(formulario.capacidade_maxima);
     const cargosPermitidos = ['professor', 'auxiliar'];
-    const elegiveis = profissionais.dados.filter((profissional) => (editando && profissional.id === profissionalInicial)
-        || (profissional.status_geral === 'ATIVO' && cargosPermitidos.includes(profissional.funcao?.trim().toLocaleLowerCase('pt-BR'))));
+    const compativel = (profissional) => profissional.status_geral === 'ATIVO' && !profissional.excluido
+        && cargosPermitidos.includes(profissional.funcao?.trim().toLocaleLowerCase('pt-BR'));
+    const opcoesProfissionais = profissionais.dados.map((profissional) => ({ ...profissional, indisponivel: !compativel(profissional) }));
+    if (editando || criandoAPartir) {
+        for (const profissional of (origemCarregada?.profissionais ?? profissionaisIniciais)) {
+            if (!opcoesProfissionais.some((opcao) => opcao.id === profissional.id)) opcoesProfissionais.push({
+                id: profissional.id, nome: profissional.pessoa?.nome ?? profissional.nome ?? 'Profissional não informado',
+                funcao: profissional.cargo ?? profissional.funcao, indisponivel: true,
+            });
+        }
+    }
+    const elegiveis = opcoesProfissionais.filter((profissional) => !profissional.indisponivel || formulario.profissionais_ids.includes(profissional.id));
     const faixa = faixasOficina.find((opcao) => opcao.value === formulario.horario);
-    const profissionalValido = (editando && Number(formulario.profissional_id) === profissionalInicial)
-        || elegiveis.some((profissional) => profissional.id === Number(formulario.profissional_id));
+    const profissionalValido = formulario.profissionais_ids.length > 0 && formulario.profissionais_ids.every((id) =>
+        (editando && idsIniciais.includes(id)) || elegiveis.some((profissional) => profissional.id === id && !profissional.indisponivel));
     const agendaBloqueada = editando && (infoEdicao?.status !== 'sucesso' || infoEdicao.bloqueada);
     const valores = {
         nome: formulario.nome.trim(), ambiente_id: Number(formulario.ambiente_id),
         capacidade_maxima: formulario.capacidade_maxima === '' ? null : Number(formulario.capacidade_maxima),
-        descricao: formulario.descricao.trim() || null, profissional_id: Number(formulario.profissional_id),
+        descricao: formulario.descricao.trim() || null, profissionais_ids: formulario.profissionais_ids,
         ...(!agendaBloqueada ? (regular ? { turno: formulario.turno, ano_letivo_id: Number(formulario.ano_letivo_id) }
             : { turno: faixa?.turno ?? turma?.turno, hora_inicio: formulario.horario,
                 hora_fim: faixa?.fim ?? gruposIniciais[0]?.fim, dias_semana: [...formulario.dias_semana].sort((a, b) => a - b) }) : {}),
     };
-    const originais = editando ? { ...turma, ambiente_id: salaInicial, profissional_id: profissionalInicial,
+    const originais = editando ? { ...turma, ambiente_id: salaInicial, profissionais_ids: idsIniciais,
         hora_inicio: gruposIniciais[0]?.inicio, hora_fim: gruposIniciais[0]?.fim, dias_semana: diasIniciais } : {};
     const alterados = Object.fromEntries(Object.entries(valores).filter(([campo, valor]) => JSON.stringify(valor) !== JSON.stringify(originais[campo])));
     const mudouAgenda = ['turno', 'ano_letivo_id', 'hora_inicio', 'hora_fim', 'dias_semana'].some((campo) => campo in alterados);
@@ -166,7 +177,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
 
     function atualizarCampo(campo, valor) {
         if (campo === 'tipo' && valor === formulario.tipo) return;
-        setFormulario((atual) => ({ ...atual, [campo]: valor, ...(campo === 'tipo' ? { profissional_id: '' } : {}) }));
+        setFormulario((atual) => ({ ...atual, [campo]: valor }));
         setErros((atuais) => campo === 'tipo' ? {} : { ...atuais, [campo]: undefined });
         if (criandoAPartir && campo === 'turno' && valor !== formulario.turno) {
             setSelecionados([]);
@@ -205,7 +216,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
         if (!formulario.ambiente_id || salas.status !== 'sucesso' || !salas.dados.some((sala) => sala.id === Number(formulario.ambiente_id))) {
             novosErros.ambiente_id = 'Selecione a sala da turma.';
         }
-        if (!profissionalValido || profissionais.status !== 'sucesso') novosErros.profissional_id = 'Selecione um profissional com função compatível.';
+        if (!profissionalValido || profissionais.status !== 'sucesso') novosErros.profissionais_ids = 'Selecione ao menos um professor ou auxiliar disponível.';
         if (editando && infoEdicao?.status !== 'sucesso') {
             notificar('Aguarde a consulta das restrições da turma ou tente novamente.');
             return;
@@ -223,7 +234,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
         if (editando && !Object.keys(alterados).length) return;
         const dados = editando ? { ...alterados, ambiente_id: Number(formulario.ambiente_id) } : {
             tipo: formulario.tipo, nome: formulario.nome.trim(), turno: regular ? formulario.turno : faixa.turno,
-            profissional_id: Number(formulario.profissional_id), descricao: formulario.descricao.trim() || null,
+            profissionais_ids: formulario.profissionais_ids, descricao: formulario.descricao.trim() || null,
             ...(formulario.ambiente_id ? { ambiente_id: Number(formulario.ambiente_id) } : {}),
             ...(formulario.capacidade_maxima !== '' ? { capacidade_maxima: Number(formulario.capacidade_maxima) } : {}),
             ...(regular ? { ano_letivo_id: Number(formulario.ano_letivo_id) }
@@ -355,10 +366,10 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                             value={formulario.descricao} onChange={(event) => atualizarCampo('descricao', event.target.value)} {...acessibilidadeCampo('descricao')} />
                         {erroCampo('descricao')}
                     </div>
-                    <SeletorProfissional key={formulario.tipo} profissionais={elegiveis} value={formulario.profissional_id}
-                        onChange={(valor) => atualizarCampo('profissional_id', valor)} carregando={profissionais.status === 'carregando'}
-                        erroCarga={profissionais.erro} onTentarNovamente={tentarNovamente} error={erros.profissional_id} />
-                    {criandoAPartir && profissionais.status === 'sucesso' && !profissionalValido && <p role="alert" className="mb-md text-sm text-amber-800">O profissional da turma anterior não está disponível. Selecione um profissional ativo com função compatível.</p>}
+                    <SeletorProfissional key={formulario.tipo} profissionais={elegiveis} value={formulario.profissionais_ids}
+                        onChange={(valor) => atualizarCampo('profissionais_ids', valor)} carregando={profissionais.status === 'carregando'}
+                        erroCarga={profissionais.erro} onTentarNovamente={tentarNovamente} error={erros.profissionais_ids} />
+                    {criandoAPartir && profissionais.status === 'sucesso' && !profissionalValido && <p role="alert" className="mb-md text-sm text-amber-800">Revise a equipe da turma anterior: selecione apenas professores ou auxiliares ativos e disponíveis.</p>}
                     </div>
                     {criandoAPartir && <div id="turma-nova-alunos" data-testid="turma-nova-alunos" role="tabpanel" aria-labelledby="turma-nova-aba-alunos" hidden={aba !== 'alunos'}>
                         <RevisaoAlunosTurma alunos={carregandoAlunos ? [] : candidatos.dados} selecionados={selecionados} bloqueados={bloqueados} capacidade={formulario.capacidade_maxima}
