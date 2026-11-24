@@ -19,6 +19,11 @@ const inteiroOpcional = (schema) => z.preprocess(
   schema.optional()
 );
 
+const profissionaisIdsDTO = z.array(z.number().int().positive().max(2147483647))
+  .nonempty('Selecione ao menos um professor ou auxiliar.')
+  .refine((ids) => new Set(ids).size === ids.length, 'Não repita profissionais na seleção.')
+  .transform((ids) => [...ids].sort((a, b) => a - b));
+
 const criarTurmaDTO = z.object({
   tipo: z.enum(['REGULAR', 'OFICINA']),
   nome: z.string().trim().min(1, 'Informe o nome da turma.'),
@@ -27,7 +32,7 @@ const criarTurmaDTO = z.object({
   capacidade_maxima: inteiroOpcional(z.number().int().nonnegative()),
   ano_letivo_id: inteiroOpcional(z.number().int().positive()),
   descricao: z.string().trim().nullish(),
-  profissional_id: z.number().int().positive(),
+  profissionais_ids: profissionaisIdsDTO,
   hora_inicio: z.string().optional(),
   hora_fim: z.string().optional(),
   dias_semana: z.array(z.number().int().min(1).max(7)).default([])
@@ -74,7 +79,7 @@ const editarTurmaDTO = z.object({
   ambiente_id: z.number().int().positive(),
   capacidade_maxima: z.number().int().nonnegative().nullable(),
   descricao: z.string().trim().nullable(),
-  profissional_id: z.number().int().positive(),
+  profissionais_ids: profissionaisIdsDTO,
   hora_inicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   hora_fim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   dias_semana: z.array(z.number().int().min(1).max(5)).nonempty(),

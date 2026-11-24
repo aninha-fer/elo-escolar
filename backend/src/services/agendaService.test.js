@@ -55,12 +55,29 @@ function matricula(alteracoes = {}) {
     id: 30, aluno_id: 1, status: 'ATIVO', data_inicio: null, data_fim: null,
     turma: {
       id: 40, nome: 'Música', tipo: 'OFICINA', status: 'ATIVO', deleted_at: null,
-      ambiente: { nome: 'Sala 1' }, profissional: { pessoa: { nome: 'João' } },
+      ambiente: { nome: 'Sala 1' }, profissionais: [{ profissional: { id: 1, pessoa: { nome: 'João' } }, data_inicio: null, data_fim: null }],
       horarios: [{ id: 50, dia_semana: 1, hora_inicio: hora('10:00'), hora_fim: hora('11:00') }]
     },
     ...alteracoes
   };
 }
+
+test('agenda mostra a equipe vigente no dia sem duplicar eventos nem incluir períodos vazios', async (t) => {
+  const m = matricula();
+  m.turma.profissionais = [
+    { data_inicio: null, data_fim: data('2026-11-01'), profissional: { id: 1, pessoa: { nome: 'Anterior' } } },
+    { data_inicio: data('2026-11-02'), data_fim: null, profissional: { id: 2, pessoa: { nome: 'Professor' } } },
+    { data_inicio: data('2026-11-02'), data_fim: null, profissional: { id: 3, pessoa: { nome: 'Auxiliar' } } },
+    { data_inicio: data('2026-11-02'), data_fim: data('2026-11-01'), profissional: { id: 4, pessoa: { nome: 'Retirado' } } },
+  ];
+  simularBanco(t, { matriculas: [m] });
+  const atual = await obterAgendaAlunoService(1, '2026-11-02');
+  assert.equal(atual.eventos.length, 1);
+  assert.equal(atual.eventos[0].profissional, 'Auxiliar, Professor');
+  const anterior = await obterAgendaAlunoService(1, '2026-10-26');
+  assert.equal(anterior.eventos.length, 1);
+  assert.equal(anterior.eventos[0].profissional, 'Anterior');
+});
 
 // Aplica aos dados de teste os filtros recebidos pelas consultas Prisma.
 function corresponde(registro, filtro) {

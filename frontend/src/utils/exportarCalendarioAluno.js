@@ -101,7 +101,7 @@ export async function criarPdfCalendarioAluno(calendario) {
             const chave = `${horario.inicio} - ${horario.fim}`;
             grupos.set(chave, [...(grupos.get(chave) ?? []), DIAS[horario.dia_semana]]);
         }
-        bloco(turma.nome, [`Professor: ${turma.profissional}`, `Sala: ${turma.sala}`,
+        bloco(turma.nome, [`Profissionais: ${turma.profissional}`, `Sala: ${turma.sala}`,
             ...[...grupos].map(([horario, dias]) => `${dias.join(', ')}: ${horario}`)], turma.provisorio);
     }
     titulo('Atendimentos clínicos');

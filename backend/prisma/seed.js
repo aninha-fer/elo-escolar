@@ -10,6 +10,7 @@ async function main() {
   await prisma.aluno_responsavel.deleteMany();
   await prisma.aluno_dados_medicos.deleteMany();
   await prisma.aluno.deleteMany(); 
+  await prisma.turma_profissional.deleteMany();
   await prisma.turma.deleteMany();
   await prisma.ano_letivo.deleteMany();
   await prisma.ambiente.deleteMany();
@@ -68,7 +69,7 @@ async function main() {
     const turmaCriada = await prisma.turma.create({
       data: {
         nome: t.nome, tipo: 'REGULAR', turno: t.turno, ano_letivo_id: calendario.id,
-        capacidade_maxima: 15, profissional_id: profMap[t.prof].id,
+        capacidade_maxima: 15, profissionais: { create: { profissional_id: profMap[t.prof].id } },
         ambiente_id: ambientesMap[t.amb].id
       }
     });
@@ -102,7 +103,7 @@ async function main() {
     const oficinaManha = await prisma.turma.create({
       data: {
         nome: o.nome, tipo: 'OFICINA', turno: 'MANHA', ano_letivo_id: calendario.id,
-        capacidade_maxima: 10, profissional_id: profMap[o.prof].id,
+        capacidade_maxima: 10, profissionais: { create: { profissional_id: profMap[o.prof].id } },
         ambiente_id: ambientesMap[o.amb].id
       }
     });
@@ -119,7 +120,7 @@ async function main() {
     const oficinaTarde = await prisma.turma.create({
       data: {
         nome: o.nome, tipo: 'OFICINA', turno: 'TARDE', ano_letivo_id: calendario.id,
-        capacidade_maxima: 10, profissional_id: profMap[o.prof].id,
+        capacidade_maxima: 10, profissionais: { create: { profissional_id: profMap[o.prof].id } },
         ambiente_id: ambientesMap[o.amb].id
       }
     });

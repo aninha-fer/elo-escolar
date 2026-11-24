@@ -1,3 +1,5 @@
+import { ProfissionaisTurma } from '../../components/ProfissionaisTurma';
+import { HistoricoProfissionais } from './components/HistoricoProfissionais';
 import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
@@ -77,7 +79,6 @@ export function TurmaDetalhes() {
     const tipo = regular ? 'Turma Regular' : 'Oficina';
     const grupos = agruparHorarios(turma.horarios);
     const dias = [...new Set(grupos.flatMap((grupo) => grupo.dias))].sort((a, b) => a - b);
-    const nomeProfissional = turma.profissional?.pessoa?.nome;
     const campos = [
         ['Período', formatarTurno(turma.turno)],
         ['Dias da semana', dias.length ? formatarFrequencia(dias) : 'Não informados'],
@@ -117,11 +118,9 @@ export function TurmaDetalhes() {
                         </dl>
                     )}
                     <div className="mt-sm border-t border-gray-200 pt-md">
-                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Profissional responsável</h4>
-                        {nomeProfissional ? <div className="break-words text-sm text-text-main">
-                            <p>{nomeProfissional}</p>
-                            <p className="mt-xs text-xs text-text-muted">{turma.profissional.cargo || 'Função não informada'}</p>
-                        </div> : <p className="text-sm text-slate-500">Não informado</p>}
+                        <h4 className="mb-sm text-[10px] font-semibold uppercase tracking-wider text-text-muted">Professores e auxiliares</h4>
+                        <ProfissionaisTurma profissionais={turma.profissionais} mostrarCargo />
+                        <HistoricoProfissionais historico={turma.historico_profissionais} />
                     </div>
                 </DivInformacoes>
                 <div className="min-w-0">

@@ -2,7 +2,7 @@ const { bloquearCalendarios, inicioMatriculaRegular, hojeInstituicao, turmaExpir
 const prisma = require('../prismaClient');
 const { paginarIds, formatarPagina } = require('./paginacaoService');
 const { criarTurmaDTO, editarTurmaDTO, excluirTurmaDTO, criarTurmaAPartirDTO } = require('../dtos/turmaDTO');
-const { bloquearProfissionalAtivo } = require('./profissionalService');
+const { selectVinculosProfissionais, formatarProfissionaisTurma, validarProfissionaisTurma, atualizarProfissionaisTurma } = require('./turmaProfissionalService');
 const { filtroMatriculasParaEncerrar, bloquearTurmaParaEncerramento, encerrarMatriculasTurma, sincronizarTurmasExpiradas } = require('./encerramentoTurmaService');
 const { matricularTurmaRegularNaTransacao } = require('./matriculaService');
 const { filtroMatriculasAtivas, matriculaVigente } = require('./encerramentoAtividade');
@@ -47,9 +47,7 @@ async function listarTurmasService(tipo, paginacao, filtros = {}) {
         include: {
             ano_letivo: true, horarios: true,
             ambiente: true,
-            profissional: {
-                include: { pessoa: true }
-            },
+            profissionais: selectVinculosProfissionais,
             _count: {
                 select: {
                     matriculas: {
@@ -63,7 +61,7 @@ async function listarTurmasService(tipo, paginacao, filtros = {}) {
         }
     });
     return formatarPagina(turmas.map((turma) => ({
-        ...comExpiracao(turma),
+        ...comExpiracao(formatarProfissionaisTurma(turma)),
         vagas_ocupadas: turma._count.matriculas,
         vagas_disponiveis: turma.capacidade_maxima == null ? null : Math.max(turma.capacidade_maxima - turma._count.matriculas, 0),
         _count: undefined,
@@ -83,9 +81,7 @@ async function listarTurmasRegularesPorTurnoService(turno) {
         include: {
             ano_letivo: true, horarios: true,
             ambiente: true,
-            profissional: {
-                include: { pessoa: true }
-            },
+            profissionais: selectVinculosProfissionais,
             _count: {
                 select: {
                     matriculas: {
@@ -100,7 +96,7 @@ async function listarTurmasRegularesPorTurnoService(turno) {
     });
 
     return turmas.map((turma) => ({
-        ...turma,
+        ...formatarProfissionaisTurma(turma),
         vagas_ocupadas: turma._count.matriculas,
         vagas_disponiveis: turma.capacidade_maxima == null ? null : Math.max(turma.capacidade_maxima - turma._count.matriculas, 0),
         _count: undefined,
@@ -116,7 +112,7 @@ async function criarTurmaService(dadosTurma) {
 }
 
 async function criarTurmaNaTransacao(tx, dados) {
-    const { tipo, nome, turno, ambiente_id, capacidade_maxima, ano_letivo_id, descricao, profissional_id } = dados;
+    const { tipo, nome, turno, ambiente_id, capacidade_maxima, ano_letivo_id, descricao, profissionais_ids } = dados;
     const horarios = gerarHorariosTurma(dados);
     if (ano_letivo_id !== undefined) {
         const calendario = await tx.ano_letivo.findUnique({ where: { id: ano_letivo_id } });
@@ -124,13 +120,7 @@ async function criarTurmaNaTransacao(tx, dados) {
         if (tipo === 'REGULAR') inicioMatriculaRegular({ nome, ano_letivo: calendario });
     }
 
-    const profissional = await bloquearProfissionalAtivo(tx, profissional_id);
-    const cargosPermitidos = ['professor', 'auxiliar'];
-    if (!cargosPermitidos.includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'))) {
-        throw Object.assign(new Error(tipo === 'REGULAR'
-            ? 'Selecione um professor ou auxiliar para a turma regular.'
-            : 'Selecione um professor ou auxiliar para a oficina.'), { statusCode: 400 });
-    }
+    await validarProfissionaisTurma(tx, profissionais_ids);
     if (ambiente_id !== undefined) {
         const ambiente = await tx.ambiente.findUnique({ where: { id: ambiente_id }, select: { id: true } });
         if (!ambiente) {
@@ -140,7 +130,7 @@ async function criarTurmaNaTransacao(tx, dados) {
 
     const turma = await tx.turma.create({
         data: {
-            nome, tipo, turno, profissional_id,
+            nome, tipo, turno,
             capacidade_maxima: capacidade_maxima ?? null,
             ambiente_id: ambiente_id ?? null,
             descricao: descricao || null,
@@ -148,16 +138,17 @@ async function criarTurmaNaTransacao(tx, dados) {
             status: 'ATIVO'
         }
     });
+    await atualizarProfissionaisTurma(tx, turma.id, profissionais_ids);
     await tx.turma_horario.createMany({
         data: horarios.map((horario) => ({ ...horario, turma_id: turma.id }))
     });
-    return comExpiracao(await tx.turma.findUnique({ where: { id: turma.id }, include: { ano_letivo: true, horarios: true } }));
+    return comExpiracao(formatarProfissionaisTurma(await tx.turma.findUnique({ where: { id: turma.id }, include: { ano_letivo: true, horarios: true, profissionais: selectVinculosProfissionais } })));
 }
 
 async function obterOrigemNovaTurma(cliente, id) {
     const origem = await cliente.turma.findUnique({ where: { id }, include: {
         ano_letivo: true, horarios: true, ambiente: { select: { id: true, nome: true } },
-        profissional: { select: { id: true, cargo: true, pessoa: { select: { nome: true } } } },
+        profissionais: selectVinculosProfissionais,
     } });
     if (!origem || origem.deleted_at) throw Object.assign(new Error('Turma de origem não encontrada.'), { statusCode: 404 });
     if (origem.tipo !== 'REGULAR' || origem.status !== 'INATIVO') {
@@ -185,7 +176,7 @@ async function prepararNovaTurmaService(id, turno) {
         select: { aluno_id: true, data_inicio: true, data_fim: true },
     });
     const idsAnteriores = new Set(anteriores.filter((m) => !m.data_fim || m.data_fim >= m.data_inicio).map((m) => m.aluno_id));
-    return { origem: comExpiracao(origem), alunos: alunos.map((a) => ({ id: a.id, nome: a.pessoa.nome, participa_procan: a.participa_procan, ano_anterior: idsAnteriores.has(a.id) })) };
+    return { origem: comExpiracao(formatarProfissionaisTurma(origem)), alunos: alunos.map((a) => ({ id: a.id, nome: a.pessoa.nome, participa_procan: a.participa_procan, ano_anterior: idsAnteriores.has(a.id) })) };
 }
 
 async function criarTurmaAPartirService(id, entrada) {
@@ -228,7 +219,7 @@ async function obterTurmaService(turma_id, incluirAlunos = true) {
       turno: true,
       ambiente: { select: { id: true, nome: true } },
       descricao: true,
-      profissional: { select: { id: true, cargo: true, pessoa: { select: { nome: true } } } },
+      profissionais: selectVinculosProfissionais,
       ano_letivo_id: true,
       ano_letivo: true,
       status: true,
@@ -259,7 +250,7 @@ async function obterTurmaService(turma_id, incluirAlunos = true) {
   const vigentes = cancelamentos.filter((m) => matriculaVigente(m, hoje));
   const quantidadeAtivas = incluirAlunos ? vigentes.filter((m) => m.status === 'ATIVO').length
     : await prisma.matricula_turma.count({ where: { turma_id, ...filtroMatriculasAtivas(hoje) } });
-  return { ...comExpiracao(dados), possui_matriculas: (_count?.matriculas ?? matriculas.length) > 0, alunos: matriculas.map((matricula) => matricula.aluno),
+  return { ...comExpiracao(formatarProfissionaisTurma(dados, true)), possui_matriculas: (_count?.matriculas ?? matriculas.length) > 0, alunos: matriculas.map((matricula) => matricula.aluno),
     matriculas_ativas: quantidadeAtivas,
     ...(incluirAlunos ? { confirmacao_cancelamentos: { matriculas: vigentes.map((m) => m.id).sort((a, b) => a - b),
       matriculas_ativas: quantidadeAtivas } } : {}) };
@@ -318,7 +309,7 @@ async function editarTurmaService(id, entrada) {
         let encerrar;
         if (dados.status === 'INATIVO') encerrar = await bloquearTurmaParaEncerramento(tx, id);
         else await tx.$queryRaw`SELECT "id" FROM "turma" WHERE "id" = ${id} FOR UPDATE`;
-        const turma = await tx.turma.findUnique({ where: { id }, include: { ano_letivo: true, horarios: true } });
+        const turma = await tx.turma.findUnique({ where: { id }, include: { ano_letivo: true, horarios: true, profissionais: selectVinculosProfissionais } });
         if (!turma || turma.deleted_at) throw Object.assign(new Error('Turma não encontrada.'), { statusCode: 404 });
         const matriculas = await tx.matricula_turma.groupBy({ by: ['status', 'data_fim'], where: { turma_id: id }, _count: { _all: true } });
         const possuiMatriculas = matriculas.some((grupo) => grupo._count._all > 0);
@@ -350,12 +341,12 @@ async function editarTurmaService(id, entrada) {
             const sala = await tx.ambiente.findUnique({ where: { id: dados.ambiente_id }, select: { id: true } });
             if (!sala) throw Object.assign(new Error('Sala não encontrada.'), { statusCode: 404 });
         }
-        if (dados.profissional_id !== undefined || dados.status === 'ATIVO') {
-            const profissional = await bloquearProfissionalAtivo(tx, dados.profissional_id ?? turma.profissional_id);
-            const permitido = ['professor', 'auxiliar'].includes(profissional.cargo.trim().toLocaleLowerCase('pt-BR'));
-            if (!permitido || profissional.pessoa.status_geral !== 'ATIVO') {
-                throw Object.assign(new Error('Selecione um profissional ativo com função compatível com a turma.'), { statusCode: 400 });
-            }
+        const atuais = turma.profissionais.filter((vinculo) => !vinculo.data_fim).map((vinculo) => vinculo.profissional_id);
+        if (dados.profissionais_ids !== undefined || dados.status === 'ATIVO') {
+            const selecionados = dados.profissionais_ids ?? atuais;
+            const validar = dados.status === 'ATIVO' ? selecionados : selecionados.filter((id) => !atuais.includes(id));
+            if (validar.length) await validarProfissionaisTurma(tx, validar);
+            if (!selecionados.length) throw Object.assign(new Error('Selecione ao menos um professor ou auxiliar.'), { statusCode: 400 });
         }
         if (regular && dados.status === 'ATIVO') {
             const calendario = dados.ano_letivo_id === undefined ? turma.ano_letivo
@@ -371,23 +362,24 @@ async function editarTurmaService(id, entrada) {
         const mudouCronograma = mudouTurno || mudouHorario || mudouDias;
         let horarios;
         if (mudouCronograma) {
-            const completos = criarTurmaDTO.parse({ ...turma, ...dados,
+            const completos = criarTurmaDTO.parse({ ...turma, profissionais_ids: atuais, ...dados,
                 hora_inicio: dados.hora_inicio ?? (turma.horarios[0] ? hora(turma.horarios[0].hora_inicio) : undefined),
                 hora_fim: dados.hora_fim ?? (turma.horarios[0] ? hora(turma.horarios[0].hora_fim) : undefined),
                 dias_semana: novosDias,
             });
             horarios = gerarHorariosTurma(completos);
         }
-        const campos = ['nome', 'turno', 'ano_letivo_id', 'ambiente_id', 'capacidade_maxima', 'descricao', 'profissional_id', 'status'];
+        const campos = ['nome', 'turno', 'ano_letivo_id', 'ambiente_id', 'capacidade_maxima', 'descricao', 'status'];
         const data = Object.fromEntries(campos.filter((campo) => dados[campo] !== undefined).map((campo) => [campo, dados[campo]]));
         if (encerrar) await encerrarMatriculasTurma(tx, turma, encerrar);
         await tx.turma.update({ where: { id }, data });
+        if (dados.profissionais_ids !== undefined) await atualizarProfissionaisTurma(tx, id, dados.profissionais_ids, turma.profissionais);
         if (horarios) {
             await tx.turma_horario.deleteMany({ where: { turma_id: id } });
             await tx.turma_horario.createMany({ data: horarios.map((h) => ({ ...h, turma_id: id })) });
         }
-        return comExpiracao(await tx.turma.findUnique({ where: { id }, include: { ano_letivo: true, horarios: true, ambiente: { select: { id: true, nome: true } },
-            profissional: { select: { id: true, cargo: true, pessoa: { select: { nome: true } } } } } }));
+        return comExpiracao(formatarProfissionaisTurma(await tx.turma.findUnique({ where: { id }, include: { ano_letivo: true, horarios: true, ambiente: { select: { id: true, nome: true } },
+            profissionais: selectVinculosProfissionais } })));
     }, { isolationLevel: 'ReadCommitted' });
 }
 

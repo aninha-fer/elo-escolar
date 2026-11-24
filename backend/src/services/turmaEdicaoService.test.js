@@ -13,7 +13,7 @@ const hora = (valor) => new Date(`1970-01-01T${valor}:00.000Z`);
 function simular(t, opcoes = {}) {
     let estado = {
         turma: { id: 10, nome: 'Turma A', tipo: opcoes.tipo ?? 'REGULAR', turno: 'MANHA', ano_letivo_id: 2026,
-            ambiente_id: 2, capacidade_maxima: 10, descricao: null, profissional_id: 1, status: 'ATIVO' },
+            ambiente_id: 2, capacidade_maxima: 10, descricao: null, profissionais_ids: [1], status: 'ATIVO' },
         horarios: (opcoes.tipo === 'OFICINA' ? [2, 4] : [1, 2, 3, 4, 5]).map((dia_semana) => ({
             id: dia_semana, turma_id: 10, dia_semana,
             hora_inicio: hora(opcoes.tipo === 'OFICINA' ? '08:15' : dia_semana === 3 ? '12:30' : '07:30'),
@@ -21,6 +21,7 @@ function simular(t, opcoes = {}) {
         })),
         matriculas: [], ...opcoes.estado,
     };
+    estado.profissionais = [{ id: 1, profissional_id: 1, data_inicio: null, data_fim: null, profissional: { id: 1, cargo: 'Professor', pessoa: { nome: 'Ana', status_geral: 'ATIVO' } } }];
     const chamadas = [];
     const original = prisma.$transaction;
     t.after(() => { prisma.$transaction = original; });
@@ -32,7 +33,7 @@ function simular(t, opcoes = {}) {
             ano_letivo: { findUnique: async ({where}) => ({id: where.id, ano: where.id, data_inicio: new Date('2027-02-08T00:00:00Z'), data_fim: new Date('2099-12-18T00:00:00Z')}) },
             turma: {
                 findUnique: async ({ where }) => { assert.equal(chamadas[0], 'bloqueio'); assert.deepEqual(where, { id: 10 });
-                    return pendente.turma ? { ...pendente.turma, horarios: pendente.horarios } : null; },
+                    return pendente.turma ? { ...pendente.turma, horarios: pendente.horarios, profissionais: pendente.profissionais } : null; },
                 update: async ({ data }) => { chamadas.push('turma'); Object.assign(pendente.turma, data); },
             },
             matricula_turma: {
@@ -52,6 +53,10 @@ function simular(t, opcoes = {}) {
             funcionario: { findUnique: async () => opcoes.profissionalInexistente ? null : {
                 cargo: opcoes.cargo ?? 'Professor', pessoa: { status_geral: opcoes.statusProfissional ?? 'ATIVO' },
             } },
+            turma_profissional: {
+                updateMany: async ({ where, data }) => { for (const v of pendente.profissionais) if (!v.data_fim && where.profissional_id.in.includes(v.profissional_id)) Object.assign(v, data); },
+                createMany: async ({ data }) => { pendente.profissionais.push(...data.map((v) => ({ ...v, id: pendente.profissionais.length + v.profissional_id, data_fim: null, profissional: { id: v.profissional_id, cargo: opcoes.cargo ?? 'Professor', pessoa: { nome: 'Novo', status_geral: 'ATIVO' } } }))); },
+            },
             turma_horario: {
                 deleteMany: async ({ where }) => { assert.deepEqual(where, { turma_id: 10 }); chamadas.push('remover-horarios'); pendente.horarios = []; },
                 createMany: async ({ data }) => {
@@ -107,7 +112,7 @@ for (const tipo of ['REGULAR', 'OFICINA']) {
                 : [{ turno: 'TARDE' }, { hora_inicio: '09:45' }, { hora_fim: '11:00' }, { dias_semana: [1] }];
             for (const agenda of alteracoes) assert.equal((await editar({ ...agenda, ambiente_id: 2, nome: 'Não deve gravar' })).code, 409);
             assert.equal(banco.estado.turma.nome, 'Turma A');
-            assert.equal((await editar({ ambiente_id: 2, nome: 'Novo nome', descricao: 'Descrição', capacidade_maxima: 12, profissional_id: 2 })).code, 200);
+            assert.equal((await editar({ ambiente_id: 2, nome: 'Novo nome', descricao: 'Descrição', capacidade_maxima: 12, profissionais_ids: [2] })).code, 200);
             assert.deepEqual(banco.estado.horarios, horarios);
         });
     }
@@ -190,15 +195,15 @@ test('horários fora das faixas e campos específicos do tipo errado são recusa
 for (const cargo of ['Professor', 'Auxiliar']) {
     test(`oficina aceita ${cargo} como responsável na edição`, async (t) => {
         simular(t, { tipo: 'OFICINA', cargo });
-        assert.equal((await editar({ profissional_id: 9 })).code, 200);
+        assert.equal((await editar({ profissionais_ids: [9] })).code, 200);
     });
 }
 
 for (const [opcoes, body, esperado] of [
     [{ salaInexistente: true }, { ambiente_id: 99 }, 404],
-    [{ profissionalInexistente: true }, { ambiente_id: 2, profissional_id: 9 }, 404],
-    [{ cargo: 'Clínico' }, { ambiente_id: 2, profissional_id: 9 }, 400],
-    [{ statusProfissional: 'INATIVO' }, { ambiente_id: 2, profissional_id: 9 }, 400],
+    [{ profissionalInexistente: true }, { ambiente_id: 2, profissionais_ids: [9] }, 404],
+    [{ cargo: 'Clínico' }, { ambiente_id: 2, profissionais_ids: [9] }, 400],
+    [{ statusProfissional: 'INATIVO' }, { ambiente_id: 2, profissionais_ids: [9] }, 400],
     [{ estado: { turma: null } }, { status: 'ATIVO' }, 404],
 ]) {
     test(`edição valida vínculos e existência: ${JSON.stringify(opcoes)}`, async (t) => {
@@ -217,7 +222,7 @@ test('detalhe sinaliza histórico mesmo sem alunos com matrícula ativa', async 
         assert.deepEqual(select._count, { select: { matriculas: true } });
         return { id: 10, horarios: [], matriculas: [], _count: { matriculas: 1 } };
     };
-    assert.deepEqual(await obterTurmaService(10), { id: 10, horarios: [], expirada: false, alunos: [], possui_matriculas: true,
+    assert.deepEqual(await obterTurmaService(10), { id: 10, horarios: [], profissionais: [], historico_profissionais: [], expirada: false, alunos: [], possui_matriculas: true,
         matriculas_ativas: 0, confirmacao_cancelamentos: { matriculas: [], matriculas_ativas: 0 } });
 });
 

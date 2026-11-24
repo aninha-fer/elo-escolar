@@ -1,6 +1,49 @@
 # elo-escolar
 Sistema de gestão escolar para a APAE - Estância Velha
 
+## Equipe de turmas e oficinas
+
+Cadastro, edição e criação a partir de outra turma recebem `profissionais_ids`, uma
+lista não vazia de IDs de funcionários, sem duplicações. Novos vínculos exigem
+profissionais ativos, não excluídos, com cargo Professor ou Auxiliar. Não existe
+responsável principal. Alterar o cargo do profissional continua permitido e não
+remove seus vínculos existentes.
+
+As respostas de turmas retornam `profissionais`, com `id`, `cargo`, `pessoa.nome`,
+`status_geral` e `excluido`. O detalhe também retorna `historico_profissionais`,
+com o ID do vínculo, profissional e datas `data_inicio`/`data_fim`. No PATCH,
+omitir `profissionais_ids` preserva a equipe; informá-lo substitui a seleção
+completa. Adições e encerramentos são gravados na mesma transação da turma.
+
+`turma_profissional` preserva os períodos de atuação. A vigência é diária, no
+fuso da instituição: inclusão começa hoje e retirada encerra em ontem, inclusive.
+Inclusão e retirada no mesmo dia produzem período vazio, preservado no histórico.
+O retorno cria outro vínculo. Inativar/excluir a turma preserva sua equipe;
+reativar exige revalidar todos os responsáveis. Inativar/excluir um profissional
+continua bloqueado enquanto ele integrar qualquer turma ativa, mesmo com outros
+responsáveis, além das restrições clínicas existentes.
+
+A migration `20261123000000_multiplos_profissionais_turma` transfere os vínculos
+atuais, inclusive de turmas inativas ou excluídas, antes de remover a coluna
+singular. O início dos vínculos migrados permanece desconhecido (`null`). Um
+índice único parcial impede dois vínculos abertos do mesmo profissional na turma.
+A agenda semanal usa os responsáveis vigentes em cada dia; os nomes e cargos
+continuam sendo os dados atuais do profissional. O PDF do calendário apresenta
+a equipe atual. Os atendimentos clínicos mantêm seu responsável individual.
+
+Após atualizar o código, aplique as migrations com `npx prisma migrate deploy`
+e gere o cliente com `npx prisma generate`, em `backend`, reiniciando a API.
+Não execute o seed para migrar dados existentes.
+
+O teste de transferência dos vínculos e integridade referencial usa um schema
+isolado em transação com rollback, sem alterar dados existentes. Em `backend`:
+
+```powershell
+$env:TESTAR_VINCULOS_POSTGRES = '1'
+node --test src/services/turmaProfissionalService.test.js
+Remove-Item Env:TESTAR_VINCULOS_POSTGRES
+```
+
 ## Agenda semanal do aluno
 
 `GET /api/alunos/:id/agenda` retorna a semana atual da instituição, de segunda a domingo,
