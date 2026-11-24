@@ -30,13 +30,6 @@ export function Home() {
         return () => controller.abort();
     }, [versao]);
 
-    useEffect(() => {
-        function atualizarAoRetornar() { if (document.visibilityState === 'visible') setVersao((v) => v + 1); }
-        window.addEventListener('focus', atualizarAoRetornar);
-        document.addEventListener('visibilitychange', atualizarAoRetornar);
-        return () => { window.removeEventListener('focus', atualizarAoRetornar); document.removeEventListener('visibilitychange', atualizarAoRetornar); };
-    }, []);
-
     const atuais = oficinas?.versao === versao ? oficinas : null;
     const dias = agruparOficinasPorDia(atuais?.dados ?? []);
     return <div className="flex min-w-0 flex-col gap-lg">
