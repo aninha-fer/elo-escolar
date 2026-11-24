@@ -1,5 +1,5 @@
 import { useToast } from '../../contexts/ToastContext';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -27,19 +27,6 @@ export function Turmas() {
     const [operacao, setOperacao] = useState(null);
     const [alterandoStatus, setAlterandoStatus] = useState(false);
     const envioStatusEmAndamento = useRef(false);
-
-    useEffect(() => {
-        function atualizarAoRetornar() {
-            if (document.visibilityState === 'visible') setTentativa((atual) => atual + 1);
-        }
-        window.addEventListener('focus', atualizarAoRetornar);
-        document.addEventListener('visibilitychange', atualizarAoRetornar);
-        return () => {
-            window.removeEventListener('focus', atualizarAoRetornar);
-            document.removeEventListener('visibilitychange', atualizarAoRetornar);
-        };
-    }, []);
-
 
     const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
     const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca, status: statusSelecionado }, tentativa);
