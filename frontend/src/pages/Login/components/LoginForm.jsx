@@ -103,7 +103,7 @@ export function LoginForm() {
             />
             {erros.senha && <p className="login-error" id="login-senha-error">{erros.senha}</p>}
             <div className="login-options flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <button data-testid="login-recuperar-senha" type="button" className="login-recovery" onClick={() => notificar('A recuperação de senha ainda não está disponível. Entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
+                <button data-testid="login-recuperar-senha" type="button" className="login-recovery" onClick={() => notificar('Para redefinir sua senha, entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
             </div>
             <Button data-testid="login-entrar" type="submit" className="login-submit" disabled={enviando}>
                 {enviando ? 'Entrando...' : 'Entrar no sistema'}

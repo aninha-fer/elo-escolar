@@ -1,13 +1,15 @@
 import { useToast } from '../contexts/ToastContext';
 import apaeLogo from '../assets/apae.png'
 import { NavLink } from 'react-router-dom';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 function Sidebar() {
     const { notificar } = useToast();
     const { usuario, sair } = useAuth();
     const [saindo, setSaindo] = useState(false);
+    const [menuAberto, setMenuAberto] = useState(false);
+    const botaoMenuRef = useRef(null);
     const perfil = { admin: 'Administrador', professor: 'Professor' }[usuario?.role] ?? usuario?.role ?? '';
     const inicial = usuario?.nome?.trim().charAt(0).toLocaleUpperCase('pt-BR') || '?';
     const botaoBase = 'rounded-sm flex items-center gap-sm p-sm font-inter text-[14px] [&_path]:stroke-current [&_path]:[stroke-opacity:1] ';
@@ -15,6 +17,17 @@ function Sidebar() {
         normal: 'text-white/58 [&_svg]:text-white hover:bg-bg-surface/10',
         clicado: 'text-secondary [&_svg]:text-secondary bg-secondary/20 font-bold border-l-secondary border-l-[2px]',
     };
+
+    function fecharMenu() {
+        setMenuAberto(false);
+    }
+
+    function tratarTeclaMenu(event) {
+        if (event.key === 'Escape' && menuAberto) {
+            fecharMenu();
+            botaoMenuRef.current?.focus();
+        }
+    }
 
     async function encerrarSessao() {
         if (saindo) return;
@@ -31,18 +44,33 @@ function Sidebar() {
     }
 
     return (
-        <div className="bg-primary w-[250px] min-h-screen flex flex-col pt-md font-inter">
-            <div className="flex items-center gap-md border-b-bg-main/35 border-b-[2px] pb-md w-full px-md">
+        <div className="bg-primary w-full max-h-dvh shrink-0 flex flex-col pt-md font-inter lg:w-[250px] lg:min-h-screen lg:max-h-none" onKeyDown={tratarTeclaMenu}>
+            <header className="flex shrink-0 items-center gap-md border-b-bg-main/35 border-b-[2px] pb-md w-full px-md">
                 <img src={apaeLogo} alt="Logo APAE" className="w-[40px] h-[40px]" />
                 <div>
                     <h2 className="text-secondary font-bold text-base"> Elo Escolar</h2>
                     <p className="text-sm text-bg-main/35 tracking-widest">APAE - Gestão</p>
                 </div>
-            </div>
-            <div className="flex flex-col gap-xs px-md py-md">
+                <button
+                    ref={botaoMenuRef}
+                    type="button"
+                    aria-label={menuAberto ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
+                    aria-expanded={menuAberto}
+                    aria-controls="menu-navegacao"
+                    onClick={() => setMenuAberto(aberto => !aberto)}
+                    className="ml-auto flex h-11 w-11 items-center justify-center rounded-sm text-white hover:bg-bg-surface/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary lg:hidden"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
+                        <path d="M3 6h18M3 12h18M3 18h18" />
+                    </svg>
+                </button>
+            </header>
+            <div id="menu-navegacao" className={`${menuAberto ? 'flex' : 'hidden'} min-h-0 flex-col overflow-y-auto lg:flex lg:flex-1 lg:overflow-visible`}>
+            <nav aria-label="Navegação principal" className="flex flex-col gap-xs px-md py-md">
 
                 <NavLink data-testid="menu-inicio"
                     to="/"
+                    onClick={fecharMenu}
                     end
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
@@ -54,6 +82,7 @@ function Sidebar() {
                 </NavLink>
                 <NavLink data-testid="menu-alunos"
                     to="/alunos"
+                    onClick={fecharMenu}
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 15 15" fill="none">
@@ -71,6 +100,7 @@ function Sidebar() {
                 </NavLink>
                 <NavLink data-testid="menu-turmas"
                     to="/turmas"
+                    onClick={fecharMenu}
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
 
@@ -90,6 +120,7 @@ function Sidebar() {
                 </NavLink>
                 {usuario?.role === 'admin' && <NavLink data-testid="menu-profissionais"
                     to="/profissionais"
+                    onClick={fecharMenu}
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 15 15" fill="none">
@@ -109,6 +140,7 @@ function Sidebar() {
                 </NavLink>}
                 {usuario?.role === 'admin' && <NavLink data-testid="menu-usuarios"
                     to="/usuarios"
+                    onClick={fecharMenu}
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 15 15" fill="none">
@@ -125,6 +157,7 @@ function Sidebar() {
                     <span>Usuários</span>
                 </NavLink>}
                 {usuario?.role === 'admin' && <NavLink data-testid="menu-configuracoes" to="/configuracoes"
+                    onClick={fecharMenu}
                     className={({ isActive }) => `${botaoBase} ${isActive ? botaoVariantes.clicado : botaoVariantes.normal}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
                         <path d="M3 5H7M21 5H11M3 12H15M21 12H19M3 19H5M21 19H9" stroke-width="2" stroke-linecap="round" stroke="currentColor" />
@@ -134,7 +167,7 @@ function Sidebar() {
                     </svg>
                     <span>Configurações</span>
                 </NavLink>}
-            </div>
+            </nav>
             <div className='flex items-center gap-md p-md mt-auto'>
                 <div className='w-10 h-10 shrink-0 bg-tertiary rounded-full flex items-center justify-center font-bold text-white' aria-hidden="true">{inicial}</div>
                 <div className="min-w-0">
@@ -156,6 +189,7 @@ function Sidebar() {
                         <path d="M12.25 7H5.25" />
                     </svg>
                 </button>
+            </div>
             </div>
         </div>
     )
