@@ -52,6 +52,8 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
     const [turmas, setTurmas] = useState([]);
     const [carregandoTurmas, setCarregandoTurmas] = useState(true);
     const [erroTurmas, setErroTurmas] = useState('');
+    const turmasDoPeriodo = turmas.filter((turma) => turma.turno === formulario.turno);
+    const semTurmasDisponiveis = Boolean(formulario.turno) && !carregandoTurmas && !erroTurmas && turmasDoPeriodo.length === 0;
     const [tentativa, setTentativa] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [acaoEnvio, setAcaoEnvio] = useState(null);
@@ -424,8 +426,11 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             checked={formulario.participa_almoco}
                             onChange={(valor) => atualizarCampo('participa_almoco', valor)}
                         />))}
-                        {campoComErro('turma_id', (<Select data-testid="aluno-formulario-turma-regular"
+                        {campoComErro('turma_id', (<><Select data-testid="aluno-formulario-turma-regular"
+                            id="turma-regular-aluno"
                             label="Turma regular"
+                            className={semTurmasDisponiveis ? 'mb-sm!' : ''}
+                            aria-describedby={[erros.turma_id ? 'turma-regular-aluno-error' : '', semTurmasDisponiveis ? 'aluno-turmas-vazio' : ''].filter(Boolean).join(' ') || undefined}
                             name="turma_id" loading={carregandoTurmas} loadingLabel="Carregando turmas regulares..."
                             value={formulario.turma_id}
                             onChange={(event) => atualizarCampo('turma_id', event.target.value)}
@@ -434,14 +439,17 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             options={[
                                 ...(turmaAtual && turmaAtual.turno === formulario.turno && !turmas.some((turma) => turma.id === turmaAtual.id)
                                     ? [{ value: turmaAtual.id, label: `${turmaAtual.nome} — ${turmaAtual.status === 'INATIVO' ? 'Inativa' : 'Vínculo atual'}`, disabled: true }] : []),
-                                ...turmas
-                                .filter((turma) => turma.turno === formulario.turno)
+                                ...turmasDoPeriodo
                                 .map((turma) => ({
                                     value: turma.id,
                                     label: `${turma.nome} - ${formatarTurno(turma.turno)}${turma.capacidade_maxima == null ? ' — Sem limite' : turma.vagas_disponiveis === 0 ? ' — Lotada: rascunho não reserva vaga' : ''}`,
                                 })),
                             ]}
-                            error={erros['turma_id']} />), true, 'sm:ml-30')}
+                            error={erros['turma_id']} />
+                            {semTurmasDisponiveis && <p id="aluno-turmas-vazio" role="status" className="mb-md rounded-sm bg-amber-50 p-sm text-xs text-amber-800">
+                                Nenhuma turma regular disponível para o período selecionado.
+                            </p>}
+                        </>), true, 'sm:ml-30')}
                     </div>
                     {(submitError || conflitos.length > 0) && (
                         <div role="alert" className="mb-md rounded-sm bg-red-50 p-sm text-sm text-red-700">
