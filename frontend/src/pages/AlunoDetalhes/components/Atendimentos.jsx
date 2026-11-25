@@ -9,21 +9,22 @@ import { FormularioAtendimento } from './FormularioAtendimento';
 export function Atendimentos({ atendimentos = [], total = atendimentos.length, idAluno, statusAluno, onSuccess, permissao }) {
     const { notificar } = useToast();
     const [operacao, setOperacao] = useState(null);
-    const [carregando, setCarregando] = useState(false);
+    const [atendimentoCarregando, setAtendimentoCarregando] = useState(null);
+    const carregando = atendimentoCarregando !== null;
     const [cancelando, setCancelando] = useState(false);
     const ocupada = useRef(false);
 
     async function abrirEdicao(atendimento) {
         if (ocupada.current) return;
         ocupada.current = true;
-        setCarregando(true);
+        setAtendimentoCarregando(atendimento.id);
         try {
             const dados = await atendimentosService.buscarPorId(idAluno, atendimento.id);
             if (!dados.pode_editar) { notificar('Este atendimento está encerrado ou não permite edição.'); return; }
             setOperacao({ tipo: 'editar', atendimento: dados });
         } catch (error) {
             notificar(error.response?.data?.erro || 'Não foi possível carregar o atendimento.');
-        } finally { ocupada.current = false; setCarregando(false); }
+        } finally { ocupada.current = false; setAtendimentoCarregando(null); }
     }
 
     function abrirCancelamento(atendimento) {
@@ -56,10 +57,10 @@ export function Atendimentos({ atendimentos = [], total = atendimentos.length, i
                     Novo Atendimento
                 </Button>}
             </header>
-            {carregando && <p role="status" className="p-md text-sm text-text-muted">Carregando atendimento...</p>}
             {atendimentos.length ? <ul>{atendimentos.map((atendimento) => <AtendimentoItem key={atendimento.id} atendimento={atendimento}
                 onEditar={permissao && statusAluno !== 'INATIVO' ? abrirEdicao : undefined}
-                onCancelar={permissao ? abrirCancelamento : undefined} cancelando={cancelando || carregando} />)}</ul>
+                onCancelar={permissao ? abrirCancelamento : undefined} cancelando={cancelando || carregando}
+                carregandoEdicao={atendimentoCarregando === atendimento.id} />)}</ul>
                 : <p className="px-lg py-xl text-center text-sm text-text-muted">Nenhum atendimento vigente encontrado para este aluno.</p>}
             {permissao && ['criar', 'editar'].includes(operacao?.tipo) && <FormularioAtendimento key={operacao.atendimento?.id ?? 'novo'}
                 atendimento={operacao.atendimento} idAluno={idAluno} onClose={fechar} onSuccess={salvo} />}

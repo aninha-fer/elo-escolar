@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { ConteudoBotao } from './ConteudoBotao';
 
 export function Modal({
   isOpen,
@@ -13,6 +14,8 @@ export function Modal({
   secondaryText,
   onSecondaryAction,
   isConfirmLoading,
+  isSecondaryLoading = false,
+  loadingText = 'Salvando...',
   isConfirmDisabled,
   showFooter = true,
   showHeader = true,
@@ -84,10 +87,11 @@ export function Modal({
                 data-testid={testId ? `${testId}-acao-secundaria` : undefined}
                 type="button"
                 onClick={onSecondaryAction}
-                disabled={isConfirmLoading}
+                disabled={isConfirmLoading || isSecondaryLoading}
+                aria-busy={isSecondaryLoading}
                 className="px-4 py-2 text-sm font-semibold text-text-main bg-bg-surface border border-slate-300 rounded-md hover:bg-bg-main disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {secondaryText}
+                <ConteudoBotao carregando={isSecondaryLoading} descricao={loadingText}>{secondaryText}</ConteudoBotao>
               </button>
             )}
             
@@ -97,10 +101,11 @@ export function Modal({
                 type={confirmFormId ? 'submit' : 'button'}
                 form={confirmFormId}
                 onClick={confirmFormId ? undefined : onConfirm}
-                disabled={isConfirmDisabled || isConfirmLoading}
+                disabled={isConfirmDisabled || isConfirmLoading || isSecondaryLoading}
+                aria-busy={Boolean(isConfirmLoading)}
                 className="px-4 py-2 text-sm font-semibold text-secondary bg-bg-surface border border-secondary rounded-md hover:bg-secondary hover:text-bg-surface disabled:opacity-50"
               >
-                {isConfirmLoading ? 'Carregando...' : confirmText}
+                <ConteudoBotao carregando={isConfirmLoading} descricao={loadingText}>{confirmText}</ConteudoBotao>
               </button>
             )}
           </div>

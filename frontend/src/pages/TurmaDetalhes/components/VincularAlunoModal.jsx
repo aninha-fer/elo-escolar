@@ -1,3 +1,5 @@
+import { ConteudoBotao } from '../../../components/ConteudoBotao';
+import { Spinner } from '../../../components/Spinner';
 import { useToast } from '../../../contexts/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../../components/Modal';
@@ -38,7 +40,7 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
 
     const carregando = !resultado || resultado.tentativa !== tentativa;
     const disponiveis = resultado?.status === 'sucesso'
-        ? resultado.dados.filter((aluno) => ['ATIVO', 'RASCUNHO'].includes(aluno.status) && !aluno.turma_regular) : [];
+        ? resultado.dados.filter((aluno) => aluno.status === 'ATIVO' && !aluno.turma_regular) : [];
     const filtrados = disponiveis.filter((aluno) => normalizarTexto(aluno.nome || '').includes(normalizarTexto(busca)));
     const alunoSelecionado = disponiveis.find((aluno) => aluno.id === Number(selecionado));
 
@@ -77,27 +79,25 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
             </span>}>
             <form id="form-vincular-aluno" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando}>
-                    <p className="mb-md text-sm text-slate-500">São exibidos alunos ativos ou em rascunho que ainda não possuem turma regular. O turno, os dias de frequência e as vagas serão validados ao confirmar.</p>
+                    <p className="mb-md text-sm text-slate-500">São exibidos alunos ativos que ainda não possuem turma regular. O turno, os dias de frequência e as vagas serão validados ao confirmar.</p>
                     <Input data-testid="turma-vincular-aluno-busca" id="vinculo-busca-aluno" label="Buscar aluno" placeholder="Buscar por nome..." value={busca}
                         onChange={(event) => setBusca(event.target.value)} />
-                    {carregando ? <p role="status" className="py-md text-sm text-slate-500">Carregando alunos...</p>
-                        : resultado.status === 'erro' ? <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
-                            <p role="alert">{resultado.erro}</p><button data-testid="turma-vincular-aluno-tentar-novamente" type="button" className="mt-sm underline" onClick={() => setTentativa((atual) => atual + 1)}>Tentar novamente</button>
-                        </div> : <fieldset className="mb-md min-w-0">
+                    {resultado?.status === 'erro' ? <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
+                            <p role="alert">{resultado.erro}</p><button data-testid="turma-vincular-aluno-tentar-novamente" type="button" className="mt-sm underline" disabled={carregando} onClick={() => setTentativa((atual) => atual + 1)}><ConteudoBotao carregando={carregando}>Tentar novamente</ConteudoBotao></button>
+                        </div> : carregando ? <div className="py-md text-sm text-slate-500 flex items-center gap-sm"><Spinner label="Carregando alunos..." /><span>Carregando alunos...</span></div> : <fieldset className="mb-md min-w-0">
                             <legend className="mb-sm text-xs font-semibold uppercase tracking-wider text-slate-600">Aluno <span className="text-danger">*</span></legend>
                             <div className="max-h-72 overflow-y-auto rounded-sm border border-slate-200 divide-y divide-slate-200">
-                                {filtrados.length === 0 ? <p role="status" className="p-md text-sm text-slate-500">{disponiveis.length ? 'Nenhum aluno encontrado para esta busca.' : 'Nenhum aluno sem turma regular disponível.'}</p>
+                                {filtrados.length === 0 ? <p role="status" className="p-md text-sm text-slate-500">{disponiveis.length ? 'Nenhum aluno encontrado para esta busca.' : 'Nenhum aluno ativo sem turma regular disponível.'}</p>
                                     : filtrados.map((aluno) => <label key={aluno.id} className="flex cursor-pointer items-center gap-sm p-md hover:bg-bg-main has-checked:bg-blue-50">
                                         <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-600">{obterIniciais(aluno.nome)}</span>
                                         <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold">{aluno.nome}</span>
-                                            <span className="block text-xs text-slate-500">{formatarTurno(aluno.turno)} · {aluno.dias_frequencia?.length ? formatarFrequencia(aluno.dias_frequencia) : 'Dias não informados'}{aluno.status === 'RASCUNHO' ? ' · Rascunho' : ''}</span>
+                                            <span className="block text-xs text-slate-500">{formatarTurno(aluno.turno)} · {aluno.dias_frequencia?.length ? formatarFrequencia(aluno.dias_frequencia) : 'Dias não informados'}</span>
                                         </span>
                                         <input data-testid={`turma-vincular-aluno-${aluno.id}`} type="radio" name="aluno_id" value={aluno.id} checked={selecionado === String(aluno.id)} required
                                             onChange={(event) => { setSelecionado(event.target.value); setErroEnvio(''); setConflitos([]); }} className="size-4 shrink-0 accent-blue-600" />
                                     </label>)}
                             </div>
                         </fieldset>}
-                    {alunoSelecionado?.status === 'RASCUNHO' && <p role="status" className="mb-md rounded-sm bg-amber-50 p-md text-sm text-amber-800">Este aluno está em rascunho. O vínculo será provisório, sem ocupar vaga. Ele aparecerá nesta turma após a ativação e nova validação da disponibilidade.</p>}
                     {erroEnvio && <div role="alert" className="rounded-sm bg-red-50 p-md text-sm text-red-700"><p>{erroEnvio}</p>
                         {conflitos.length > 0 && <ul className="mt-sm list-disc space-y-xs pl-md">{conflitos.map((conflito, indice) => <li key={indice}>{conflito.mensagem || 'Não foi possível concluir o vínculo por incompatibilidade com a turma.'}</li>)}</ul>}
                     </div>}

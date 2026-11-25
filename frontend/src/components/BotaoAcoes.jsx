@@ -1,13 +1,14 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Spinner } from './Spinner';
 
-export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, className = '', testId }) {
+export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, loading = false, loadingLabel = 'Carregando registro...', className = '', testId }) {
     const [aberto, setAberto] = useState(false);
     const botaoRef = useRef(null);
     const menuRef = useRef(null);
     const focoInicial = useRef('primeiro');
     const id = useId();
-    const indisponivel = disabled || options.length === 0;
+    const indisponivel = disabled || loading || options.length === 0;
     const visivel = aberto && !indisponivel;
 
     function fechar(devolverFoco = false) {
@@ -95,7 +96,7 @@ export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, 
     return (
         <>
             <button data-testid={testId} ref={botaoRef} id={`${id}-botao`} type="button" title={label} aria-label={label}
-                aria-haspopup="menu" aria-expanded={visivel} aria-controls={visivel ? `${id}-menu` : undefined} disabled={indisponivel}
+                aria-haspopup="menu" aria-expanded={visivel} aria-controls={visivel ? `${id}-menu` : undefined} disabled={indisponivel} aria-busy={loading}
                 onClick={(event) => { event.stopPropagation(); focoInicial.current = 'primeiro'; setAberto((atual) => !atual); }}
                 onKeyDown={(event) => {
                     event.stopPropagation();
@@ -106,9 +107,9 @@ export function BotaoAcoes({ options = [], label = 'Ações', disabled = false, 
                     }
                 }}
                 className={`inline-flex size-9 cursor-pointer shrink-0 items-center justify-center rounded-sm border bg-bg-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${visivel ? 'border-secondary bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-500 hover:border-secondary hover:text-secondary'} ${className}`}>
-                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 18 18" fill="currentColor">
+                {loading ? <Spinner label={loadingLabel} /> : <svg aria-hidden="true" width="16" height="16" viewBox="0 0 18 18" fill="currentColor">
                     <circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" /><circle cx="15" cy="9" r="1.5" />
-                </svg>
+                </svg>}
             </button>
             {visivel && createPortal(
                 <div data-testid={testId ? `${testId}-menu` : undefined} ref={menuRef} id={`${id}-menu`} role="menu" tabIndex={-1} aria-labelledby={`${id}-botao`} onKeyDown={navegarMenu}

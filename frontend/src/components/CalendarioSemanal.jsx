@@ -1,4 +1,5 @@
 import { converterHora, formatarHora, formatarDataBR } from "../utils/formatters";
+import { Spinner } from './Spinner';
 
 const DIAS_SEMANA = [
     { numero: 1, nome: 'Seg' },
@@ -148,9 +149,8 @@ export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, 
                 </label>
             </div>
 
-            {carregando ? <p role="status" className="p-md text-sm text-text-muted">Carregando agenda...</p>
-                : erro ? <p role="alert" className="p-md text-sm text-red-700">{erro}</p>
-                : <div className="overflow-x-auto">
+            <div className="relative" data-testid="aluno-agenda-grade">
+                <div className={`overflow-x-auto ${carregando ? 'opacity-40' : ''}`} aria-hidden={carregando || Boolean(erro) || undefined}>
                 <div className="min-w-[560px]">
                 <div className="grid grid-cols-[56px_repeat(5,minmax(96px,1fr))] border-b border-gray-300 bg-bg-main">
                     <div />
@@ -183,7 +183,14 @@ export function CalendarioSemanal({ agenda, dataReferencia, onSelecionarSemana, 
                     ))}
                 </div>
                 </div>
-            </div>}
+                </div>
+                {carregando && <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg-surface/70">
+                    <Spinner size={32} label="Carregando agenda..." />
+                </div>}
+                {!carregando && erro && <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg-surface/90 p-md">
+                    <p role="alert" className="text-sm text-red-700">{erro}</p>
+                </div>}
+            </div>
 
             {!carregando && !erro && eventos.length === 0 && (
                 <p className="border-t border-slate-200 px-md py-lg text-center text-sm text-text-muted">

@@ -89,7 +89,7 @@ export function FormularioUsuario({ onClose, onCriado }) {
         <Modal testId="usuario-formulario" isOpen onClose={fecharModal} title="Novo usuário" subtitle="Defina os dados de acesso e o nível de permissão."
             confirmText={<span className="inline-flex items-center gap-sm">
                             <SaveIcon />
-                            {enviando ? 'Salvando' : 'Salvar Usuário'}
+                            Salvar Usuário
                         </span>} cancelText="Cancelar" confirmFormId="form-cadastro-usuario" onConfirm={enviar} isConfirmLoading={enviando}>
             <form id="form-cadastro-usuario" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando} className="min-w-0">

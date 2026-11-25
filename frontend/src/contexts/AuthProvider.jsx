@@ -153,7 +153,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{ ...sessao, entrar, sair, recarregarSessao, trocarSenhaInicial }}
     >
-      <div inert={estadoConexao.visivel} aria-hidden={estadoConexao.visivel ? true : undefined}>{children}</div>
+      <div inert={estadoConexao.visivel} aria-hidden={estadoConexao.visivel ? true : undefined}
+        data-conexao-bloqueada={estadoConexao.visivel ? 'true' : undefined}>{children}</div>
       {estadoConexao.visivel && <TelaConexao estado={estadoConexao} inicial={sessao.status === 'carregando'}
         focoAnterior={focoAnterior} onTentarNovamente={() => { void conexao.verificar().catch(() => {}); }} />}
     </AuthContext.Provider>

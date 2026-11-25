@@ -15,7 +15,9 @@ import { BotaoExportarCalendario } from '../../components/BotaoExportarCalendari
 export function Alunos() {
     const { notificar } = useToast();
     const [alunoEdicao, setAlunoEdicao] = useState(null);
-    const [carregandoEdicao, setCarregandoEdicao] = useState(false);
+    const [alunoCarregando, setAlunoCarregando] = useState(null);
+    const carregandoEdicao = alunoCarregando !== null;
+    const envioEdicao = useRef(false);
     const [tentativa, setTentativa] = useState(0);
     const [alunoStatus, setAlunoStatus] = useState(null);
     const [alterandoStatus, setAlterandoStatus] = useState(false);
@@ -32,13 +34,15 @@ export function Alunos() {
     const contagemStatus = listagem.contagensStatus ?? { TODOS: 0, ATIVO: 0, INATIVO: 0, RASCUNHO: 0 };
 
     async function abrirEdicao(aluno) {
+        if (envioEdicao.current) return;
+        envioEdicao.current = true;
         try {
-            setCarregandoEdicao(true);
+            setAlunoCarregando(aluno.id);
             const dados = await alunoService.buscarPorId(aluno.id);
             setAlunoEdicao(dados);
             setIsModalOpen(true);
         } catch { notificar('Não foi possível carregar o aluno para edição.'); }
-        finally { setCarregandoEdicao(false); }
+        finally { envioEdicao.current = false; setAlunoCarregando(null); }
     }
     function abrirModal() { setAlunoEdicao(null); setIsModalOpen(true); }
     function fecharModal() { setIsModalOpen(false); setAlunoEdicao(null); }
@@ -144,15 +148,14 @@ export function Alunos() {
                 </Button>}
                 {isModalOpen && podeEditar && <FormularioAluno aluno={alunoEdicao} onClose={fecharModal} onSalvo={alunoSalvo} />}
             </div>
-            {carregandoEdicao && <p role="status">Carregando dados para edição...</p>}
             <div className="overflow-hidden rounded-md border border-slate-200 bg-bg-surface shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-md border-b border-slate-200 px-lg py-md">
                     <p className="text-sm text-text-muted">{listagem.total} alunos na seleção atual</p>
                     <BotaoExportarCalendario testId="alunos-exportar-calendarios" total={listagem.total} disabled={listagem.carregando || Boolean(listagem.erro)} filtros={{ busca: termoBusca, status: statusSelecionado }} />
                 </div>
-                {!listagem.carregando && !listagem.erro && <TabelaAlunos semBorda podeEditar={podeEditar} alunos={listagem.itens} onAcao={podeEditar && !carregandoEdicao ? abrirEdicao : undefined}
-                    onAlterarStatus={podeEditar && !carregandoEdicao ? abrirStatus : undefined}
-                    onExcluir={podeEditar && !carregandoEdicao ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo} />}
+                {!listagem.carregando && !listagem.erro && <TabelaAlunos semBorda podeEditar={podeEditar} alunos={listagem.itens} onAcao={podeEditar ? abrirEdicao : undefined}
+                    onAlterarStatus={podeEditar ? abrirStatus : undefined} carregandoEdicaoId={alunoCarregando}
+                    onExcluir={podeEditar ? abrirExclusao : undefined} alterandoStatus={alterandoStatus || excluindo || carregandoEdicao} />}
             </div>
             <CarregarMais testId="alunos-paginacao" listagem={listagem} />
             {podeEditar && alunoExclusao && <ModalConfirmacao testId="aluno-excluir" isOpen estado="atencao" showCancel

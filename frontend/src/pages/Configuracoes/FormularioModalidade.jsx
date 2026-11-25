@@ -27,7 +27,7 @@ export function FormularioModalidade({ onSalvo }) {
             onChange={(event) => { setNome(event.target.value); setErro(''); }} aria-invalid={Boolean(erro)} aria-describedby={erro ? 'modalidade-nome-erro' : undefined} />
         {erro && <p id="modalidade-nome-erro" className="mb-md text-sm text-danger">{erro}</p>}
         <div className="flex justify-end border-t border-slate-200 pt-md">
-            <Button data-testid="modalidade-salvar" type="submit" disabled={enviando} className="disabled:opacity-50"><SaveIcon />{enviando ? 'Salvando...' : 'Cadastrar modalidade'}</Button>
+            <Button data-testid="modalidade-salvar" type="submit" loading={enviando} loadingLabel="Cadastrando modalidade..." className="disabled:opacity-50"><SaveIcon />Cadastrar modalidade</Button>
         </div>
     </form>;
 }

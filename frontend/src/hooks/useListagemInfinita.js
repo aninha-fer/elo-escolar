@@ -8,6 +8,7 @@ export function useListagemInfinita(carregar, parametros = {}, versao = 0) {
     const controllerAtual = useRef(null);
     const envio = useRef(null);
     const buscaAnterior = useRef('');
+    const recargaManual = useRef(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -16,7 +17,9 @@ export function useListagemInfinita(carregar, parametros = {}, versao = 0) {
         const atraso = params.busca !== buscaAnterior.current ? 300 : 0;
         buscaAnterior.current = params.busca;
         const timer = setTimeout(async () => {
-            setResultado((anterior) => ({ chave, carregando: true, itens: [], total: 0, contagens_status: anterior?.contagens_status }));
+            const manual = recargaManual.current;
+            recargaManual.current = false;
+            setResultado((anterior) => ({ chave, carregando: true, carregamentoManual: manual, itens: [], total: 0, contagens_status: anterior?.contagens_status }));
             try {
                 const pagina = await carregar({ ...params, paginado: true }, controller.signal);
                 if (!controller.signal.aborted) setResultado({ ...pagina, chave, carregando: false });
@@ -28,11 +31,11 @@ export function useListagemInfinita(carregar, parametros = {}, versao = 0) {
         return () => { clearTimeout(timer); controller.abort(); };
     }, [carregar, consulta, chave, tentativa]);
 
-    const carregarMais = useCallback(async () => {
+    const carregarMais = useCallback(async (origem = 'automatica') => {
         const controller = controllerAtual.current;
         if (!controller || controller.signal.aborted || resultado?.chave !== chave || !resultado.tem_mais || envio.current === controller) return;
         envio.current = controller;
-        setResultado((atual) => ({ ...atual, carregandoMais: true, erroMais: '' }));
+        setResultado((atual) => ({ ...atual, carregandoMais: true, carregamentoManual: origem === 'manual', erroMais: '' }));
         try {
             const pagina = await carregar({ ...JSON.parse(consulta), paginado: true, cursor: resultado.proximo_cursor }, controller.signal);
             if (!controller.signal.aborted) setResultado((atual) => {
@@ -49,6 +52,6 @@ export function useListagemInfinita(carregar, parametros = {}, versao = 0) {
     return { itens: atual?.itens ?? [], total: atual?.total ?? 0, totalAtivas: atual?.total_ativas,
         contagensStatus: atual?.contagens_status ?? resultado?.contagens_status,
         carregando: !atual || atual.carregando, erro: atual?.erro, carregandoMais: Boolean(atual?.carregandoMais),
-        erroMais: atual?.erroMais, temMais: Boolean(atual?.tem_mais), carregarMais,
-        recarregar: () => setTentativa((valor) => valor + 1) };
+        erroMais: atual?.erroMais, temMais: Boolean(atual?.tem_mais), carregamentoManual: Boolean(atual?.carregamentoManual), carregarMais,
+        recarregar: () => { recargaManual.current = true; setTentativa((valor) => valor + 1); } };
 }

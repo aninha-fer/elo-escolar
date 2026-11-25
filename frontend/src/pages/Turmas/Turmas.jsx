@@ -1,5 +1,5 @@
 import { useToast } from '../../contexts/ToastContext';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useListagemInfinita } from '../../hooks/useListagemInfinita';
 import { CarregarMais } from '../../components/CarregarMais';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -26,20 +26,8 @@ export function Turmas() {
     const [modalAberto, setModalAberto] = useState(false);
     const [operacao, setOperacao] = useState(null);
     const [alterandoStatus, setAlterandoStatus] = useState(false);
+    const [consultandoVinculos, setConsultandoVinculos] = useState(false);
     const envioStatusEmAndamento = useRef(false);
-
-    useEffect(() => {
-        function atualizarAoRetornar() {
-            if (document.visibilityState === 'visible') setTentativa((atual) => atual + 1);
-        }
-        window.addEventListener('focus', atualizarAoRetornar);
-        document.addEventListener('visibilitychange', atualizarAoRetornar);
-        return () => {
-            window.removeEventListener('focus', atualizarAoRetornar);
-            document.removeEventListener('visibilitychange', atualizarAoRetornar);
-        };
-    }, []);
-
 
     const [statusSelecionado, setStatusSelecionado] = useState('ATIVO');
     const listagem = useListagemInfinita(turmasService.listarPaginadas, { tipo: tipoTurma, busca: termoBusca, status: statusSelecionado }, tentativa);
@@ -72,9 +60,11 @@ export function Turmas() {
     }
 
     async function abrirOperacao(tipo, turma) {
+        if (envioStatusEmAndamento.current) return;
         setOperacao({ tipo, turma });
         if (tipo === 'editar' || tipo === 'nova-a-partir' || (tipo === 'status' && turma.status === 'INATIVO')) return;
         envioStatusEmAndamento.current = true;
+        setConsultandoVinculos(true);
         setAlterandoStatus(true);
         try {
             const atual = await turmasService.buscarPorId(turma.id);
@@ -83,6 +73,7 @@ export function Turmas() {
             notificar(error.response?.data?.erro || 'Não foi possível consultar as matrículas. Feche e tente novamente.');
         } finally {
             envioStatusEmAndamento.current = false;
+            setConsultandoVinculos(false);
             setAlterandoStatus(false);
         }
     }
@@ -227,6 +218,7 @@ export function Turmas() {
                 </>}
                 confirmText={operacao.turma.status === 'INATIVO' ? 'Confirmar ativação' : 'Confirmar inativação'}
                 onConfirm={confirmarStatus} isConfirmLoading={alterandoStatus}
+                loadingText={consultandoVinculos ? 'Consultando matrículas da turma...' : 'Alterando status da turma...'}
                 isConfirmDisabled={operacao.turma.status !== 'INATIVO' && !operacao.confirmacao} />}
             {operacao?.tipo === 'excluir' && podeEditar && <ModalConfirmacao testId="turma-excluir" isOpen onClose={fecharConfirmacao}
                 estado="atencao" showCancel title="Excluir turma?" confirmText="Confirmar exclusão"
@@ -234,7 +226,8 @@ export function Turmas() {
                     Deseja excluir a turma <strong>{operacao.turma.nome}</strong>? Essa turma possui {operacao.turma.matriculas_ativas ?? operacao.turma.vagas_ocupadas ?? 0} matrículas ativas que serão canceladas. Essa ação não pode ser desfeita.
                     {operacao.confirmacao?.matriculas.length > (operacao.turma.matriculas_ativas ?? 0) && <span className="mt-sm block">Os vínculos provisórios também serão encerrados.</span>}
                 </>}
-                onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus} isConfirmDisabled={!operacao.confirmacao} />}
+                onConfirm={confirmarExclusao} isConfirmLoading={alterandoStatus} isConfirmDisabled={!operacao.confirmacao}
+                loadingText={consultandoVinculos ? 'Consultando matrículas da turma...' : 'Excluindo turma...'} />}
         </section>
     );
 }

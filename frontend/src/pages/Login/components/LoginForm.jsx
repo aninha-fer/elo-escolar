@@ -105,8 +105,8 @@ export function LoginForm() {
             <div className="login-options flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <button data-testid="login-recuperar-senha" type="button" className="login-recovery" onClick={() => notificar('Para redefinir sua senha, entre em contato com a administração da instituição.')}>Esqueci minha senha</button>
             </div>
-            <Button data-testid="login-entrar" type="submit" className="login-submit" disabled={enviando}>
-                {enviando ? 'Entrando...' : 'Entrar no sistema'}
+            <Button data-testid="login-entrar" type="submit" className="login-submit" loading={enviando} loadingLabel="Entrando no sistema...">
+                Entrar no sistema
             </Button>
 
         </form>

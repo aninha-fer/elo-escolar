@@ -1,3 +1,4 @@
+import { ConteudoBotao } from '../../../components/ConteudoBotao';
 import { useToast } from '../../../contexts/ToastContext';
 import { Input } from "../../../components/Input";
 import { Modal } from "../../../components/Modal";
@@ -66,9 +67,8 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
         async function carregarProfissionais() {
             try {
                 setCarregandoProfissionais(true);
-                setErroProfissionais('');
                 const dados = await profissionaisService.listarTodos(controller.signal);
-                if (!controller.signal.aborted) setProfissionais(dados.filter((profissional) => profissional.status_geral === 'ATIVO' || profissional.id === atendimento?.profissional_id));
+                if (!controller.signal.aborted) { setErroProfissionais(''); setProfissionais(dados.filter((profissional) => profissional.status_geral === 'ATIVO' || profissional.id === atendimento?.profissional_id)); }
             } catch (err) {
                 if (controller.signal.aborted || err.code === 'ERR_CANCELED') return;
                 setErroProfissionais(err.response?.data?.erro || 'Não foi possível carregar os profissionais.');
@@ -83,10 +83,10 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
     useEffect(() => {
         const controller = new AbortController();
         async function carregar() {
-            setCarregandoModalidades(true); setErroModalidades('');
+            setCarregandoModalidades(true);
             try {
                 const dados = await modalidadesService.listarTodos(controller.signal);
-                if (!controller.signal.aborted) setModalidades(dados);
+                if (!controller.signal.aborted) { setModalidades(dados); setErroModalidades(''); }
             } catch (error) {
                 if (!controller.signal.aborted && error.code !== 'ERR_CANCELED') setErroModalidades(error.response?.data?.erro || 'Não foi possível carregar as modalidades.');
             } finally { if (!controller.signal.aborted) setCarregandoModalidades(false); }
@@ -222,6 +222,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                         <Select data-testid="atendimento-formulario-modalidade"
                             label="Modalidade"
                             name="modalidade_id" disabled={bloqueado || carregandoModalidades || Boolean(erroModalidades)}
+                            loading={carregandoModalidades} loadingLabel="Carregando modalidades..."
                             value={formulario.modalidade_id}
                             onChange={(event) => atualizarCampo('modalidade_id', event.target.value)}
                             placeholder="Selecione uma modalidade"
@@ -235,7 +236,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             onChange={(valor) => atualizarCampo('profissional_id', valor)}
                             onCadastrar={() => setNovoProfissional(true)} textoCadastro="Adicionar profissional"
                             disabled={carregandoProfissionais || Boolean(erroProfissionais)}
-                            placeholder={carregandoProfissionais ? 'Carregando profissionais...' : 'Selecione um profissional'}
+                            loading={carregandoProfissionais} placeholder="Selecione um profissional"
                             required
                             options={profissionais.map((profissional) => ({
                                 value: profissional.id,
@@ -243,16 +244,12 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                             }))}
                         />
                     </div>
-                    {carregandoModalidades && <p role="status" className="mb-md text-sm text-text-muted">Carregando modalidades...</p>}
-                    {erroModalidades && <div role="alert" className="mb-md text-sm text-danger"><p>{erroModalidades}</p><button type="button" data-testid="atendimento-modalidades-tentar" onClick={() => setTentativaModalidades((valor) => valor + 1)}>Tentar novamente</button></div>}
+                    {erroModalidades && <div role="alert" className="mb-md text-sm text-danger"><p>{erroModalidades}</p><button type="button" data-testid="atendimento-modalidades-tentar" disabled={carregandoModalidades} onClick={() => setTentativaModalidades((valor) => valor + 1)}><ConteudoBotao carregando={carregandoModalidades}>Tentar novamente</ConteudoBotao></button></div>}
                     {!carregandoModalidades && !erroModalidades && !modalidades.length && <p className="mb-md text-sm text-text-muted">Cadastre uma modalidade nas configurações para agendar um atendimento.</p>}
-                    {carregandoProfissionais && <p role="status" className="mb-md text-sm text-text-muted">Carregando profissionais...</p>}
                     {erroProfissionais && (
                         <div className="mb-md text-sm text-red-700" role="alert">
                             <p>{erroProfissionais}</p>
-                            <button data-testid="atendimento-formulario-profissionais-tentar-novamente" type="button" className="mt-xs underline" onClick={() => setTentativaProfissionais((valor) => valor + 1)}>
-                                Tentar novamente
-                            </button>
+                            <button data-testid="atendimento-formulario-profissionais-tentar-novamente" type="button" className="mt-xs underline" disabled={carregandoProfissionais} onClick={() => setTentativaProfissionais((valor) => valor + 1)}><ConteudoBotao carregando={carregandoProfissionais}>Tentar novamente</ConteudoBotao></button>
                         </div>
                     )}
                     {!carregandoProfissionais && !erroProfissionais && profissionais.length === 0 && (

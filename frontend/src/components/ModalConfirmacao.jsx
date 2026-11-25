@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { Modal } from './Modal';
+import { ConteudoBotao } from './ConteudoBotao';
 
 export function ModalConfirmacao({
     isOpen,
@@ -13,6 +14,7 @@ export function ModalConfirmacao({
     showCancel = estado === 'atencao',
     isConfirmLoading = false,
     isConfirmDisabled = false,
+    loadingText = 'Processando...',
     testId,
 }) {
     const titleId = useId();
@@ -44,8 +46,10 @@ export function ModalConfirmacao({
                     </button>}
                     <button data-testid={testId ? `${testId}-confirmar` : undefined} type="button" onClick={onConfirm ?? onClose} disabled={isConfirmDisabled || isConfirmLoading} aria-busy={isConfirmLoading}
                         className={`inline-flex items-center justify-center gap-sm rounded-md px-lg py-md text-sm font-semibold text-bg-surface transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${confirmacao ? 'bg-success hover:bg-emerald-700' : 'bg-danger hover:bg-red-700'}`}>
-                        {!confirmacao && <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 6 12 12M6 18 18 6" /></svg>}
-                        {isConfirmLoading ? 'Carregando...' : confirmText}
+                        <ConteudoBotao carregando={isConfirmLoading} descricao={loadingText}>
+                            {!confirmacao && <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 6 12 12M6 18 18 6" /></svg>}
+                            {confirmText}
+                        </ConteudoBotao>
                     </button>
                 </div>
             </div>

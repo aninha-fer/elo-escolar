@@ -1158,6 +1158,75 @@ function simularEquipe(t, inicial = {}) {
   return simularBanco(t, { pessoa: [{ id: 10, nome: 'Ana', status_geral: 'ATIVO' }, { id: 11, nome: 'Bruno', status_geral: 'ATIVO' }], ambiente: [{ id: 2, nome: 'Sala' }], ...inicial });
 }
 
+for (const [statusAluno, excluido, esperado] of [
+  ['ATIVO', false, 201], ['RASCUNHO', false, 409], ['INATIVO', false, 404], ['ATIVO', true, 404],
+]) {
+  test(`vínculo pela turma: endpoint valida aluno ${statusAluno}${excluido ? ' excluído' : ''} e não aceita desativar a exigência pelo body`, async (t) => {
+    const express = require('express');
+    const { createServer } = require('node:http');
+    const banco = simularBanco(t, { pessoa: [{ ...pessoaEdicao, status_geral: statusAluno === 'ATIVO' ? 'ATIVO' : 'INATIVO' }],
+      aluno: [{ ...aluno(1, statusAluno), ...(excluido ? { deleted_at: new Date() } : {}) }] });
+    const antes = structuredClone(banco);
+    const app = express(); app.use(express.json());
+    app.use('/api', (req, res, next) => { req.usuario = { role: 'admin' }; next(); }, require('../routes/matriculaRoutes'));
+    const server = createServer(app);
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    t.after(() => new Promise((resolve) => server.close(resolve)));
+    const resposta = await fetch(`http://127.0.0.1:${server.address().port}/api/matriculas/regular`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aluno_id: 1, turma_id: 20, exigirAlunoAtivo: false, status: 'ATIVO' }),
+    });
+    assert.equal(resposta.status, esperado);
+    const dados = await resposta.json();
+    if (esperado === 201) {
+      assert.equal(dados.status, 'ATIVO');
+      assert.equal(banco.matricula_turma.length, 1);
+      assert.deepEqual((await obterTurmaService(20)).alunos.map((a) => a.id), [1]);
+      assert.equal((await listarTurmasRegularesPorTurnoService('MANHA'))[0].vagas_ocupadas, 1);
+    } else {
+      if (statusAluno === 'RASCUNHO') assert.match(dados.erro, /Somente alunos ativos/);
+      assert.deepEqual(banco, antes);
+    }
+  });
+}
+
+test('vínculo pela turma reconsulta o aluno após aguardar uma inativação concorrente', async (t) => {
+  const banco = simularBanco(t, { aluno: [aluno(1, 'ATIVO')] });
+  let liberar, sinalizar;
+  const bloqueado = new Promise((resolve) => { sinalizar = resolve; });
+  const continuar = new Promise((resolve) => { liberar = resolve; });
+  const inativacao = prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${1} FOR UPDATE`;
+    sinalizar();
+    await continuar;
+    await tx.aluno.update({ where: { id: 1 }, data: { status: 'INATIVO' } });
+  });
+  await bloqueado;
+  const resultado = matricularTurmaRegularService({ aluno_id: 1, turma_id: 20 }, { exigirAlunoAtivo: true })
+    .then(() => null, (erro) => erro);
+  try {
+    await new Promise(setImmediate);
+    assert.equal(banco.matricula_turma.length, 0);
+  } finally { liberar(); }
+  await inativacao;
+  assert.equal((await resultado).statusCode, 404);
+  assert.equal(banco.matricula_turma.length, 0);
+});
+
+test('cadastro e edição do rascunho continuam permitindo regular provisória mesmo sem vagas', async (t) => {
+  const banco = simularBanco(t, { turma: [turma(20, 'REGULAR', 0), turma(21, 'REGULAR', 0)] });
+  const criado = await criarAlunoService({ nome: 'Rascunho Teste', status: 'RASCUNHO', turno: 'MANHA', dias_frequencia: [1, 2], turma_id: 20 });
+  const inicial = banco.matricula_turma.find((m) => m.aluno_id === criado.id);
+  assert.equal(inicial.status, 'PROVISORIO');
+  assert.equal(inicial.data_inicio, null);
+  await editarAlunoService(criado.id, { turma_id: 21 });
+  const vigente = banco.matricula_turma.find((m) => m.aluno_id === criado.id && m.turma_id === 21);
+  assert.equal(vigente.status, 'PROVISORIO');
+  assert.equal(vigente.data_inicio, null);
+  assert.equal(banco.aluno.find((a) => a.id === criado.id).status, 'RASCUNHO');
+  assert.ok((await listarTurmasRegularesPorTurnoService('MANHA')).every((t) => t.vagas_ocupadas === 0));
+});
+
 for (const tipo of ['REGULAR', 'OFICINA']) {
   test(`${tipo}: cadastro e listagem retornam todos os profissionais sem multiplicar vagas`, async (t) => {
     const banco = simularEquipe(t, { turma_horario: [] });

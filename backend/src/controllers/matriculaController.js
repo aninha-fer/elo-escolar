@@ -58,7 +58,7 @@ function responderErroVinculo(error, res) {
 async function criarMatriculaRegular(req, res) {
   try {
     const dados = matricularRegularDTO.parse(req.body);
-    return res.status(201).json(await matricularTurmaRegularService(dados));
+    return res.status(201).json(await matricularTurmaRegularService(dados, { exigirAlunoAtivo: true }));
   } catch (error) {
     return responderErroVinculo(error, res);
   }

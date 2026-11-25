@@ -4,7 +4,6 @@ import { CampoInformacao } from '../../components/CampoInformacao';
 import EditIcon from '../../components/icons/EditIcon';
 import { TrashIcon } from '../../components/icons/TrashIcon';
 import { TagExpiradaTurma } from '../../components/TagExpiradaTurma';
-import { ProfissionaisTurma } from '../../components/ProfissionaisTurma';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600',
@@ -59,8 +58,13 @@ export function TurmaItem({ turma, profissionais = [], onSelecionar, podeEditar 
                     </> : <CampoTurma titulo="Período" valor={formatarTurno(turma.turno)} />}
                     <CampoTurma titulo="Sala" valor={turma.ambiente?.nome || 'Ambiente não informado'} />
                     <CampoTurma titulo="Vagas" valor={capacidade} />
-                    <CampoTurma titulo="Professores" valor={<ProfissionaisTurma profissionais={profissionais} />} />
-                    <CampoTurma titulo="Descrição" valor={turma.descricao || '-'} descricao className="w-70"/>
+                    <CampoTurma titulo="Professores" valor={profissionais.length ? <ul aria-label="Professores da turma" className="flex flex-wrap gap-sm">
+                        {profissionais.map((profissional) => <li key={profissional.id}
+                            className="max-w-full break-words rounded-full bg-amber-50 px-sm py-xs text-sm leading-6 text-amber-600">
+                            {profissional.pessoa?.nome ?? profissional.nome}
+                        </li>)}
+                    </ul> : 'Profissional não informado'} />
+                    <CampoTurma titulo="Descrição" valor={turma.descricao || '-'} descricao className="w-70" />
                 </dl>
                 <button data-testid={`turma-${turma.id}-abrir`} type="button" className="absolute inset-0 size-full cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2"
                     aria-label={`Selecionar ${oficina ? 'oficina' : 'turma'} ${nome}`} onClick={() => onSelecionar?.(turma)} />

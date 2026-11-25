@@ -4,7 +4,7 @@ import { formatarFrequencia, formatarStatus, formatarTurno } from '../../utils/f
 import EditIcon from '../../components/icons/EditIcon';
 import { TrashIcon } from '../../components/icons/TrashIcon';
 
-export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, alterandoStatus = false, semBorda = false, podeEditar = false }) {
+export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, alterandoStatus = false, carregandoEdicaoId = null, semBorda = false, podeEditar = false }) {
     const navigate = useNavigate();
 
     const estilosStatus = {
@@ -113,7 +113,8 @@ export function TabelaAlunos({ alunos = [], onAcao, onAlterarStatus, onExcluir, 
                                 </td>
                                 {podeEditar && <td className="px-6 py-4 text-right">
                                     {(onAcao || onAlterarStatus || onExcluir) && <div className="inline-flex" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                                        <BotaoAcoes testId={`aluno-${aluno.id}-acoes`} label={`Ações para ${nome}`} disabled={alterandoStatus} options={[
+                                        <BotaoAcoes testId={`aluno-${aluno.id}-acoes`} label={`Ações para ${nome}`} disabled={alterandoStatus}
+                                            loading={carregandoEdicaoId === aluno.id} loadingLabel={`Carregando ${nome} para edição...`} options={[
                                             { id: 'editar', label: 'Editar', disabled: !onAcao, onClick: () => onAcao?.(aluno), icon: <EditIcon /> },
                                             { id: 'status', label: status === 'INATIVO' ? 'Ativar aluno' : 'Inativar aluno',
                                                 disabled: !onAlterarStatus, onClick: () => onAlterarStatus?.(aluno) },

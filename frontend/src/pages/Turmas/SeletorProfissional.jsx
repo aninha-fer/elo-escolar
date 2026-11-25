@@ -1,3 +1,5 @@
+import { ConteudoBotao } from '../../components/ConteudoBotao';
+import { Spinner } from '../../components/Spinner';
 import { useState } from 'react';
 import { Input } from '../../components/Input';
 
@@ -20,11 +22,10 @@ export function SeletorProfissional({ profissionais, value = [], onChange, carre
                     wrapperClassName="mb-0!" inputClassName="rounded-none! border-0! bg-bg-main!"
                     value={busca} onChange={(event) => setBusca(event.target.value)}
                     icon={<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>} />
-                {carregando ? <p role="status" className="p-md text-sm text-text-muted">Carregando profissionais...</p>
-                    : erroCarga ? <div className="p-md text-sm text-red-700">
+                {erroCarga ? <div className="p-md text-sm text-red-700">
                         <p role="alert">{erroCarga}</p>
-                        <button data-testid="turma-formulario-profissionais-tentar-novamente" type="button" className="mt-sm underline" onClick={onTentarNovamente}>Tentar novamente</button>
-                    </div> : filtrados.length === 0 ? <p role="status" className="p-md text-sm text-text-muted">
+                        <button data-testid="turma-formulario-profissionais-tentar-novamente" type="button" className="mt-sm underline" disabled={carregando} onClick={onTentarNovamente}><ConteudoBotao carregando={carregando}>Tentar novamente</ConteudoBotao></button>
+                    </div> : carregando ? <div className="p-md text-sm text-text-muted flex items-center gap-sm"><Spinner label="Carregando profissionais..." /><span>Carregando profissionais...</span></div> : filtrados.length === 0 ? <p role="status" className="p-md text-sm text-text-muted">
                         {profissionais.length === 0 ? 'Nenhum profissional com função compatível cadastrado.' : 'Nenhum profissional encontrado para esta busca.'}
                     </p> : <div className="max-h-60 overflow-y-auto divide-y divide-slate-200">
                         {filtrados.map((profissional) => (

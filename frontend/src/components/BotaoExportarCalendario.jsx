@@ -5,6 +5,7 @@ import { criarPdfCalendarioAluno, nomeArquivoAluno } from '../utils/exportarCale
 import { criarZipCalendariosAlunos } from '../utils/exportarCalendariosZip';
 import { baixarArquivo } from '../utils/baixarArquivo';
 import { useToast } from '../contexts/ToastContext';
+import { ConteudoBotao } from './ConteudoBotao';
 
 export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = false, className = '', testId }) {
     const { notificar } = useToast();
@@ -50,7 +51,9 @@ export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = fa
             {exportando && <button data-testid={`${testId}-cancelar`} type="button" onClick={cancelar} className="rounded-sm text-sm text-text-muted underline">Cancelar exportação</button>}
             <button data-testid={testId} type="button" onClick={exportar} disabled={disabled || exportando || (!alunoId && !total)} aria-busy={exportando}
                 className="inline-flex items-center justify-center gap-sm rounded-sm border border-slate-200 bg-bg-surface px-md py-sm text-sm font-semibold text-text-muted hover:bg-bg-main focus-visible:outline-2 focus-visible:outline-secondary disabled:cursor-not-allowed disabled:opacity-50">
-                <Download size={16} aria-hidden="true" />{exportando ? 'Exportando...' : alunoId ? 'Exportar calendário' : 'Exportar calendários'}
+                <ConteudoBotao carregando={exportando} descricao="Exportando calendário...">
+                    <Download size={16} aria-hidden="true" />{alunoId ? 'Exportar calendário' : 'Exportar calendários'}
+                </ConteudoBotao>
             </button>
         </div>
         {progresso && <p role="status" className="max-w-80 text-right text-xs text-text-muted">{progresso}</p>}

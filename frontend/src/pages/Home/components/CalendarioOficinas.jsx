@@ -5,6 +5,7 @@ import { Calendar, Download, ArrowRight } from 'react-feather';
 import { Button } from '../../../components/Button';
 import { exportarCalendarioOficinas } from '../../../utils/exportarCalendarioOficinas';
 import { OficinaCalendarioItem } from './OficinaCalendarioItem';
+import { ConteudoBotao } from '../../../components/ConteudoBotao';
 
 export function CalendarioOficinas({ dias, dataReferencia, carregando, erro, onTentarNovamente }) {
     const { notificar } = useToast();
@@ -29,7 +30,7 @@ export function CalendarioOficinas({ dias, dataReferencia, carregando, erro, onT
             <div className="flex items-center gap-md text-sm font-semibold">
                 <button data-testid="inicio-exportar-oficinas" type="button" onClick={exportar} disabled={carregando || Boolean(erro) || vazio || exportando}
                     className="inline-flex items-center gap-sm rounded-sm text-slate-500 hover:text-text-main focus-visible:outline-2 focus-visible:outline-secondary disabled:cursor-not-allowed disabled:opacity-40">
-                    {exportando ? 'Exportando...' : 'Exportar'}<Download size={15} aria-hidden="true" />
+                    <ConteudoBotao carregando={exportando} descricao="Exportando calendário de oficinas...">Exportar<Download size={15} aria-hidden="true" /></ConteudoBotao>
                 </button>
                 <Link data-testid="inicio-ver-oficinas" to="/turmas?tipo=OFICINA" className="inline-flex items-center gap-xs rounded-sm text-blue-600 hover:underline">Ver todas<ArrowRight size={17} aria-hidden="true" /></Link>
             </div>

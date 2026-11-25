@@ -2,7 +2,7 @@ import { formatarDataBR, formatarFrequencia, formatarHora, formatarDataHoraInsti
 import { BotaoAcoes } from './BotaoAcoes';
 import EditIcon from './icons/EditIcon';
 
-export function AtendimentoItem({ atendimento, onEditar, onCancelar, cancelando = false }) {
+export function AtendimentoItem({ atendimento, onEditar, onCancelar, cancelando = false, carregandoEdicao = false }) {
     const semanal = atendimento.tipo_recorrencia === 'SEMANAL';
     const mensal = atendimento.tipo_recorrencia === 'MENSAL';
     const frequencia = atendimento.frequencia ?? 1;
@@ -39,7 +39,8 @@ export function AtendimentoItem({ atendimento, onEditar, onCancelar, cancelando 
                 </div>
                 {mensal && <p className="text-xs text-text-muted">Confira na agenda as datas de cada sessão mensal.</p>}
             </div>
-            {(onEditar || onCancelar) && <BotaoAcoes testId={`atendimento-${atendimento.id}-acoes`} label={`Ações para ${atendimento.modalidade}`} disabled={cancelando} options={[
+            {(onEditar || onCancelar) && <BotaoAcoes testId={`atendimento-${atendimento.id}-acoes`} label={`Ações para ${atendimento.modalidade}`} disabled={cancelando}
+                loading={carregandoEdicao} loadingLabel="Carregando atendimento para edição..." options={[
                 { id: 'editar', label: 'Editar', disabled: !onEditar || eventualIniciado,
                     icon: <EditIcon />, onClick: () => onEditar?.(atendimento) },
                 { id: 'cancelar', label: 'Cancelar', disabled: !onCancelar, textColor: '#DC2626',

@@ -207,7 +207,6 @@ export function AlunoDetalhes() {
                 <BotaoExportarCalendario alunoId={id} disabled={!aluno} className="ml-auto" testId="aluno-exportar-calendario" />
             </div>
 
-            {carregandoEdicao && <p role="status" className="text-sm text-text-muted">Carregando dados para edição...</p>}
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-8" aria-label="Abas de navegação">
                     {TABS.map((tab) => {
