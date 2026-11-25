@@ -1,5 +1,19 @@
 const { z } = require('zod');
 
+const dataNascimentoDTO = z.string().superRefine((valor, contexto) => {
+  const data = new Date(`${valor}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor) || Number.isNaN(data.getTime()) || data.toISOString().slice(0, 10) !== valor) {
+    contexto.addIssue({ code: 'custom', message: 'Data de nascimento inválida.' });
+    return;
+  }
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const parte = (tipo) => partes.find((item) => item.type === tipo).value;
+  const hoje = `${parte('year')}-${parte('month')}-${parte('day')}`;
+  if (valor >= hoje) contexto.addIssue({ code: 'custom', message: 'A data de nascimento deve ser anterior a hoje.' });
+});
+
 const textoOpcional = z.preprocess(
   (valor) => typeof valor === 'string' ? valor.trim() || undefined : valor === null ? undefined : valor,
   z.string().optional()
@@ -42,7 +56,7 @@ const dadosMedicosDTO = z.object({
 const criarAlunoBaseDTO = z.object({
   nome: z.string({ required_error: "Nome é obrigatório" }).min(2, "Nome muito curto"),
   telefone: telefoneOpcional,
-  data_nascimento: z.preprocess((valor) => valor === '' || valor === null ? undefined : valor, z.string().refine((valor) => !Number.isNaN(Date.parse(valor)), 'Data de nascimento inválida').optional()),
+  data_nascimento: z.preprocess((valor) => valor === '' || valor === null ? undefined : valor, dataNascimentoDTO.optional()),
   responsaveis: z.array(responsavelDTO).default([]),
   participa_procan: z.boolean().default(false),
   observacoes: textoOpcional,
@@ -65,10 +79,7 @@ const editarAlunoDTO = criarAlunoBaseDTO.omit({ status: true, responsaveis: true
   nome: z.string().trim().min(2, 'Informe o nome completo.'),
   participa_procan: z.boolean(),
   telefone: z.string().regex(/^\d{10,11}$/, 'Informe um telefone com DDD.').nullable(),
-  data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((valor) => {
-    const data = new Date(valor + 'T00:00:00.000Z');
-    return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
-  }, 'Data de nascimento inválida.').nullable(),
+  data_nascimento: dataNascimentoDTO.nullable(),
   observacoes: z.string().trim().nullable(),
   responsaveis: z.array(responsavelDTO.extend({ id: z.number().int().positive().optional() })),
   status: z.enum(['RASCUNHO', 'ATIVO']),

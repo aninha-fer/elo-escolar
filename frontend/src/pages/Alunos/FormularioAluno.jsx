@@ -11,6 +11,7 @@ import { SelecaoDiasSemana } from '../../components/SelecaoDiasSemana';
 import { alunoService } from '../../services/alunoService';
 import { turmasService } from '../../services/turmasService';
 import { formatarTurno } from '../../utils/formatters';
+import { hojeInstituicao } from '../../utils/anoLetivo';
 import { SaveIcon } from '../../components/icons/SaveIcon';
 const formularioInicial = {
     nome: '',
@@ -32,6 +33,8 @@ const formularioInicial = {
 export function FormularioAluno({ aluno, onClose, onSalvo }) {
     const { notificar } = useToast();
     const editando = Boolean(aluno);
+    const limiteNascimento = new Date(`${hojeInstituicao()}T00:00:00.000Z`);
+    limiteNascimento.setUTCDate(limiteNascimento.getUTCDate() - 1);
     const turmaAtual = aluno?.turma_regular;
     const [formulario, setFormulario] = useState(() => aluno ? {
         ...formularioInicial, ...aluno, nome: aluno.pessoa.nome, telefone: aluno.pessoa.telefone ?? '',
@@ -166,6 +169,14 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
         if (formulario.dias_frequencia.length === 0) novosErros.dias_frequencia = 'Selecione ao menos um dia de frequência.';
 
         if (telefone && !/^\d{10,11}$/.test(telefone)) novosErros.telefone = 'O telefone deve conter DDD e ter 10 ou 11 dígitos.';
+        if (formulario.data_nascimento) {
+            const data = new Date(`${formulario.data_nascimento}T00:00:00.000Z`);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(formulario.data_nascimento) || Number.isNaN(data.getTime()) || data.toISOString().slice(0, 10) !== formulario.data_nascimento) {
+                novosErros.data_nascimento = 'Data de nascimento inválida.';
+            } else if (formulario.data_nascimento >= hojeInstituicao()) {
+                novosErros.data_nascimento = 'A data de nascimento deve ser anterior a hoje.';
+            }
+        }
         for (const responsavel of responsaveisComChave) {
             const prefixo = `responsaveis.${responsavel.chave}`;
             if (responsavel.nome.length < 2) novosErros[`${prefixo}.nome`] = 'Informe o nome do responsável, com pelo menos 2 caracteres.';
@@ -317,6 +328,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                             id="data-nascimento-aluno"
                             name="data_nascimento"
                             type="date"
+                            max={limiteNascimento.toISOString().slice(0, 10)}
                             label="Data de nascimento"
                             value={formulario.data_nascimento}
                             onChange={(event) => atualizarCampo('data_nascimento', event.target.value)}
