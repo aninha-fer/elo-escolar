@@ -1,3 +1,5 @@
+import { ConteudoBotao } from '../../components/ConteudoBotao';
+import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../contexts/ToastContext';
 import { useState } from 'react';
 import { Input } from '../../components/Input';
@@ -32,9 +34,9 @@ export function RevisaoAlunosTurma({ alunos, selecionados, bloqueados, capacidad
             {excedeu && <p role="alert" className="mb-md rounded-sm bg-red-50 p-sm text-sm text-red-700">A seleção excede o número de vagas. Remova alunos ou ajuste a capacidade.</p>}
             <Input data-testid="turma-nova-busca-aluno" aria-label="Buscar aluno por nome" placeholder="Buscar aluno por nome..." value={busca} onChange={(event) => setBusca(event.target.value)} disabled={disabled}
                 icon={<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>} />
-            {carregando ? <p role="status" className="p-md text-sm text-text-muted">Carregando alunos...</p> : erro ? <div className="rounded-sm bg-red-50 p-sm text-sm text-red-700">
-                <p role="alert">{erro}</p><button data-testid="turma-nova-alunos-tentar-novamente" type="button" onClick={onTentarNovamente} className="mt-sm underline">Tentar novamente</button>
-            </div> : <ul className="max-h-96 divide-y divide-slate-200 overflow-y-auto rounded-sm border border-slate-200">
+            {erro ? <div className="rounded-sm bg-red-50 p-sm text-sm text-red-700">
+                <p role="alert">{erro}</p><button data-testid="turma-nova-alunos-tentar-novamente" type="button" onClick={onTentarNovamente} disabled={carregando} className="mt-sm underline"><ConteudoBotao carregando={carregando}>Tentar novamente</ConteudoBotao></button>
+            </div> : carregando ? <div className="p-md text-sm text-text-muted flex items-center gap-sm"><Spinner label="Carregando alunos..." /><span>Carregando alunos...</span></div> : <ul className="max-h-96 divide-y divide-slate-200 overflow-y-auto rounded-sm border border-slate-200">
                 {filtrados.length === 0 && <li className="p-md text-sm text-text-muted">{alunos.length ? 'Nenhum aluno encontrado para esta busca.' : 'Nenhum aluno disponível para o turno escolhido.'}</li>}
                 {filtrados.map((aluno) => {
                     const selecionado = selecionados.includes(aluno.id);

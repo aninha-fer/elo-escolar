@@ -1,3 +1,4 @@
+import { Spinner } from '../components/Spinner';
 import { useToast } from '../contexts/ToastContext';
 import apaeLogo from '../assets/apae.png'
 import { NavLink } from 'react-router-dom';
@@ -183,11 +184,11 @@ function Sidebar() {
                     className="ml-auto flex shrink-0 items-center justify-center rounded-sm p-sm text-white/35 transition-colors hover:bg-bg-surface/10 hover:text-white/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary disabled:cursor-wait disabled:opacity-50"
                     onClick={encerrarSessao}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.16667" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                    {saindo ? <Spinner size={14} label="Saindo do sistema..." /> : <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.16667" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                         <path d="M5.25 12.25H2.91667C2.60725 12.25 2.3105 12.1271 2.09171 11.9083C1.87292 11.6895 1.75 11.3928 1.75 11.0833V2.91667C1.75 2.60725 1.87292 2.3105 2.09171 2.09171C2.3105 1.87292 2.60725 1.75 2.91667 1.75H5.25" />
                         <path d="M9.33337 9.91671L12.25 7.00004L9.33337 4.08337" />
                         <path d="M12.25 7H5.25" />
-                    </svg>
+                    </svg>}
                 </button>
             </div>
             </div>

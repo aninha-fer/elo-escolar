@@ -1,3 +1,4 @@
+import { ConteudoBotao } from '../../components/ConteudoBotao';
 import { useToast } from '../../contexts/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
@@ -46,9 +47,11 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
         }
     } : formularioInicial);
     const [turmas, setTurmas] = useState([]);
+    const [carregandoTurmas, setCarregandoTurmas] = useState(true);
     const [erroTurmas, setErroTurmas] = useState('');
     const [tentativa, setTentativa] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [acaoEnvio, setAcaoEnvio] = useState(null);
     const [submitError, setSubmitError] = useState('');
     const [erros, setErros] = useState({});
     const [conflitos, setConflitos] = useState([]);
@@ -59,7 +62,8 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
         const controller = new AbortController();
         turmasService.listarTurmasRegularesPorTurno(controller.signal).then((dados) => {
             if (!controller.signal.aborted) { setTurmas(dados); setErroTurmas(''); }
-        }).catch(() => { if (!controller.signal.aborted) setErroTurmas('Não foi possível carregar as turmas.'); });
+        }).catch(() => { if (!controller.signal.aborted) setErroTurmas('Não foi possível carregar as turmas.'); })
+            .finally(() => { if (!controller.signal.aborted) setCarregandoTurmas(false); });
         return () => controller.abort();
     }, [tentativa]);
     function atualizarCampo(campo, valor) {
@@ -208,6 +212,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
 
         try {
             enviando.current = true;
+            setAcaoEnvio(status === 'RASCUNHO' ? 'rascunho' : 'principal');
             setIsSubmitting(true);
             setSubmitError('');
             if (editando) {
@@ -252,6 +257,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
         } finally {
             enviando.current = false;
             setIsSubmitting(false);
+            setAcaoEnvio(null);
         }
     }
 
@@ -279,8 +285,9 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
             onSecondaryAction={!editando || aluno.status === 'RASCUNHO' ? salvarRascunho : undefined}
             confirmFormId="form-cadastro-aluno"
             onConfirm={handleSubmit}
-            isConfirmLoading={isSubmitting}>
-            {erroTurmas && <div role="alert" className="mb-md text-sm text-red-700">{erroTurmas} <button data-testid="aluno-formulario-turmas-tentar-novamente" type="button" className="underline" onClick={() => setTentativa((v) => v + 1)}>Tentar novamente</button></div>}
+            isConfirmLoading={isSubmitting && acaoEnvio !== 'rascunho'}
+            isSecondaryLoading={isSubmitting && acaoEnvio === 'rascunho'}>
+            {erroTurmas && <div role="alert" className="mb-md text-sm text-red-700">{erroTurmas} <button data-testid="aluno-formulario-turmas-tentar-novamente" type="button" className="underline" disabled={carregandoTurmas} onClick={() => { setCarregandoTurmas(true); setTentativa((v) => v + 1); }}><ConteudoBotao carregando={carregandoTurmas}>Tentar novamente</ConteudoBotao></button></div>}
             <form id="form-cadastro-aluno" onSubmit={handleSubmit} noValidate>
                 <fieldset disabled={isSubmitting} className="min-w-0">
                     <div className="mb-md border-b border-gray-200 pb-sm">
@@ -407,7 +414,7 @@ export function FormularioAluno({ aluno, onClose, onSalvo }) {
                         />))}
                         {campoComErro('turma_id', (<Select data-testid="aluno-formulario-turma-regular"
                             label="Turma regular"
-                            name="turma_id"
+                            name="turma_id" loading={carregandoTurmas} loadingLabel="Carregando turmas regulares..."
                             value={formulario.turma_id}
                             onChange={(event) => atualizarCampo('turma_id', event.target.value)}
                             placeholder="Sem turma regular"

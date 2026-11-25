@@ -3,6 +3,7 @@ import { CalendarioSemanal } from "../../../components/CalendarioSemanal";
 import { formatarDataBR, formatarFrequencia, formatarTelefone, formatarTurno, formatarSimNao, formatarAutorizacaoAnalgesico } from "../../../utils/formatters";
 import { CampoInformacao } from "../../../components/CampoInformacao";
 import EditIcon from "../../../components/icons/EditIcon";
+import { Spinner } from '../../../components/Spinner';
 
 export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, onSelecionarSemana, carregandoAgenda, erroAgenda, permissao, onEditar, carregandoEdicao = false }) {
     const responsaveis = dadosAluno?.responsaveis ?? [];
@@ -19,7 +20,7 @@ export function VisaoGeral({ dadosAluno, agenda, turmaRegular, dataReferencia, o
                             {permissao && <button data-testid="aluno-editar" type="button" onClick={onEditar} disabled={carregandoEdicao}
                                 aria-label="Editar aluno" title="Editar aluno" aria-busy={carregandoEdicao}
                                 className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary disabled:cursor-wait disabled:opacity-50 [&>svg]:size-5 [&_path]:stroke-current">
-                                <EditIcon />
+                                {carregandoEdicao ? <Spinner label="Carregando dados para edição..." /> : <EditIcon />}
                             </button>}
                     </div>
                 }>

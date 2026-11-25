@@ -72,8 +72,8 @@ export function FormularioAnoLetivo({ calendario, onSalvo }) {
                 {erro.conflitos && <ul className="mt-sm list-disc pl-lg">{erro.conflitos.map((c, i) => <li key={i}>{c.mensagem}</li>)}</ul>}
             </div>}
             <div className="flex justify-end border-t border-slate-200 pt-md">
-                <Button data-testid={`calendario-${calendario?.id ?? 'novo'}-salvar`} type="submit" disabled={enviando} className="disabled:opacity-50">
-                    <SaveIcon /> {enviando ? 'Salvando...' : calendario ? 'Salvar alterações' : 'Cadastrar calendário'}
+                <Button data-testid={`calendario-${calendario?.id ?? 'novo'}-salvar`} type="submit" loading={enviando} loadingLabel="Salvando calendário..." className="disabled:opacity-50">
+                    <SaveIcon /> {calendario ? 'Salvar alterações' : 'Cadastrar calendário'}
                 </Button>
             </div>
         </form>

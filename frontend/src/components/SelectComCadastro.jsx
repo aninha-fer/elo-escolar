@@ -1,14 +1,15 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Plus } from 'react-feather';
+import { Spinner } from './Spinner';
 
-export function SelectComCadastro({ id, label, value, options = [], placeholder = 'Selecione', disabled = false,
+export function SelectComCadastro({ id, label, value, options = [], placeholder = 'Selecione', disabled = false, loading = false,
     required = false, onChange, onCadastrar, textoCadastro, testId }) {
     const gerado = useId(), campoId = id ?? gerado;
     const [aberto, setAberto] = useState(false);
     const botao = useRef(null), menu = useRef(null);
     const selecionado = options.find((opcao) => String(opcao.value) === String(value));
-    const visivel = aberto && !disabled;
+    const visivel = aberto && !disabled && !loading;
 
     function fechar() { setAberto(false); botao.current?.focus(); }
 
@@ -50,10 +51,11 @@ export function SelectComCadastro({ id, label, value, options = [], placeholder 
         </label>
         <button ref={botao} id={campoId} data-testid={testId} type="button" role="combobox" aria-haspopup="listbox"
             aria-expanded={visivel} aria-controls={visivel ? `${campoId}-opcoes` : undefined} aria-required={required} aria-labelledby={`${campoId}-label ${campoId}-valor`}
-            disabled={disabled} onClick={() => setAberto((atual) => !atual)} onKeyDown={(event) => {
+            disabled={disabled || loading} aria-busy={loading} onClick={() => setAberto((atual) => !atual)} onKeyDown={(event) => {
                 if (['ArrowDown', 'ArrowUp'].includes(event.key)) { event.preventDefault(); setAberto(true); }
             }} className="flex w-full items-center justify-between gap-sm rounded-sm border border-slate-200 bg-bg-surface px-md py-sm text-left text-text-main focus:outline-none focus:ring-1 focus:ring-secondary disabled:opacity-50">
-            <span id={`${campoId}-valor`} className="min-w-0 break-words">{selecionado?.label ?? placeholder}</span><ChevronDown size={16} className="shrink-0" aria-hidden="true" />
+            <span id={`${campoId}-valor`} className="min-w-0 break-words">{selecionado?.label ?? placeholder}</span>
+            {loading ? <Spinner label={`Carregando ${label.toLocaleLowerCase('pt-BR')}...`} /> : <ChevronDown size={16} className="shrink-0" aria-hidden="true" />}
         </button>
         {visivel && createPortal(<div ref={menu} onKeyDown={teclado} style={{ position: 'fixed', zIndex: 70, visibility: 'hidden' }}
             className="overflow-y-auto rounded-sm border border-slate-200 bg-bg-surface shadow-lg" data-testid={`${testId}-menu`}>

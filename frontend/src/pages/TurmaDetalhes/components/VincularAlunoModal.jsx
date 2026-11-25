@@ -1,3 +1,5 @@
+import { ConteudoBotao } from '../../../components/ConteudoBotao';
+import { Spinner } from '../../../components/Spinner';
 import { useToast } from '../../../contexts/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../../components/Modal';
@@ -80,10 +82,9 @@ export function VincularAlunoModal({ turma, onClose, onVinculado }) {
                     <p className="mb-md text-sm text-slate-500">São exibidos alunos ativos que ainda não possuem turma regular. O turno, os dias de frequência e as vagas serão validados ao confirmar.</p>
                     <Input data-testid="turma-vincular-aluno-busca" id="vinculo-busca-aluno" label="Buscar aluno" placeholder="Buscar por nome..." value={busca}
                         onChange={(event) => setBusca(event.target.value)} />
-                    {carregando ? <p role="status" className="py-md text-sm text-slate-500">Carregando alunos...</p>
-                        : resultado.status === 'erro' ? <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
-                            <p role="alert">{resultado.erro}</p><button data-testid="turma-vincular-aluno-tentar-novamente" type="button" className="mt-sm underline" onClick={() => setTentativa((atual) => atual + 1)}>Tentar novamente</button>
-                        </div> : <fieldset className="mb-md min-w-0">
+                    {resultado?.status === 'erro' ? <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
+                            <p role="alert">{resultado.erro}</p><button data-testid="turma-vincular-aluno-tentar-novamente" type="button" className="mt-sm underline" disabled={carregando} onClick={() => setTentativa((atual) => atual + 1)}><ConteudoBotao carregando={carregando}>Tentar novamente</ConteudoBotao></button>
+                        </div> : carregando ? <div className="py-md text-sm text-slate-500 flex items-center gap-sm"><Spinner label="Carregando alunos..." /><span>Carregando alunos...</span></div> : <fieldset className="mb-md min-w-0">
                             <legend className="mb-sm text-xs font-semibold uppercase tracking-wider text-slate-600">Aluno <span className="text-danger">*</span></legend>
                             <div className="max-h-72 overflow-y-auto rounded-sm border border-slate-200 divide-y divide-slate-200">
                                 {filtrados.length === 0 ? <p role="status" className="p-md text-sm text-slate-500">{disponiveis.length ? 'Nenhum aluno encontrado para esta busca.' : 'Nenhum aluno ativo sem turma regular disponível.'}</p>

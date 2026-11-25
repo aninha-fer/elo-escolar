@@ -1,3 +1,5 @@
+import { Spinner } from '../../components/Spinner';
+import { ConteudoBotao } from '../../components/ConteudoBotao';
 import { useToast } from '../../contexts/ToastContext';
 import { Link } from 'react-router-dom';
 import { anosLetivosService } from '../../services/anosLetivosService';
@@ -165,9 +167,10 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
         ? [...faixasOficina, { value: gruposIniciais[0].inicio, label: `${gruposIniciais[0].inicio} – ${gruposIniciais[0].fim} (atual)` }] : faixasOficina;
 
     function tentarNovamente() {
-        setProfissionais({ status: 'carregando', dados: [] });
-        setSalas({ status: 'carregando', dados: [] });
-        setInfoEdicao(null);
+        setProfissionais((atual) => ({ ...atual, status: 'carregando' }));
+        setSalas((atual) => ({ ...atual, status: 'carregando' }));
+        setCalendarios((atual) => ({ ...atual, status: 'carregando' }));
+        setInfoEdicao((atual) => atual?.status === 'erro' ? { status: 'carregando', erro: true } : null);
         setTentativa((atual) => atual + 1);
     }
 
@@ -295,8 +298,8 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                     className={`border-b-2 p-sm text-sm font-semibold ${aba === 'alunos' ? 'border-secondary bg-blue-50 text-secondary' : 'border-transparent text-slate-500'}`}>2. Revisar alunos</button>
             </div>}
             {criandoAPartir && !origemCarregada && (candidatos?.status === 'erro' ? <div className="mb-md rounded-sm bg-red-50 p-sm text-sm text-red-700">
-                <p role="alert">{candidatos.erro}</p><button data-testid="turma-nova-origem-tentar-novamente" type="button" onClick={() => setTentativa((atual) => atual + 1)} className="mt-sm underline">Tentar novamente</button>
-            </div> : <p role="status" className="mb-md text-sm text-text-muted">Carregando dados da turma anterior...</p>)}
+                <p role="alert">{candidatos.erro}</p><button data-testid="turma-nova-origem-tentar-novamente" type="button" onClick={() => setTentativa((atual) => atual + 1)} disabled={carregandoAlunos} className="mt-sm underline"><ConteudoBotao carregando={carregandoAlunos}>Tentar novamente</ConteudoBotao></button>
+            </div> : <div className="mb-md text-sm text-text-muted flex items-center gap-sm"><Spinner label="Carregando dados da turma anterior..." /><span>Carregando dados da turma anterior...</span></div>)}
             <form id="form-cadastro-turma" onSubmit={enviar} noValidate>
                 <fieldset disabled={enviando || (criandoAPartir && !origemCarregada)} className="min-w-0">
                     <div id="turma-nova-dados" data-testid={criandoAPartir ? 'turma-nova-dados' : undefined} role={criandoAPartir ? 'tabpanel' : undefined} aria-labelledby={criandoAPartir ? 'turma-nova-aba-dados' : undefined} hidden={criandoAPartir && aba !== 'dados'}>
@@ -307,8 +310,8 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                             { value: 'REGULAR', title: 'Turma Regular', subtitle: 'Aulas diárias com cronograma fixo' },
                             { value: 'OFICINA', title: 'Oficina', subtitle: 'Aulas semanais' },
                         ]} />}
-                    {editando && !infoEdicao && <p role="status" className="mb-md text-sm text-slate-500">Consultando matrículas e histórico...</p>}
-                    {editando && infoEdicao?.status === 'erro' && <div className="mb-md text-sm text-red-700"><p role="alert">Não foi possível consultar as restrições da turma.</p><button data-testid="turma-formulario-restricoes-tentar-novamente" type="button" className="underline" onClick={tentarNovamente}>Tentar novamente</button></div>}
+                    {editando && !infoEdicao && <div className="mb-md text-sm text-slate-500 flex items-center gap-sm"><Spinner label="Consultando matrículas e histórico..." /><span>Consultando matrículas e histórico...</span></div>}
+                    {editando && (infoEdicao?.status === 'erro' || infoEdicao?.erro) && <div className="mb-md text-sm text-red-700"><p role="alert">Não foi possível consultar as restrições da turma.</p><button data-testid="turma-formulario-restricoes-tentar-novamente" type="button" className="underline" onClick={tentarNovamente} disabled={infoEdicao?.status === 'carregando'}><ConteudoBotao carregando={infoEdicao?.status === 'carregando'}>Tentar novamente</ConteudoBotao></button></div>}
                     {infoEdicao?.bloqueada && <p className="mb-md rounded-sm bg-tertiary/20 p-sm text-sm text-amber-800 border border-amber-800">Esta turma possui matrículas ativas ou histórico de matrículas. Alguns dados não podem ser alterados.</p>}
                     <Input data-testid="turma-formulario-nome" id="turma-nome" label="Nome" labelClassName="font-mono" name="nome" required
                         value={formulario.nome} onChange={(event) => atualizarCampo('nome', event.target.value)}
@@ -323,8 +326,8 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                             </div>
                             <div>
                                 <Select data-testid="turma-formulario-ano-letivo" id="turma-ano" label="Ano letivo" labelClassName="font-mono" name="ano_letivo_id" required disabled={agendaBloqueada || calendarios.status !== 'sucesso'}
-                                    options={opcoesCalendario} value={formulario.ano_letivo_id} onChange={(event) => atualizarCampo('ano_letivo_id', event.target.value)} {...acessibilidadeCampo('ano_letivo_id')} />
-                                {calendarios.status === 'erro' && <p role="alert" className="text-sm text-danger">Não foi possível carregar os calendários. <button data-testid="turma-calendarios-tentar" type="button" onClick={tentarNovamente} className="underline">Tentar novamente</button></p>}
+                                    options={opcoesCalendario} loading={calendarios.status === 'carregando'} loadingLabel="Carregando calendários..." value={formulario.ano_letivo_id} onChange={(event) => atualizarCampo('ano_letivo_id', event.target.value)} {...acessibilidadeCampo('ano_letivo_id')} />
+                                {calendarios.erro && <p role="alert" className="text-sm text-danger">Não foi possível carregar os calendários. <button data-testid="turma-calendarios-tentar" type="button" onClick={tentarNovamente} className="underline" disabled={calendarios.status === 'carregando'}><ConteudoBotao carregando={calendarios.status === 'carregando'}>Tentar novamente</ConteudoBotao></button></p>}
                                 {calendarios.status === 'sucesso' && !opcoesCalendario.length && <p className="text-sm text-text-muted">Cadastre um calendário em <Link to="/configuracoes" className="text-tertiary underline">Configurações</Link>.</p>}
                                 {erroCampo('ano_letivo_id')}
                             </div>
@@ -348,10 +351,9 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                         <div>
                             <Select data-testid="turma-formulario-sala" id="turma-sala" label="Sala / ambiente" labelClassName="font-mono" name="ambiente_id" placeholder="Selecione uma sala" required
                                 value={formulario.ambiente_id} onChange={(event) => atualizarCampo('ambiente_id', event.target.value)}
-                                disabled={salas.status !== 'sucesso'} options={salas.dados.map((sala) => ({ value: sala.id, label: sala.nome }))} error={erros.ambiente_id} />
-                            {salas.status === 'carregando' && <p role="status" className="mb-md text-xs text-text-muted">Carregando salas...</p>}
-                            {salas.status === 'erro' && <div className="mb-md text-sm text-red-700"><p role="alert">{salas.erro}</p>
-                                <button data-testid="turma-formulario-salas-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-xs underline">Tentar novamente</button></div>}
+                                disabled={salas.status !== 'sucesso'} loading={salas.status === 'carregando'} loadingLabel="Carregando salas..." options={salas.dados.map((sala) => ({ value: sala.id, label: sala.nome }))} error={erros.ambiente_id} />
+                            {salas.erro && <div className="mb-md text-sm text-red-700"><p role="alert">{salas.erro}</p>
+                                <button data-testid="turma-formulario-salas-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-xs underline" disabled={salas.status === 'carregando'}><ConteudoBotao carregando={salas.status === 'carregando'}>Tentar novamente</ConteudoBotao></button></div>}
                         </div>
                         <div>
                             <Input data-testid="turma-formulario-vagas" id="turma-vagas" label="Vagas" labelClassName="font-mono" name="capacidade_maxima" type="number" min="0" step="1" placeholder="Ex: 12"
@@ -374,7 +376,7 @@ export function FormularioTurma({ tipoInicial = 'REGULAR', turma, turmaOrigem, o
                     {criandoAPartir && <div id="turma-nova-alunos" data-testid="turma-nova-alunos" role="tabpanel" aria-labelledby="turma-nova-aba-alunos" hidden={aba !== 'alunos'}>
                         <RevisaoAlunosTurma alunos={carregandoAlunos ? [] : candidatos.dados} selecionados={selecionados} bloqueados={bloqueados} capacidade={formulario.capacidade_maxima}
                             onSelecionar={alternarAluno} onBloquear={alternarBloqueio} onSortear={(ids) => { setSelecionados(ids); }} disabled={enviando}
-                            carregando={carregandoAlunos} erro={!carregandoAlunos && candidatos.erro} onTentarNovamente={() => setTentativa((atual) => atual + 1)} />
+                            carregando={carregandoAlunos} erro={candidatos?.turno === formulario.turno ? candidatos?.erro : undefined} onTentarNovamente={() => setTentativa((atual) => atual + 1)} />
                     </div>}
                 </fieldset>
             </form>
