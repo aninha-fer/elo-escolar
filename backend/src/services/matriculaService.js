@@ -21,10 +21,13 @@ async function bloquearTurmas(tx, ids) {
     }
 }
 
-async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }, { dataInicio } = {}) {
+async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }, { dataInicio, exigirAlunoAtivo = false } = {}) {
     await tx.$queryRaw`SELECT "id" FROM "aluno" WHERE "id" = ${aluno_id} FOR UPDATE`;
     const aluno = await tx.aluno.findUnique({ where: { id: aluno_id } });
     const status = obterStatusVinculo(aluno);
+    if (exigirAlunoAtivo && aluno.status !== 'ATIVO') {
+        throw Object.assign(new Error('Somente alunos ativos podem ser vinculados pela turma. Organize a turma do aluno em rascunho pelo cadastro ou pela edição do aluno.'), { statusCode: 409 });
+    }
     await bloquearTurmas(tx, [turma_id]);
     const turma = await tx.turma.findUnique({ where: { id: turma_id }, include: { ano_letivo: true, horarios: true } });
     if (!turma || turma.deleted_at || turma.tipo !== 'REGULAR' || turma.status !== 'ATIVO') {
@@ -56,9 +59,9 @@ async function matricularTurmaRegularNaTransacao(tx, { aluno_id, turma_id }, { d
     return tx.matricula_turma.create({ data: { aluno_id, turma_id, status, data_inicio: status === 'ATIVO' ? inicioRegular : null } });
 }
 
-async function matricularTurmaRegularService(dados) {
+async function matricularTurmaRegularService(dados, { exigirAlunoAtivo = false } = {}) {
     await sincronizarTurmasExpiradas({ alunoIds: [dados.aluno_id] });
-    return prisma.$transaction(async (tx) => { await bloquearCalendarios(tx); return matricularTurmaRegularNaTransacao(tx, dados); }, { isolationLevel: 'ReadCommitted' });
+    return prisma.$transaction(async (tx) => { await bloquearCalendarios(tx); return matricularTurmaRegularNaTransacao(tx, dados, { exigirAlunoAtivo }); }, { isolationLevel: 'ReadCommitted' });
 }
 
 function obterDataInicioMatricula() {

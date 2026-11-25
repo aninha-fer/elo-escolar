@@ -32,18 +32,6 @@ export function TurmaDetalhes() {
     const idValido = /^\d+$/.test(id) && Number(id) > 0 && Number(id) <= 2147483647;
 
     useEffect(() => {
-        function atualizarAoRetornar() {
-            if (document.visibilityState === 'visible') setTentativa((atual) => atual + 1);
-        }
-        window.addEventListener('focus', atualizarAoRetornar);
-        document.addEventListener('visibilitychange', atualizarAoRetornar);
-        return () => {
-            window.removeEventListener('focus', atualizarAoRetornar);
-            document.removeEventListener('visibilitychange', atualizarAoRetornar);
-        };
-    }, []);
-
-    useEffect(() => {
         if (!idValido) return;
         const controller = new AbortController();
         async function carregarTurma() {
@@ -86,11 +74,9 @@ export function TurmaDetalhes() {
         ['Vagas', turma.capacidade_maxima ?? 'Sem limite de vagas'],
     ];
 
-    function alunoVinculado(matricula) {
+    function alunoVinculado() {
         setModalAberto(false);
-        notificar(matricula.status === 'PROVISORIO'
-            ? 'Vínculo provisório criado no planejamento do aluno em rascunho. Ele não ocupa vaga nem aparece na lista de matrículas ativas até a ativação.'
-            : 'Aluno vinculado à turma com sucesso.', 'sucesso');
+        notificar('Aluno vinculado à turma com sucesso.', 'sucesso');
         setTentativa((atual) => atual + 1);
     }
 

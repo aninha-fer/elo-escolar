@@ -147,8 +147,13 @@ está lotada. As contagens continuam considerando somente `ATIVO`. Capacidade
 matrículas efetivas. Operações que ocupam vagas bloqueiam as turmas envolvidas
 para evitar que alunos distintos ocupem simultaneamente a última vaga.
 
-A turma regular pode ser escolhida ao salvar o cadastro como rascunho. A API
-também oferece `POST /api/matriculas/regular` com `{ "aluno_id": 1, "turma_id": 2 }`.
+A turma regular pode ser escolhida no cadastro ou na edição do aluno em rascunho,
+preservando a matrícula provisória e suas validações. Na tela da turma, o modal
+"Vincular Aluno" oferece somente alunos ativos sem turma regular vigente.
+`POST /api/matriculas/regular`, com `{ "aluno_id": 1, "turma_id": 2 }`, exige aluno
+ativo e revalida o status sob bloqueio dentro da transação; rascunhos recebem 409
+sem criar matrícula. Essa restrição é definida pelo servidor para esse endpoint
+e não altera as matrículas provisórias nos demais fluxos.
 A resposta dos detalhes do aluno inclui `matricula_regular` com `id` e `status`.
 O calendário identifica o planejamento com texto `Provisório` e borda tracejada,
 mantendo a grade e os controles existentes da Visão Geral.
