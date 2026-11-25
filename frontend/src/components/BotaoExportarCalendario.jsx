@@ -20,7 +20,7 @@ export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = fa
         const controller = new AbortController(); envio.current = controller;
         const filtrosIniciais = { ...filtros };
         const { signal } = controller;
-        setExportando(true); setProgresso('Preparando exportação...');
+        setExportando(true); setProgresso('');
         try {
             if (alunoId) {
                 const dados = await alunoService.buscarCalendarioExportacao(alunoId, signal);

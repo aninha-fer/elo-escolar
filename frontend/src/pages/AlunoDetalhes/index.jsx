@@ -15,6 +15,7 @@ import { FormularioAluno } from '../Alunos/FormularioAluno';
 import { Ocorrencias } from './components/Ocorrencias';
 import { ocorrenciasService } from '../../services/ocorrenciasService';
 import { BotaoExportarCalendario } from '../../components/BotaoExportarCalendario';
+import { CarregamentoCentralizado } from '../../components/CarregamentoCentralizado';
 
 const estilosStatus = {
     ATIVO: 'bg-emerald-50 text-emerald-600 before:bg-emerald-600',
@@ -130,7 +131,7 @@ export function AlunoDetalhes() {
         return () => controller.abort();
     }, [id, refreshToken, dataReferencia]);
 
-    if (loading) return <div className="p-4">Carregando dados do aluno...</div>;
+    if (loading) return <div className="flex min-h-full flex-col"><CarregamentoCentralizado label="Carregando dados do aluno..." /></div>;
     if (error) return <div className="p-4 text-red-600 bg-red-50 rounded">{error}</div>;
 
     const turmaRegular = aluno?.turma_regular;

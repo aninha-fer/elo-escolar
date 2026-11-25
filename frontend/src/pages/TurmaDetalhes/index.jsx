@@ -15,6 +15,7 @@ import { BotaoVoltar } from '../../components/BotaoVoltar';
 import { TagExpiradaTurma } from '../../components/TagExpiradaTurma';
 import { Download } from 'react-feather';
 import { ExportarDiarioModal } from './components/ExportarDiarioModal';
+import { CarregamentoCentralizado } from '../../components/CarregamentoCentralizado';
 
 const estilosStatus = { ATIVO: 'bg-emerald-50 text-emerald-600', INATIVO: 'bg-slate-100 text-slate-500', PROVISORIO: 'bg-amber-50 text-amber-700' };
 const rotulosStatus = { ATIVO: 'Ativa', INATIVO: 'Inativa', PROVISORIO: 'Provisória' };
@@ -55,7 +56,7 @@ export function TurmaDetalhes() {
             <p role="alert" className="text-red-700">Identificador de turma inválido.</p>
         </div>
     );
-    if (!resultado || resultado.id !== id || resultado.tentativa !== tentativa) return <div className="space-y-md"><BotaoVoltar data-testid="turma-voltar" to='/turmas' /><p role="status">Carregando dados da turma...</p></div>;
+    if (!resultado || resultado.id !== id || resultado.tentativa !== tentativa) return <div className="flex min-h-full flex-col gap-md"><BotaoVoltar data-testid="turma-voltar" className="self-start" to='/turmas' /><CarregamentoCentralizado label="Carregando dados da turma..." /></div>;
     if (resultado.status === 'erro') return <div className="space-y-md"><BotaoVoltar data-testid="turma-voltar" to='/turmas' />
         <div className="rounded-sm bg-red-50 p-md text-sm text-red-700"><p role="alert">{resultado.codigo === 404 ? 'Turma não encontrada.' : resultado.erro}</p>
             {resultado.codigo !== 404 && <button data-testid="turma-tentar-novamente" type="button" onClick={() => setTentativa((atual) => atual + 1)} className="mt-sm underline">Tentar novamente</button>}
