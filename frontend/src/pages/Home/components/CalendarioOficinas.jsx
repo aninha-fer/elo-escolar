@@ -6,6 +6,7 @@ import { Button } from '../../../components/Button';
 import { exportarCalendarioOficinas } from '../../../utils/exportarCalendarioOficinas';
 import { OficinaCalendarioItem } from './OficinaCalendarioItem';
 import { ConteudoBotao } from '../../../components/ConteudoBotao';
+import { Spinner } from '../../../components/Spinner';
 
 export function CalendarioOficinas({ dias, dataReferencia, carregando, erro, onTentarNovamente }) {
     const { notificar } = useToast();
@@ -35,9 +36,10 @@ export function CalendarioOficinas({ dias, dataReferencia, carregando, erro, onT
                 <Link data-testid="inicio-ver-oficinas" to="/turmas?tipo=OFICINA" className="inline-flex items-center gap-xs rounded-sm text-blue-600 hover:underline">Ver todas<ArrowRight size={17} aria-hidden="true" /></Link>
             </div>
         </header>
-        {carregando ? <p role="status" className="p-lg text-sm text-text-muted">Carregando oficinas...</p> : erro ? <div role="alert" className="m-lg rounded-sm bg-red-50 p-md text-sm text-danger">
+        {erro ? <div role="alert" className="m-lg rounded-sm bg-red-50 p-md text-sm text-danger">
             <p>{erro}</p><Button data-testid="inicio-oficinas-tentar" type="button" onClick={onTentarNovamente} className="mt-sm">Tentar novamente</Button>
-        </div> : <dl className="divide-y divide-slate-200 px-sm py-sm sm:px-md">
+        </div> : <div className="relative min-h-64">
+            <dl aria-hidden={carregando || undefined} className={`divide-y divide-slate-200 px-sm py-sm sm:px-md ${carregando ? 'opacity-40' : ''}`}>
             {dias.map((dia) => <div key={dia.numero} data-testid={`inicio-oficinas-dia-${dia.numero}`} className="flex flex-col sm:flex-row">
                 <dt className="shrink-0 py-sm text-xs font-bold text-text-main sm:w-15 sm:py-md">{dia.nome}</dt>
                 <dd className="min-w-0 flex-1 pb-md sm:border-l sm:border-slate-200 sm:py-sm sm:pl-md">
@@ -45,6 +47,10 @@ export function CalendarioOficinas({ dias, dataReferencia, carregando, erro, onT
                         : <p className="py-sm text-xs text-slate-400">Nenhuma oficina programada.</p>}
                 </dd>
             </div>)}
-        </dl>}
+            </dl>
+            {carregando && <div className="absolute inset-0 flex items-center justify-center bg-bg-surface/70">
+                <Spinner label="Carregando oficinas..." size={32} />
+            </div>}
+        </div>}
     </section>;
 }

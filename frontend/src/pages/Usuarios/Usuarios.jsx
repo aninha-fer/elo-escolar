@@ -12,6 +12,7 @@ import { ResetarSenhaUsuario } from './ResetarSenhaUsuario';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 import { useAuth } from '../../contexts/AuthContext';
 import { FiltroEstado } from '../../components/FiltroEstado';
+import { CarregamentoCentralizado } from '../../components/CarregamentoCentralizado';
 
 export function Usuarios() {
     const { notificar } = useToast();
@@ -88,7 +89,7 @@ export function Usuarios() {
     }
 
     return (
-        <div className="flex min-w-0 flex-col gap-lg">
+        <div className="flex min-h-full min-w-0 flex-col gap-lg">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Usuários</h1>
             <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
                 <FiltroEstado data-testid="turmas-filtro-ativo"
@@ -136,7 +137,7 @@ export function Usuarios() {
                     Novo Usuário
                 </Button>
             </div>
-            {carregando ? <p role="status">Carregando usuários...</p> : erro ? (
+            {carregando ? <CarregamentoCentralizado label="Carregando usuários..." /> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
                     <button data-testid="usuarios-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold">Tentar novamente</button>

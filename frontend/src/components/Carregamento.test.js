@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createServer } from 'vite';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -75,6 +75,41 @@ test('feedbacks de carregamento ficam no controle acionado e preservam o conteú
         assert.match(ocupado, /role="status" aria-label="Carregando agenda/);
         assert.match(ocupado, /aria-busy="true"/);
         assert.doesNotMatch(normal, /class="spinner/);
+    });
+
+    await t.test('detalhes e listagens abrem com spinner centralizado sem texto de carregamento visível', async () => {
+        const { ToastContext } = await carregar('contexts/ToastContext');
+        const { AuthContext } = await carregar('contexts/AuthContext');
+        for (const [caminho, nome, label] of [
+            ['pages/AlunoDetalhes/index', 'AlunoDetalhes', 'Carregando dados do aluno...'],
+            ['pages/TurmaDetalhes/index', 'TurmaDetalhes', 'Carregando dados da turma...'],
+            ['pages/Turmas/Turmas', 'Turmas', 'Carregando turmas regulares...'],
+            ['pages/Usuarios/Usuarios', 'Usuarios', 'Carregando usuários...'],
+            ['pages/Profissionais/Profissionais', 'Profissionais', 'Carregando profissionais...'],
+        ]) {
+            const modulo = await carregar(caminho);
+            const html = renderToStaticMarkup(createElement(ToastContext.Provider, { value: { notificar() {} } },
+                createElement(AuthContext.Provider, { value: { usuario: { id: 1, role: 'admin' } } },
+                    createElement(MemoryRouter, { initialEntries: ['/1'] },
+                        createElement(Routes, null, createElement(Route, { path: '/:id', element: createElement(modulo[nome]) }))))));
+            assert.match(html, /flex min-h-64 flex-1 items-center justify-center/);
+            assert.ok(html.includes(`role="status" aria-label="${label}"`), nome);
+            assert.doesNotMatch(html, />Carregando[^<]*</);
+        }
+    });
+
+    await t.test('calendário de oficinas da home mantém os dias com spinner centralizado durante a consulta', async () => {
+        const { ToastContext } = await carregar('contexts/ToastContext');
+        const { CalendarioOficinas } = await carregar('pages/Home/components/CalendarioOficinas');
+        const props = { dias: [{ numero: 1, nome: 'Segunda', oficinas: [] }] };
+        const renderizarHome = (carregando) => renderToStaticMarkup(createElement(ToastContext.Provider, { value: { notificar() {} } },
+            createElement(MemoryRouter, null, createElement(CalendarioOficinas, { ...props, carregando }))));
+        const html = renderizarHome(true);
+        assert.match(html, /inicio-oficinas-dia-1/);
+        assert.match(html, /absolute inset-0 flex items-center justify-center/);
+        assert.match(html, /role="status" aria-label="Carregando oficinas/);
+        assert.doesNotMatch(html, />Carregando oficinas[^<]*</);
+        assert.doesNotMatch(renderizarHome(false), /class="spinner/);
     });
 
     await t.test('paginação manual mantém spinner dentro do botão; automática usa o final da lista', () => {

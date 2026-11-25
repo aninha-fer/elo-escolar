@@ -9,6 +9,7 @@ import { TabelaProfissionais } from './TabelaProfissionais';
 import { FormularioProfissional } from './FormularioProfissional';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 import { FiltroEstado } from '../../components/FiltroEstado';
+import { CarregamentoCentralizado } from '../../components/CarregamentoCentralizado';
 
 function VinculosProfissional({ conflitos }) {
     const turmas = conflitos.filter((item) => item.codigo === 'TURMA_VINCULADA' && item.turma_nome);
@@ -105,7 +106,7 @@ export function Profissionais() {
     }
 
     return (
-        <section className="profissionais-page flex min-w-0 flex-col gap-lg" aria-labelledby="profissionais-titulo">
+        <section className="profissionais-page flex min-h-full min-w-0 flex-col gap-lg" aria-labelledby="profissionais-titulo">
             <h1 id="profissionais-titulo" className="text-xl font-bold text-text-main">Profissionais</h1>
             <div className="flex w-full  flex-col gap-sm sm:flex-row sm:items-stretch">
                 <FiltroEstado data-testid="profissionais-filtro-ativo"
@@ -150,7 +151,7 @@ export function Profissionais() {
                     Novo Profissional
                 </Button>
             </div>
-            {carregando ? <p role="status">Carregando profissionais...</p> : erro ? (
+            {carregando ? <CarregamentoCentralizado label="Carregando profissionais..." /> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
                     <button data-testid="profissionais-tentar-novamente" type="button" className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold" onClick={tentarNovamente}>Tentar novamente</button>

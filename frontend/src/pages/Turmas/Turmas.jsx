@@ -13,6 +13,7 @@ import { normalizarProfissionais } from '../../utils/formatters';
 import { FormularioTurma } from './FormularioTurma';
 import { ModalConfirmacao } from '../../components/ModalConfirmacao';
 import { FiltroEstado } from '../../components/FiltroEstado';
+import { CarregamentoCentralizado } from '../../components/CarregamentoCentralizado';
 
 export function Turmas() {
     const { notificar } = useToast();
@@ -134,7 +135,7 @@ export function Turmas() {
     }
 
     return (
-        <section className="flex min-w-0 flex-col gap-lg" aria-labelledby="turmas-titulo">
+        <section className="flex min-h-full min-w-0 flex-col gap-lg" aria-labelledby="turmas-titulo">
             <h1 id="turmas-titulo" className="text-xl font-bold text-text-main">Turmas</h1>
             <div>
                 <div className="flex w-full flex-col gap-sm sm:flex-row sm:items-stretch">
@@ -185,7 +186,7 @@ export function Turmas() {
                     </FiltroEstado>
                 </div>
             </div>
-            {carregando ? <p role="status">Carregando {tipoTurma === 'REGULAR' ? 'turmas regulares' : 'oficinas'}...</p> : erro ? (
+            {carregando ? <CarregamentoCentralizado label={`Carregando ${tipoTurma === 'REGULAR' ? 'turmas regulares' : 'oficinas'}...`} /> : erro ? (
                 <div className="rounded-sm bg-red-50 p-md text-sm text-red-700">
                     <p role="alert">{erro}</p>
                     <button data-testid="turmas-tentar-novamente" type="button" onClick={tentarNovamente} className="mt-sm rounded-sm border border-danger px-sm py-xs font-semibold">Tentar novamente</button>
