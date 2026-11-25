@@ -1,7 +1,7 @@
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../contexts/ToastContext';
 import apaeLogo from '../assets/apae.png'
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -47,11 +47,14 @@ function Sidebar() {
     return (
         <div className="bg-primary w-full max-h-dvh shrink-0 flex flex-col pt-md font-inter lg:w-[250px] lg:min-h-screen lg:max-h-none" onKeyDown={tratarTeclaMenu}>
             <header className="flex shrink-0 items-center gap-md border-b-bg-main/35 border-b-[2px] pb-md w-full px-md">
-                <img src={apaeLogo} alt="Logo APAE" className="w-[40px] h-[40px]" />
-                <div>
-                    <h2 className="text-secondary font-bold text-base"> Elo Escolar</h2>
-                    <p className="text-sm text-bg-main/35 tracking-widest">APAE - Gestão</p>
-                </div>
+                <Link data-testid="menu-logo-inicio" to="/" onClick={fecharMenu} aria-label="Elo Escolar — Ir para o início"
+                    className="flex items-center gap-md rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary">
+                    <img src={apaeLogo} alt="Logo APAE" className="w-[40px] h-[40px]" />
+                    <div>
+                        <h2 className="text-secondary font-bold text-base"> Elo Escolar</h2>
+                        <p className="text-sm text-bg-main/35 tracking-widest">APAE - Gestão</p>
+                    </div>
+                </Link>
                 <button
                     ref={botaoMenuRef}
                     type="button"

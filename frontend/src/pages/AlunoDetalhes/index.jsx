@@ -149,7 +149,7 @@ export function AlunoDetalhes() {
         setSearchParams((atuais) => {
             atuais.set('aba', idAba);
             return atuais;
-        });
+        }, { replace: true });
     }
 
     function selecionarSemana(data) {
@@ -157,7 +157,7 @@ export function AlunoDetalhes() {
             if (data) atuais.set('data', data);
             else atuais.delete('data');
             return atuais;
-        });
+        }, { replace: true });
     }
 
     function atualizarDados() {
