@@ -88,7 +88,7 @@ export function AlunoDetalhes() {
                 setError(null);
                 const [dados, disponiveis] = await Promise.all([
                     alunoService.buscarPorId(id, controller.signal),
-                    turmasService.listarOficinasDisponiveis(controller.signal),
+                    turmasService.listarOficinasAtivas(controller.signal),
                 ]);
                 if (controller.signal.aborted) return;
                 setAluno(dados);
