@@ -299,6 +299,7 @@ export function FormularioAtendimento({ atendimento, idAluno, onClose, onSuccess
                     </div>
 
                     <Toggle testId="atendimento-formulario-recorrente" disabled={editando}
+                        id="atendimento-formulario-recorrente"
                         label="Atendimento Recorrente"
                         name="recorrente"
                         checked={isRecorrente}
