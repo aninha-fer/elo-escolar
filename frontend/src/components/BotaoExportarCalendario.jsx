@@ -48,7 +48,7 @@ export function BotaoExportarCalendario({ alunoId, filtros, total, disabled = fa
     }
     return <div className={`flex min-w-0 flex-col items-end gap-xs ${className}`}>
         <div className="flex flex-wrap items-center justify-end gap-sm">
-            {exportando && <button data-testid={`${testId}-cancelar`} type="button" onClick={cancelar} className="rounded-sm text-sm text-text-muted underline">Cancelar exportação</button>}
+            {exportando && !alunoId && <button data-testid={`${testId}-cancelar`} type="button" onClick={cancelar} className="rounded-sm text-sm text-text-muted underline">Cancelar exportação</button>}
             <button data-testid={testId} type="button" onClick={exportar} disabled={disabled || exportando || (!alunoId && !total)} aria-busy={exportando}
                 className="inline-flex items-center justify-center gap-sm rounded-sm border border-slate-200 bg-bg-surface px-md py-sm text-sm font-semibold text-text-muted hover:bg-bg-main focus-visible:outline-2 focus-visible:outline-secondary disabled:cursor-not-allowed disabled:opacity-50">
                 <ConteudoBotao carregando={exportando} descricao="Exportando calendário...">

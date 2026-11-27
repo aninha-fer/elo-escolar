@@ -41,19 +41,6 @@ export const turmasService = {
     return data;
   },
 
-  /**
-   * @param {Object} params
-   * @param {AbortSignal} signal
-   */
-
-  async listarOficinasDisponiveis(signal) {
-    const response = await api.get('/turmas', {
-      params: { tipo: 'OFICINA' },
-      signal,
-    });
-    return response.data;
-  },
-
   async listarRegularesDisponiveis(signal) {
     const response = await api.get('/turmas', {
       params: { tipo: 'REGULAR' },

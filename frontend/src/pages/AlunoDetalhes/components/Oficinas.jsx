@@ -72,7 +72,7 @@ export function Oficinas({ oficinas = [], oficinasDisponiveis = [], totalAtivas,
         ...matricula.turma, matricula_id: matricula.id, status_vinculo: matricula.status,
     }))), false);
     const oficinasParaSelecao = agruparOficinas(normalizarTurmas(
-        oficinasDisponiveis.filter((oficina) => ['MANHA', 'TARDE'].includes(turno) && oficina.turno === turno)
+        oficinasDisponiveis.filter((oficina) => oficina.status === 'ATIVO' && ['MANHA', 'TARDE'].includes(turno) && oficina.turno === turno)
     ));
     const quantidadeAtivas = totalAtivas ?? oficinasAgrupadas.filter((oficina) => oficina.status_vinculo === 'ATIVO').length;
     const [isModalOpen, setIsModalOpen] = useState(false);
